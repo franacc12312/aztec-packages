@@ -1089,24 +1089,43 @@ export async function getL1DeploymentAddresses(env: TestConfig): Promise<L1Contr
 /**
  * Rolls the Aztec pods in the given namespace.
  * @param namespace - The namespace to roll the Aztec pods in.
- * @dev - IMPORTANT: This function DOES NOT delete the underlying PVCs.
- *        This means that the pods will be restarted with the same persistent storage.
- *        This is useful for testing, but you should be aware of the implications.
+ * @param clearState - If true, also deletes the underlying PVCs to clear persistent storage.
+ *        This is required for rollup upgrades where the old state is incompatible with the new rollup.
+ *        Defaults to false, which preserves the existing storage.
  */
-export async function rollAztecPods(namespace: string) {
-  await deleteResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=boot-node' });
-  await deleteResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=prover-node' });
-  await deleteResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=prover-broker' });
-  await deleteResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=prover-agent' });
-  await deleteResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=validator' });
-  await deleteResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=pxe' });
+export async function rollAztecPods(namespace: string, clearState: boolean = false) {
+  const components = ['p2p-bootstrap', 'prover-node', 'prover-broker', 'prover-agent', 'validator', 'rpc'];
+
+  // Delete pods
+  for (const component of components) {
+    await deleteResourceByLabel({
+      resource: 'pods',
+      namespace: namespace,
+      label: `app.kubernetes.io/component=${component}`,
+    });
+  }
+
+  // If clearState is true, also delete PVCs to clear persistent storage
+  if (clearState) {
+    for (const component of components) {
+      await deleteResourceByLabel({
+        resource: 'pvc',
+        namespace: namespace,
+        label: `app.kubernetes.io/component=${component}`,
+      });
+    }
+  }
+
   await sleep(10 * 1000);
-  await waitForResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=boot-node' });
-  await waitForResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=prover-node' });
-  await waitForResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=prover-broker' });
-  await waitForResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=prover-agent' });
-  await waitForResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=validator' });
-  await waitForResourceByLabel({ resource: 'pods', namespace: namespace, label: 'app=pxe' });
+
+  // Wait for pods to come back
+  for (const component of components) {
+    await waitForResourceByLabel({
+      resource: 'pods',
+      namespace: namespace,
+      label: `app.kubernetes.io/component=${component}`,
+    });
+  }
 }
 
 /**
