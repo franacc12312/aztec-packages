@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1765388590297,
+  "lastUpdate": 1765388988583,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -468491,6 +468491,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 291,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Aztec Bot",
+            "username": "AztecBot",
+            "email": "49558828+AztecBot@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "0d853f9d66760867ea242ac76b829589b5447552",
+          "message": "feat: merge-train/avm (#18886)\n\nBEGIN_COMMIT_OVERRIDE\nfix(avm)!: ff_gt related circuit issues (#18883)\nfeat(avm_fuzzing): indirect/relative + 32bit addressing (#18857)\nfeat(avm)!: pre-audit execution.pil (#18864)\nfeat(avm): initial ws in fuzzer (#18734)\nfeat(avm): refactor avm ts fuzzer (#18735)\nfix import\nmore imports\nchore(avm): remove unused constant from GenericPermutationSettingIndices\nenum (#18903)\nEND_COMMIT_OVERRIDE",
+          "timestamp": "2025-12-09T21:10:54Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/0d853f9d66760867ea242ac76b829589b5447552"
+        },
+        "date": 1765388984899,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 689,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 99,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 265,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 210,
             "unit": "seconds"
           }
         ]
