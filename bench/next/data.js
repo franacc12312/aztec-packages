@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1765497294147,
+  "lastUpdate": 1765514366909,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -468913,6 +468913,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 210,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Aztec Bot",
+            "username": "AztecBot",
+            "email": "49558828+AztecBot@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "fa9c5fa19cc73ebabe83160d2beec508a3abe961",
+          "message": "feat: merge-train/avm (#18974)\n\nBEGIN_COMMIT_OVERRIDE\nfeat(avm)!: constrain last child success in context.pil (#18891)\nfix(avm): cpp is a perfectly good language\nfix: makeGas and makeAppendOnlyTreeSnapshot should respect that members\nare u32 (#18960)\nfix(avm): the \"deepest\" error for C++ simulations is the LAST one at the\ndeepest level (#18959)\nEND_COMMIT_OVERRIDE",
+          "timestamp": "2025-12-11T23:13:00Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/fa9c5fa19cc73ebabe83160d2beec508a3abe961"
+        },
+        "date": 1765514364979,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 796,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 104,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 245,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 212,
             "unit": "seconds"
           }
         ]
