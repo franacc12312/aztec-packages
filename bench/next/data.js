@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1765922109462,
+  "lastUpdate": 1765946600944,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -467986,6 +467986,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 212,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jan Beneš",
+            "username": "benesjan",
+            "email": "janbenes1234@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "b98e36bfafeeccb57659104106ec2adbfb42800a",
+          "message": "refactor: more robust tagging index sync as sender (#17611)\n\nIn this PR I implement the approach that Nico originally described in\n[this\npost](https://forum.aztec.network/t/on-note-discovery-and-index-coordination/7165)\nfor sender tagging index sync (for recipient it will be done in a\nfollowup PR).\n\nTo summarize I do the following:\n1. Associate the tagging index with a hash of a tx in which the\ncorresponding tax was used,\n2. I track the status of the given tx in the tagging data provider,\n3. tagging index status can be either PENDING, FINALIZED or\nDROPPED_OR_REVERTED (this status is only symbolic as when we realize a\ncorresponding tx has been dropped or reverted we just delete the pending\nindex),\n4. when choosing the next index to use when sending a private log I\nchoose `HIGHEST_PENDING_INDEX + 1` (or `HIGHEST_FINALIZED_INDEX + 1` if\nthere is no pending index),\n5. if the chosen index is further than WINDOW_LENGTH away from the\nHIGHEST_FINALIZED_INDEX an error is thrown. This should be a good\nguarantee of us never losing a log because we are always looking for a\nWINDOW_LENGTH of logs.\n\n# Notes for reviewer\n- I separated `TaggingDataProvider` into `SenderTaggingDataProvider` and\n`RecipientTaggingDataProvider` because the algorithms are completely\ndisjoint and it makes the code clearer.\n- Moved the `syncTaggedLogsAsSender` function to `pxe/src/tagging`\ndirectory and renamed it as `syncSenderTaggingIndexes`. Now\n`PrivateExecutionOracle` just calls this function. This is a step in the\ndirection of deprecating `PXEOracleInterface` and it allowed me to write\na reasonably clear unit tests.\n\n# Issues created in this PR\n- https://github.com/AztecProtocol/aztec-packages/issues/17775\n- https://github.com/AztecProtocol/aztec-packages/issues/17776",
+          "timestamp": "2025-12-16T21:23:17Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/b98e36bfafeeccb57659104106ec2adbfb42800a"
+        },
+        "date": 1765946598401,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 495,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 87,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 54,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 233,
             "unit": "seconds"
           }
         ]
