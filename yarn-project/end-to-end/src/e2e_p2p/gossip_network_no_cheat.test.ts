@@ -10,7 +10,6 @@ import { Signature } from '@aztec/foundation/eth-signature';
 import { sleep } from '@aztec/foundation/sleep';
 import { MockZKPassportVerifierAbi } from '@aztec/l1-artifacts/MockZKPassportVerifierAbi';
 import { RollupAbi } from '@aztec/l1-artifacts/RollupAbi';
-import { StakingAssetHandlerAbi } from '@aztec/l1-artifacts/StakingAssetHandlerAbi';
 import type { SequencerClient } from '@aztec/sequencer-client';
 import { BlockAttestation, ConsensusPayload } from '@aztec/stdlib/p2p';
 import { ZkPassportProofParams } from '@aztec/stdlib/zkpassport';
@@ -104,12 +103,6 @@ describe('e2e_p2p_network', () => {
       client: t.ctx.deployL1ContractsValues.l1Client,
     });
 
-    const stakingAssetHandler = getContract({
-      address: t.ctx.deployL1ContractsValues.l1ContractAddresses.stakingAssetHandlerAddress!.toString(),
-      abi: StakingAssetHandlerAbi,
-      client: t.ctx.deployL1ContractsValues.l1Client,
-    });
-
     const zkPassportVerifier = getContract({
       address: t.ctx.deployL1ContractsValues.l1ContractAddresses.zkPassportVerifierAddress!.toString(),
       abi: MockZKPassportVerifierAbi,
@@ -117,6 +110,9 @@ describe('e2e_p2p_network', () => {
     });
 
     expect((await rollupWrapper.getAttesters()).length).toBe(0);
+
+    // Use the base account as the withdrawer for all validators in this test
+    const withdrawerAddress = EthAddress.fromString(t.baseAccount.address);
 
     // Add the validators to the rollup using the same function as the CLI
     for (let i = 0; i < validators.length; i++) {
@@ -128,7 +124,7 @@ describe('e2e_p2p_network', () => {
         privateKey: t.baseAccountPrivateKey,
         mnemonic: undefined,
         attesterAddress: EthAddress.fromString(validator.attester.toString()),
-        merkleProof: [], // empty merkle proof - check is disabled in the test
+        withdrawerAddress,
         stakingAssetHandlerAddress: t.ctx.deployL1ContractsValues.l1ContractAddresses.stakingAssetHandlerAddress!,
         proofParams: mockPassportProof,
         blsSecretKey: Fr.random().toBigInt(),
@@ -151,10 +147,9 @@ describe('e2e_p2p_network', () => {
     expect(attestersImmedatelyAfterAdding.length).toBe(validators.length);
 
     // Check that the validators are added correctly
-    const withdrawer = await stakingAssetHandler.read.withdrawer();
     for (const validator of validators) {
       const info = await rollupWrapper.getAttesterView(validator.attester.toString());
-      expect(info.config.withdrawer.toChecksumString()).toBe(withdrawer);
+      expect(info.config.withdrawer.toChecksumString()).toBe(withdrawerAddress.toChecksumString());
     }
 
     // Wait for the validators to be added to the rollup
