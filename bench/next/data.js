@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766022196904,
+  "lastUpdate": 1766030795540,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -468028,6 +468028,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 233,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Aztec Bot",
+            "username": "AztecBot",
+            "email": "49558828+AztecBot@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "f6e358b355479eb4350491f58e4d013467169e60",
+          "message": "feat: merge-train/avm (#19078)\n\nBEGIN_COMMIT_OVERRIDE\nfeat(avm): calldata fuzzer (#18697)\nchore(avm)!: pre-audit review registers.pil (#19027)\nfix(avm)!: pre-audit addressing (#19001)\nfix!: avm proof length was wrong (#19068)\nchore(avm)!: pre-audit review for gas.pil (#19077)\nchore: cleanup up and improve avm opcode spammer (#19062)\nEND_COMMIT_OVERRIDE",
+          "timestamp": "2025-12-18T01:00:05Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/f6e358b355479eb4350491f58e4d013467169e60"
+        },
+        "date": 1766030793403,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 400,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 98,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 54,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 122,
             "unit": "seconds"
           }
         ]
