@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766171514715,
+  "lastUpdate": 1766174023562,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -465232,6 +465232,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 154,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jan Beneš",
+            "username": "benesjan",
+            "email": "janbenes1234@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "d11f720c4f822a5c9f187ccf329cc52c09e9c36c",
+          "message": "feat: caching block hash (#19138)\n\nFor [my other\nwork](https://github.com/AztecProtocol/aztec-packages/pull/19030/changes)\nI need retrieval of a block header hash to be fast.\n\nIn this PR I ensure this is the case by caching the hash.",
+          "timestamp": "2025-12-19T16:45:08Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/d11f720c4f822a5c9f187ccf329cc52c09e9c36c"
+        },
+        "date": 1766174020572,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 408,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 122,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 54,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 155,
             "unit": "seconds"
           }
         ]
