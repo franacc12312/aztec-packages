@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766162199121,
+  "lastUpdate": 1766164534161,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -466864,6 +466864,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 439,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Aztec Bot",
+            "username": "AztecBot",
+            "email": "49558828+AztecBot@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "e9b7795cb037dc7441de9a2080595e6f3fdde670",
+          "message": "docs: add note on why events are serialized (#19150)\n\nCloses https://github.com/AztecProtocol/aztec-packages/issues/11571 (as\nwon't do)",
+          "timestamp": "2025-12-19T15:01:09Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/e9b7795cb037dc7441de9a2080595e6f3fdde670"
+        },
+        "date": 1766164531623,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 439,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 144,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 65,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 154,
             "unit": "seconds"
           }
         ]
