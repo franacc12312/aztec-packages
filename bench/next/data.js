@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766116826118,
+  "lastUpdate": 1766117455806,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -468194,6 +468194,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 153,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Aztec Bot",
+            "username": "AztecBot",
+            "email": "49558828+AztecBot@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "1684678f431a350553077341f86a8d76658c569b",
+          "message": "feat: merge-train/barretenberg (#19116)\n\nBEGIN_COMMIT_OVERRIDE\nchore: declutter verifier instances (#19108)\nfix: edge-case issues in wnaf relation in the ECCVM (#19112)\nEND_COMMIT_OVERRIDE",
+          "timestamp": "2025-12-18T23:13:13Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/1684678f431a350553077341f86a8d76658c569b"
+        },
+        "date": 1766117453640,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 432,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 82,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 74,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 151,
             "unit": "seconds"
           }
         ]
