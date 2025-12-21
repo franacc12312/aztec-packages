@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766274920148,
+  "lastUpdate": 1766294078359,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -464437,6 +464437,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 155,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Aztec Bot",
+            "username": "AztecBot",
+            "email": "49558828+AztecBot@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "9ee2d158b82b4dd7a6449950c5faf6054d166123",
+          "message": "feat: merge-train/avm (#19171)\n\nBEGIN_COMMIT_OVERRIDE\nfix(avm)!: fix NUM_WIRES (#19170)\nchore(bb): minor C++ changes (#19172)\nEND_COMMIT_OVERRIDE",
+          "timestamp": "2025-12-20T23:12:15Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/9ee2d158b82b4dd7a6449950c5faf6054d166123"
+        },
+        "date": 1766294076030,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 608,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 234,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 54,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 192,
             "unit": "seconds"
           }
         ]
