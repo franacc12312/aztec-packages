@@ -1,0 +1,471 @@
+import { Buffer32 } from '@aztec/foundation/buffer';
+import { EthAddress } from '@aztec/foundation/eth-address';
+import type { Signature } from '@aztec/foundation/eth-signature';
+import { sleep } from '@aztec/foundation/sleep';
+
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+
+import type { CreateHASignerConfig } from './config.js';
+import { MockDatabase } from './db/mock.js';
+import { DutyStatus, DutyType } from './db/types.js';
+import { DutyAlreadySignedError, SlashingProtectionError } from './errors.js';
+import { ValidatorHASigner } from './validator_ha_signer.js';
+
+// Test data constants
+const VALIDATOR_ADDRESS = EthAddress.random();
+const SIGNING_ROOT = Buffer32.random();
+const SIGNING_ROOT_2 = Buffer32.random();
+const NODE_ID = 'test-node-1';
+const SIGNATURE_STRING = '0xsignature123';
+
+// Mock signature
+const mockSignature = {
+  toString: () => SIGNATURE_STRING,
+} as unknown as Signature;
+
+describe('ValidatorHASigner', () => {
+  let db: MockDatabase;
+  let config: CreateHASignerConfig;
+
+  beforeEach(() => {
+    db = new MockDatabase();
+    config = {
+      enabled: true,
+      nodeId: NODE_ID,
+      pollingIntervalMs: 50,
+      signingTimeoutMs: 1000,
+      databaseUrl: 'postgresql://user:pass@localhost:5432/testdb',
+    };
+  });
+
+  describe('initialization', () => {
+    it('should initialize with slashing protection enabled', () => {
+      const signer = new ValidatorHASigner(db, config);
+      expect(signer.isEnabled).toBe(true);
+      expect(signer.nodeId).toBe(NODE_ID);
+    });
+
+    it('should initialize without slashing protection when disabled', () => {
+      const disabledConfig = { ...config, enabled: false };
+      const signer = new ValidatorHASigner(db, disabledConfig);
+      expect(signer.isEnabled).toBe(false);
+      expect(signer.nodeId).toBe(NODE_ID);
+    });
+
+    it('should initialize without slashing protection when db is null', () => {
+      const signer = new ValidatorHASigner(null, config);
+      expect(signer.isEnabled).toBe(false);
+      expect(signer.nodeId).toBe(NODE_ID);
+    });
+  });
+
+  describe('signWithProtection - enabled', () => {
+    let signer: ValidatorHASigner;
+    let signFn: jest.Mock<(signingRoot: Buffer32) => Promise<Signature>>;
+
+    beforeEach(() => {
+      signer = new ValidatorHASigner(db, config);
+      signFn = jest.fn<(signingRoot: Buffer32) => Promise<Signature>>();
+      signFn.mockResolvedValue(mockSignature);
+    });
+
+    it('should sign successfully on first attempt', async () => {
+      const result = await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      expect(result).toBe(mockSignature);
+      expect(signFn).toHaveBeenCalledWith(SIGNING_ROOT);
+      expect(signFn).toHaveBeenCalledTimes(1);
+
+      // Verify duty was recorded
+      const duty = await db.findDuty(VALIDATOR_ADDRESS, 100n, DutyType.BLOCK_PROPOSAL);
+      expect(duty).not.toBeNull();
+      expect(duty!.status).toBe(DutyStatus.SIGNED);
+      expect(duty!.signature).toBe(SIGNATURE_STRING);
+    });
+
+    it('should record failure when signing function throws', async () => {
+      const error = new Error('Signing failed');
+      signFn.mockRejectedValue(error);
+
+      await expect(
+        signer.signWithProtection(
+          VALIDATOR_ADDRESS,
+          SIGNING_ROOT,
+          {
+            slot: 100n,
+            blockNumber: 50n,
+            dutyType: DutyType.BLOCK_PROPOSAL,
+          },
+          signFn,
+        ),
+      ).rejects.toThrow('Signing failed');
+
+      // Verify duty was recorded as failed
+      const duty = await db.findDuty(VALIDATOR_ADDRESS, 100n, DutyType.BLOCK_PROPOSAL);
+      expect(duty).not.toBeNull();
+      expect(duty!.status).toBe(DutyStatus.FAILED);
+      expect(duty!.errorMessage).toBe('Signing failed');
+    });
+
+    it('should throw DutyAlreadySignedError when duty already signed', async () => {
+      // First signing
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      // Second attempt with same data
+      await expect(
+        signer.signWithProtection(
+          VALIDATOR_ADDRESS,
+          SIGNING_ROOT,
+          {
+            slot: 100n,
+            blockNumber: 50n,
+            dutyType: DutyType.BLOCK_PROPOSAL,
+          },
+          signFn,
+        ),
+      ).rejects.toThrow(DutyAlreadySignedError);
+
+      // Sign function should only be called once
+      expect(signFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw SlashingProtectionError when signing different data for same slot', async () => {
+      // First signing
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      // Second attempt with different data
+      await expect(
+        signer.signWithProtection(
+          VALIDATOR_ADDRESS,
+          SIGNING_ROOT_2,
+          {
+            slot: 100n,
+            blockNumber: 50n,
+            dutyType: DutyType.BLOCK_PROPOSAL,
+          },
+          signFn,
+        ),
+      ).rejects.toThrow(SlashingProtectionError);
+
+      // Sign function should only be called once
+      expect(signFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should allow signing different duty types for same slot', async () => {
+      const signingRoot = Buffer32.random();
+      // Sign block proposal
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      // Sign attestation for same slot
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        signingRoot,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.ATTESTATION,
+        },
+        signFn,
+      );
+
+      expect(signFn).toHaveBeenCalledTimes(2);
+
+      // Verify both duties exist
+      const blockDuty = await db.findDuty(VALIDATOR_ADDRESS, 100n, DutyType.BLOCK_PROPOSAL);
+      const attestationDuty = await db.findDuty(VALIDATOR_ADDRESS, 100n, DutyType.ATTESTATION);
+      expect(blockDuty).not.toBeNull();
+      expect(attestationDuty).not.toBeNull();
+      expect(attestationDuty!.signingRoot.toString()).toBe(signingRoot.toString());
+    });
+
+    it('should allow signing different slots', async () => {
+      // Sign slot 100
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      // Sign slot 101
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 101n,
+          blockNumber: 51n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      expect(signFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle all duty types', async () => {
+      const dutyTypes: DutyType[] = [DutyType.BLOCK_PROPOSAL, DutyType.ATTESTATION, DutyType.ATTESTATIONS_AND_SIGNERS];
+      for (const dutyType of dutyTypes) {
+        await signer.signWithProtection(
+          VALIDATOR_ADDRESS,
+          SIGNING_ROOT,
+          { slot: 100n, blockNumber: 50n, dutyType },
+          signFn,
+        );
+      }
+      expect(signFn).toHaveBeenCalledTimes(dutyTypes.length);
+    });
+
+    it('should handle multiple validator addresses', async () => {
+      const signer = new ValidatorHASigner(db, config);
+      const signFn = jest.fn<(signingRoot: Buffer32) => Promise<Signature>>();
+      signFn.mockResolvedValue(mockSignature);
+
+      const validator1 = EthAddress.fromString('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266');
+      const validator2 = EthAddress.fromString('0x70997970c51812dc3a010c7d01b50e0d17dc79c8');
+
+      // Same slot but different validators should both succeed
+      await signer.signWithProtection(
+        validator1,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      await signer.signWithProtection(
+        validator2,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      expect(signFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle concurrent signing attempts - first succeeds', async () => {
+      const signer = new ValidatorHASigner(db, config);
+      const signFn = jest.fn<(signingRoot: Buffer32) => Promise<Signature>>();
+
+      // First call sleeps for 200ms then succeeds
+      signFn.mockImplementationOnce(async () => {
+        await sleep(200);
+        return mockSignature;
+      });
+
+      // Start first signing (don't await)
+      const firstSign = signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      // Wait a bit to ensure first signing has started
+      await sleep(50);
+
+      // Start second signing while first is in progress
+      const secondSign = signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      // First should succeed
+      await expect(firstSign).resolves.toBe(mockSignature);
+
+      // Second should throw DutyAlreadySignedError after waiting
+      await expect(secondSign).rejects.toThrow(DutyAlreadySignedError);
+
+      // Only first signer should have called the signing function
+      expect(signFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle concurrent signing attempts - first fails, second succeeds', async () => {
+      const signer = new ValidatorHASigner(db, config);
+      const signFn = jest.fn<(signingRoot: Buffer32) => Promise<Signature>>();
+
+      // First call sleeps for 200ms then fails
+      signFn.mockImplementationOnce(async () => {
+        await sleep(200);
+        throw new Error('Signing failed');
+      });
+
+      // Second call succeeds
+      signFn.mockImplementationOnce(() => Promise.resolve(mockSignature));
+
+      // Start first signing (don't await)
+      const firstSign = signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      // Wait a bit to ensure first signing has started
+      await sleep(50);
+
+      // Start second signing while first is in progress
+      const secondSign = signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      // First should fail
+      await expect(firstSign).rejects.toThrow('Signing failed');
+
+      // Second should succeed after waiting for first to fail
+      await expect(secondSign).resolves.toBe(mockSignature);
+
+      // Both signers should have called the signing function
+      expect(signFn).toHaveBeenCalledTimes(2);
+
+      // Verify the duty is marked as signed by the second signer
+      const duty = await db.findDuty(VALIDATOR_ADDRESS, 100n, DutyType.BLOCK_PROPOSAL);
+      expect(duty).not.toBeNull();
+      expect(duty!.status).toBe(DutyStatus.SIGNED);
+    });
+  });
+
+  describe('signWithProtection - disabled', () => {
+    let signer: ValidatorHASigner;
+    let signFn: jest.Mock<(signingRoot: Buffer32) => Promise<Signature>>;
+
+    beforeEach(() => {
+      const disabledConfig = { ...config, enabled: false };
+      signer = new ValidatorHASigner(db, disabledConfig);
+      signFn = jest.fn<(signingRoot: Buffer32) => Promise<Signature>>();
+      signFn.mockResolvedValue(mockSignature);
+    });
+
+    it('should sign directly without slashing protection', async () => {
+      const result = await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      expect(result).toBe(mockSignature);
+      expect(signFn).toHaveBeenCalledWith(SIGNING_ROOT);
+
+      // Verify no duty was recorded
+      const duty = await db.findDuty(VALIDATOR_ADDRESS, 100n, DutyType.BLOCK_PROPOSAL);
+      expect(duty).toBeNull();
+    });
+
+    it('should allow signing same data multiple times', async () => {
+      // Sign twice with same data
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        SIGNING_ROOT,
+        {
+          slot: 100n,
+          blockNumber: 50n,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+        },
+        signFn,
+      );
+
+      expect(signFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should propagate signing function errors', async () => {
+      const error = new Error('Signing failed');
+      signFn.mockRejectedValue(error);
+
+      await expect(
+        signer.signWithProtection(
+          VALIDATOR_ADDRESS,
+          SIGNING_ROOT,
+          {
+            slot: 100n,
+            blockNumber: 50n,
+            dutyType: DutyType.BLOCK_PROPOSAL,
+          },
+          signFn,
+        ),
+      ).rejects.toThrow('Signing failed');
+    });
+  });
+});
