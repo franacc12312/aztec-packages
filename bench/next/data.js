@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766415967385,
+  "lastUpdate": 1766420765228,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -464517,6 +464517,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 362,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "PhilWindle",
+            "username": "PhilWindle",
+            "email": "60546371+PhilWindle@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "100e1d84fe7b79bbfcd4ffcc09fd54e680121d88",
+          "message": "chore: update retag workflow (#19141)\n\nUpdates the git-tag workflow to clone the ref directly and set up token\nauth",
+          "timestamp": "2025-12-22T11:18:05Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/100e1d84fe7b79bbfcd4ffcc09fd54e680121d88"
+        },
+        "date": 1766420762632,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 854,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 369,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 34,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 358,
             "unit": "seconds"
           }
         ]
