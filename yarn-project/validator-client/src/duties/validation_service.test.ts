@@ -30,9 +30,9 @@ describe('ValidationService', () => {
     const proposal = await service.createBlockProposal(header, archive, txs, addresses[0], {
       publishFullTxs: true,
     });
-    expect(proposal.getSender()).toEqual(store.getAddress(0));
-    expect(proposal.txs).toBeDefined();
-    expect(proposal.txs).toBe(txs);
+    expect(proposal!.getSender()).toEqual(store.getAddress(0));
+    expect(proposal!.txs).toBeDefined();
+    expect(proposal!.txs).toBe(txs);
   });
 
   it('creates a proposal without txs appended', async () => {
@@ -43,8 +43,8 @@ describe('ValidationService', () => {
     const proposal = await service.createBlockProposal(header, archive, txs, addresses[0], {
       publishFullTxs: false,
     });
-    expect(proposal.getSender()).toEqual(addresses[0]);
-    expect(proposal.txs).toBeUndefined();
+    expect(proposal!.getSender()).toEqual(addresses[0]);
+    expect(proposal!.txs).toBeUndefined();
   });
 
   it('attests to proposal', async () => {

@@ -14,6 +14,7 @@ import {
 } from '@aztec/stdlib/p2p';
 import type { CheckpointHeader } from '@aztec/stdlib/rollup';
 import type { Tx } from '@aztec/stdlib/tx';
+import { DutyAlreadySignedError, SlashingProtectionError } from '@aztec/validator-ha-signer/errors';
 
 import type { ValidatorKeyStore } from '../key_store/interface.js';
 
@@ -31,7 +32,9 @@ export class ValidationService {
    * @param txs - TxHash[] ordered list of transactions
    * @param options - Block proposal options (including broadcastInvalidBlockProposal for testing)
    *
-   * @returns A block proposal signing the above information (not the current implementation!!!)
+   * @returns A block proposal signing the above information
+   * @throws DutyAlreadySignedError if HA signer indicates duty already signed by another node
+   * @throws SlashingProtectionError if attempting to sign different data for same slot
    */
   async createBlockProposal(
     header: CheckpointHeader,
@@ -73,25 +76,49 @@ export class ValidationService {
    *
    * @param proposal - The proposal to attest to
    * @param attestors - The validators to attest with
-   * @returns attestations
+   * @returns attestations (only includes attestations that were successfully signed; excludes any already signed by other HA nodes)
    */
   async attestToProposal(proposal: BlockProposal, attestors: EthAddress[]): Promise<BlockAttestation[]> {
     const buf = Buffer32.fromBuffer(
       keccak256(proposal.payload.getPayloadToSign(SignatureDomainSeparator.blockAttestation)),
     );
-    const signatures = await Promise.all(
-      attestors.map(attestor => this.keyStore.signMessageWithAddress(attestor, buf)),
-    );
-    return signatures.map(sig => new BlockAttestation(proposal.payload, sig, proposal.signature));
+
+    // Sign each attestor individually, catching HA errors per-attestor
+    const attestations: BlockAttestation[] = [];
+    for (const attestor of attestors) {
+      try {
+        const sig = await this.keyStore.signMessageWithAddress(attestor, buf);
+        attestations.push(new BlockAttestation(proposal.payload, sig, proposal.signature));
+      } catch (error) {
+        if (error instanceof DutyAlreadySignedError || error instanceof SlashingProtectionError) {
+          this.log.debug(
+            `Attestation for slot ${proposal.slotNumber} by ${attestor} already signed by another High-Availability node`,
+          );
+          // Continue with remaining attestors
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    return attestations;
   }
 
-  async signAttestationsAndSigners(
+  /**
+   * Sign attestations and signers payload
+   * @param attestationsAndSigners - The attestations and signers to sign
+   * @param proposer - The proposer address to sign with
+   * @returns signature
+   * @throws DutyAlreadySignedError if already signed by another HA node
+   * @throws SlashingProtectionError if attempting to sign different data for same slot
+   */
+  signAttestationsAndSigners(
     attestationsAndSigners: CommitteeAttestationsAndSigners,
     proposer: EthAddress,
   ): Promise<Signature> {
     const buf = Buffer32.fromBuffer(
       keccak256(attestationsAndSigners.getPayloadToSign(SignatureDomainSeparator.attestationsAndSigners)),
     );
-    return await this.keyStore.signMessageWithAddress(proposer, buf);
+    return this.keyStore.signMessageWithAddress(proposer, buf);
   }
 }

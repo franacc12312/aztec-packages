@@ -54,7 +54,7 @@ describe('ValidatorClient', () => {
   let txProvider: MockProxy<TxProvider>;
   let keyStoreManager: KeystoreManager;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     p2pClient = mock<P2P>();
     p2pClient.getAttestationsForSlot.mockImplementation(() => Promise.resolve([]));
     p2pClient.handleAuthRequestFromPeer.mockResolvedValue(StatusMessage.random());
@@ -81,6 +81,10 @@ describe('ValidatorClient', () => {
       validatorReexecuteDeadlineMs: 6000,
       slashBroadcastedInvalidBlockPenalty: 1n,
       disableTransactions: false,
+      haSigningEnabled: false,
+      nodeId: 'test-node-id',
+      pollingIntervalMs: 1000,
+      signingTimeoutMs: 1000,
     };
 
     const keyStore: KeyStore = {
@@ -100,7 +104,7 @@ describe('ValidatorClient', () => {
     };
     keyStoreManager = new KeystoreManager(keyStore);
 
-    validatorClient = ValidatorClient.new(
+    validatorClient = await ValidatorClient.new(
       config,
       blockBuilder,
       epochCache,
@@ -491,7 +495,7 @@ describe('ValidatorClient', () => {
       };
 
       it('should upload blobs to filestore after successful re-execution', async () => {
-        const validatorWithFileStore = createValidatorWithFileStore();
+        const validatorWithFileStore = await createValidatorWithFileStore();
         validatorWithFileStore.updateConfig({ validatorReexecute: true });
         blockBuilder.buildBlock.mockImplementation(() => Promise.resolve(blockBuildResult));
         epochCache.filterInCommittee.mockResolvedValue([EthAddress.fromString(validatorAccounts[0].address)]);
@@ -524,7 +528,7 @@ describe('ValidatorClient', () => {
 
       it('should not fail attestation when blob upload fails', async () => {
         mockFileStoreBlobClient.saveBlobs.mockRejectedValue(new Error('Upload failed'));
-        const validatorWithFileStore = createValidatorWithFileStore();
+        const validatorWithFileStore = await createValidatorWithFileStore();
         validatorWithFileStore.updateConfig({ validatorReexecute: true });
         blockBuilder.buildBlock.mockImplementation(() => Promise.resolve(blockBuildResult));
         epochCache.filterInCommittee.mockResolvedValue([EthAddress.fromString(validatorAccounts[0].address)]);
@@ -541,7 +545,7 @@ describe('ValidatorClient', () => {
       });
 
       it('should trigger re-execution when filestore is configured even if validatorReexecute is false', async () => {
-        const validatorWithFileStore = createValidatorWithFileStore();
+        const validatorWithFileStore = await createValidatorWithFileStore();
         // Re-execution disabled via config, but filestore is configured which triggers re-execution
         validatorWithFileStore.updateConfig({ validatorReexecute: false });
         blockBuilder.buildBlock.mockImplementation(() => Promise.resolve(blockBuildResult));
@@ -563,7 +567,7 @@ describe('ValidatorClient', () => {
       });
 
       it('should not upload blobs when validation fails', async () => {
-        const validatorWithFileStore = createValidatorWithFileStore();
+        const validatorWithFileStore = await createValidatorWithFileStore();
         validatorWithFileStore.updateConfig({ validatorReexecute: true });
         blockBuilder.buildBlock.mockImplementation(() => Promise.resolve(blockBuildResult));
         epochCache.filterInCommittee.mockResolvedValue([EthAddress.fromString(validatorAccounts[0].address)]);

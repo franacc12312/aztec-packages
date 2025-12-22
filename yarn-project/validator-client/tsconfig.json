@@ -38,6 +38,9 @@
     },
     {
       "path": "../telemetry-client"
+    },
+    {
+      "path": "../validator-ha-signer"
     }
   ],
   "include": ["src"]

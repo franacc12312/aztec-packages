@@ -75,6 +75,7 @@
     "@aztec/slasher": "workspace:^",
     "@aztec/stdlib": "workspace:^",
     "@aztec/telemetry-client": "workspace:^",
+    "@aztec/validator-ha-signer": "workspace:^",
     "koa": "^2.16.1",
     "koa-router": "^13.1.1",
     "tslib": "^2.4.0",

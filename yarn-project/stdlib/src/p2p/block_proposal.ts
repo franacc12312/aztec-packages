@@ -81,13 +81,21 @@ export class BlockProposal extends Gossipable {
     };
   }
 
+  /**
+   * Create a block proposal from a signer function.
+   * @param payload - The consensus payload
+   * @param txHashes - The transaction hashes
+   * @param txs - Optional full transactions
+   * @param payloadSigner - Function to sign the payload (returns null if HA signer already signed this duty)
+   * @returns BlockProposal or null if the duty was already signed by another HA node
+   */
   static async createProposalFromSigner(
     payload: ConsensusPayload,
     txHashes: TxHash[],
     // Note(md): Provided separately to tx hashes such that this function can be optional
     txs: Tx[] | undefined,
     payloadSigner: (payload: Buffer32) => Promise<Signature>,
-  ) {
+  ): Promise<BlockProposal> {
     const hashed = getHashedSignaturePayload(payload, SignatureDomainSeparator.blockProposal);
     const sig = await payloadSigner(hashed);
 

@@ -49,6 +49,7 @@
     "@aztec/stdlib": "workspace:^",
     "@aztec/telemetry-client": "workspace:^",
     "@aztec/validator-client": "workspace:^",
+    "@aztec/validator-ha-signer": "workspace:^",
     "@aztec/world-state": "workspace:^",
     "lodash.chunk": "^4.2.0",
     "tslib": "^2.4.0",

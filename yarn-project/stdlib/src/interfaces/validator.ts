@@ -2,10 +2,11 @@ import type { SecretValue } from '@aztec/foundation/config';
 import { Fr } from '@aztec/foundation/curves/bn254';
 import type { EthAddress } from '@aztec/foundation/eth-address';
 import type { Signature } from '@aztec/foundation/eth-signature';
-import { schemas, zodFor } from '@aztec/foundation/schemas';
+import { type ZodFor, schemas, zodFor } from '@aztec/foundation/schemas';
 import type { SequencerConfig, SlasherConfig } from '@aztec/stdlib/interfaces/server';
 import type { BlockAttestation, BlockProposal, BlockProposalOptions } from '@aztec/stdlib/p2p';
 import type { Tx } from '@aztec/stdlib/tx';
+import { type ValidatorHASignerConfig, ValidatorHASignerConfigSchema } from '@aztec/validator-ha-signer/config';
 
 import type { PeerId } from '@libp2p/interface';
 import { z } from 'zod';
@@ -17,7 +18,7 @@ import { AllowedElementSchema } from './allowed_element.js';
 /**
  * Validator client configuration
  */
-export interface ValidatorClientConfig {
+export type ValidatorClientConfig = ValidatorHASignerConfig & {
   /** The private keys of the validators participating in attestation duties */
   validatorPrivateKeys?: SecretValue<`0x${string}`[]>;
 
@@ -44,7 +45,7 @@ export interface ValidatorClientConfig {
 
   /** Whether to run in fisherman mode: validates all proposals and attestations but does not broadcast attestations or participate in consensus */
   fishermanMode?: boolean;
-}
+};
 
 export type ValidatorClientFullConfig = ValidatorClientConfig &
   Pick<SequencerConfig, 'txPublicSetupAllowList' | 'broadcastInvalidBlockProposal'> &
@@ -56,18 +57,16 @@ export type ValidatorClientFullConfig = ValidatorClientConfig &
     disableTransactions?: boolean;
   };
 
-export const ValidatorClientConfigSchema = zodFor<Omit<ValidatorClientConfig, 'validatorPrivateKeys'>>()(
-  z.object({
-    validatorAddresses: z.array(schemas.EthAddress).optional(),
-    disableValidator: z.boolean(),
-    disabledValidators: z.array(schemas.EthAddress),
-    attestationPollingIntervalMs: z.number().min(0),
-    validatorReexecute: z.boolean(),
-    validatorReexecuteDeadlineMs: z.number().min(0),
-    alwaysReexecuteBlockProposals: z.boolean().optional(),
-    fishermanMode: z.boolean().optional(),
-  }),
-);
+export const ValidatorClientConfigSchema = ValidatorHASignerConfigSchema.extend({
+  validatorAddresses: z.array(schemas.EthAddress).optional(),
+  disableValidator: z.boolean(),
+  disabledValidators: z.array(schemas.EthAddress),
+  attestationPollingIntervalMs: z.number().min(0),
+  validatorReexecute: z.boolean(),
+  validatorReexecuteDeadlineMs: z.number().min(0),
+  alwaysReexecuteBlockProposals: z.boolean().optional(),
+  fishermanMode: z.boolean().optional(),
+}) satisfies ZodFor<Omit<ValidatorClientConfig, 'validatorPrivateKeys'>>;
 
 export const ValidatorClientFullConfigSchema = zodFor<Omit<ValidatorClientFullConfig, 'validatorPrivateKeys'>>()(
   ValidatorClientConfigSchema.extend({
@@ -95,6 +94,12 @@ export interface Validator {
 
   broadcastBlockProposal(proposal: BlockProposal): Promise<void>;
   collectAttestations(proposal: BlockProposal, required: number, deadline: Date): Promise<BlockAttestation[]>;
+  /**
+   * Sign attestations and signers payload
+   * @returns signature
+   * @throws DutyAlreadySignedError if already signed by another HA node
+   * @throws SlashingProtectionError if attempting to sign different data for same slot
+   */
   signAttestationsAndSigners(
     attestationsAndSigners: CommitteeAttestationsAndSigners,
     proposer: EthAddress,
