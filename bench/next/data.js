@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766463527180,
+  "lastUpdate": 1766471603915,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -462929,6 +462929,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 256,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "mralj",
+            "username": "mralj",
+            "email": "nikola.mratinic@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "c485cb88b22ede64273b4c9d1a9de3b5017955d0",
+          "message": "chore: Deflake e2e_l1_publisher test (#19203)\n\nWe were getting errors stopping anvil at the end of some tests. This\nadds a try/catch around stopping anvil, and initializes each anvil\ninstance in a different port to prevent a test from bleeding into the\nnext if an anvil stop actually fails.\n\nFailed test run: http://ci.aztec-labs.com/109d17afbdad557d",
+          "timestamp": "2025-12-22T20:38:19Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/c485cb88b22ede64273b4c9d1a9de3b5017955d0"
+        },
+        "date": 1766471601432,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 704,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 373,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 34,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 220,
             "unit": "seconds"
           }
         ]
