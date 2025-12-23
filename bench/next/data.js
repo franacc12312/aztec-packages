@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766521393117,
+  "lastUpdate": 1766523283207,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -460907,6 +460907,46 @@ window.BENCHMARK_DATA = {
           {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 220,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "danielntmd",
+            "email": "danielntmd@nethermind.io"
+          },
+          "committer": {
+            "name": "danielntmd",
+            "email": "danielntmd@nethermind.io"
+          },
+          "id": "8c378cfa233dec7b1784c43fcd1b01eb8cfb45ce",
+          "message": "chore(fix): fix checkpoint timeout on gating passive test and enable no fast fail",
+          "timestamp": "2025-12-22T02:59:00Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/8c378cfa233dec7b1784c43fcd1b01eb8cfb45ce"
+        },
+        "date": 1766523279396,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "spartan/ci/network_deploy/total",
+            "value": 519,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/eth_devnet",
+            "value": 208,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/rollup_contracts",
+            "value": 24,
+            "unit": "seconds"
+          },
+          {
+            "name": "spartan/ci/network_deploy/aztec_infra",
+            "value": 195,
             "unit": "seconds"
           }
         ]
