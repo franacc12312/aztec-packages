@@ -1,3 +1,4 @@
+import { BlockNumber, SlotNumber } from '@aztec/foundation/branded-types';
 import { Buffer32 } from '@aztec/foundation/buffer';
 import { EthAddress } from '@aztec/foundation/eth-address';
 import { sleep } from '@aztec/foundation/sleep';
@@ -9,12 +10,12 @@ import { PostgresSlashingProtectionDatabase } from './db/postgres.js';
 import { setupTestSchema } from './db/test_helper.js';
 import { DutyAlreadySignedError, SlashingProtectionError } from './errors.js';
 import { SlashingProtectionService } from './slashing_protection_service.js';
-import { type CheckAndRecordParams, DutyStatus, DutyType, type SlashingProtectionConfig } from './types.js';
+import { type CheckAndRecordParams, DutyStatus, DutyType, type ValidatorHASignerConfig } from './types.js';
 
 // Test data constants
 const VALIDATOR_ADDRESS = EthAddress.random();
-const SLOT = 100n;
-const BLOCK_NUMBER = 50n;
+const SLOT = SlotNumber(100);
+const BLOCK_NUMBER = BlockNumber(50);
 const DUTY_TYPE: DutyType = DutyType.BLOCK_PROPOSAL;
 const MESSAGE_HASH = Buffer32.random().toString();
 const MESSAGE_HASH_2 = Buffer32.random().toString();
@@ -27,7 +28,7 @@ describe('SlashingProtectionService', () => {
   let pool: Pool;
   let db: PostgresSlashingProtectionDatabase;
   let service: SlashingProtectionService;
-  let config: SlashingProtectionConfig;
+  let config: ValidatorHASignerConfig;
 
   beforeEach(async () => {
     pglite = new PGlite();
@@ -38,7 +39,7 @@ describe('SlashingProtectionService', () => {
     await db.initialize();
 
     config = {
-      enabled: true,
+      haSigningEnabled: true,
       nodeId: NODE_ID,
       pollingIntervalMs: 50,
       signingTimeoutMs: 1000,
@@ -449,8 +450,8 @@ describe('SlashingProtectionService', () => {
       for (let i = 0; i < 5; i++) {
         const params: CheckAndRecordParams = {
           validatorAddress: VALIDATOR_ADDRESS,
-          slot: BigInt(100 + i),
-          blockNumber: BigInt(50 + i),
+          slot: SlotNumber(100 + i),
+          blockNumber: BlockNumber(50 + i),
           dutyType: DUTY_TYPE,
           messageHash: MESSAGE_HASH,
           nodeId: NODE_ID,
@@ -464,8 +465,8 @@ describe('SlashingProtectionService', () => {
       for (let i = 0; i < 5; i++) {
         const result = await db.tryInsertOrGetExisting({
           validatorAddress: VALIDATOR_ADDRESS,
-          slot: BigInt(100 + i),
-          blockNumber: BigInt(50 + i),
+          slot: SlotNumber(100 + i),
+          blockNumber: BlockNumber(50 + i),
           dutyType: DUTY_TYPE,
           messageHash: MESSAGE_HASH,
           nodeId: NODE_ID,

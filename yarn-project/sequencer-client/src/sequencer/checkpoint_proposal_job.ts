@@ -249,7 +249,12 @@ export class CheckpointProposalJob {
       const signer = this.proposer ?? this.publisher.getSenderAddress();
       let attestationsSignature: Signature;
       try {
-        attestationsSignature = await this.validatorClient.signAttestationsAndSigners(attestations, signer);
+        attestationsSignature = await this.validatorClient.signAttestationsAndSigners(
+          attestations,
+          signer,
+          this.slot,
+          this.checkpointNumber,
+        );
       } catch (err) {
         if (err instanceof DutyAlreadySignedError) {
           this.log.info(`Attestations signature for slot ${this.slot} already signed by another HA node, yielding`, {
@@ -404,8 +409,8 @@ export class CheckpointProposalJob {
             this.log.warn(`Block proposal for slot ${this.slot} blocked by slashing protection`, {
               slot: this.slot,
               blockNumber,
-              existingSigningRoot: err.existingSigningRoot,
-              attemptedSigningRoot: err.attemptedSigningRoot,
+              existingMessageHash: err.existingMessageHash,
+              attemptedMessageHash: err.attemptedMessageHash,
             });
             // Stop building to avoid further slashing issues
             break;
@@ -610,7 +615,7 @@ export class CheckpointProposalJob {
 
     if (this.config.skipCollectingAttestations) {
       this.log.warn('Skipping attestation collection as per config (attesting with own keys only)');
-      const attestations = await this.validatorClient?.collectOwnAttestations(proposal);
+      const attestations = await this.validatorClient?.collectOwnAttestations(proposal, this.checkpointNumber);
       return new CommitteeAttestationsAndSigners(orderAttestations(attestations ?? [], committee));
     }
 
@@ -628,6 +633,7 @@ export class CheckpointProposalJob {
         proposal,
         numberOfRequiredAttestations,
         attestationDeadline,
+        this.checkpointNumber,
       );
 
       collectedAttestationsCount = attestations.length;

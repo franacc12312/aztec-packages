@@ -10,7 +10,7 @@ import type { EthAddress } from '@aztec/foundation/eth-address';
 import type { Signature } from '@aztec/foundation/eth-signature';
 import { type Logger, createLogger } from '@aztec/foundation/log';
 
-import type { CreateHASignerConfig } from './config.js';
+import type { ValidatorHASignerConfig } from './config.js';
 import { SlashingProtectionService } from './slashing_protection_service.js';
 import type { SigningContext, SlashingProtectionDatabase } from './types.js';
 
@@ -39,11 +39,11 @@ export class ValidatorHASigner {
 
   constructor(
     db: SlashingProtectionDatabase | undefined,
-    private readonly config: CreateHASignerConfig,
+    private readonly config: ValidatorHASignerConfig,
   ) {
     this.log = createLogger('validator-ha-signer');
 
-    if (config.enabled && db) {
+    if (config.haSigningEnabled && db) {
       if (!config.nodeId || config.nodeId === '') {
         throw new Error('NODE_ID is required for high-availability setups');
       }

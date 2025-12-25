@@ -15,7 +15,7 @@ import {
   type RecordSuccessParams,
 } from './db/types.js';
 import { DutyAlreadySignedError, SlashingProtectionError } from './errors.js';
-import type { SlashingProtectionConfig, SlashingProtectionDatabase } from './types.js';
+import type { SlashingProtectionDatabase, ValidatorHASignerConfig } from './types.js';
 
 /**
  * Slashing Protection Service
@@ -41,7 +41,7 @@ export class SlashingProtectionService {
 
   constructor(
     private readonly db: SlashingProtectionDatabase,
-    private readonly config: SlashingProtectionConfig,
+    private readonly config: ValidatorHASignerConfig,
   ) {
     this.log = createLogger('slashing-protection');
     this.pollingIntervalMs = config.pollingIntervalMs;

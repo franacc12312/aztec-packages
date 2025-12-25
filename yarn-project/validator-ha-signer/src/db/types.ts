@@ -1,3 +1,4 @@
+import type { BlockNumber, CheckpointNumber, SlotNumber } from '@aztec/foundation/branded-types';
 import type { EthAddress } from '@aztec/foundation/eth-address';
 import type { Signature } from '@aztec/foundation/eth-signature';
 
@@ -79,7 +80,7 @@ export interface ValidatorDutyRecord {
  */
 export interface DutyIdentifier {
   validatorAddress: EthAddress;
-  slot: bigint;
+  slot: SlotNumber;
   dutyType: DutyType;
 }
 
@@ -88,8 +89,8 @@ export interface DutyIdentifier {
  */
 export interface CheckAndRecordParams {
   validatorAddress: EthAddress;
-  slot: bigint;
-  blockNumber: bigint;
+  slot: SlotNumber;
+  blockNumber: BlockNumber | CheckpointNumber;
   dutyType: DutyType;
   messageHash: string;
   nodeId: string;
@@ -100,7 +101,7 @@ export interface CheckAndRecordParams {
  */
 export interface RecordSuccessParams {
   validatorAddress: EthAddress;
-  slot: bigint;
+  slot: SlotNumber;
   dutyType: DutyType;
   signature: Signature;
   nodeId: string;
@@ -112,7 +113,7 @@ export interface RecordSuccessParams {
  */
 export interface RecordFailureParams {
   validatorAddress: EthAddress;
-  slot: bigint;
+  slot: SlotNumber;
   dutyType: DutyType;
   error: string;
   lockToken: string;

@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS validator_duties (
   validator_address VARCHAR(42) NOT NULL,
   slot BIGINT NOT NULL,
   block_number BIGINT NOT NULL,
-  duty_type VARCHAR(30) NOT NULL CHECK (duty_type IN ('BLOCK_PROPOSAL', 'ATTESTATION', 'ATTESTATIONS_AND_SIGNERS')),
+  duty_type VARCHAR(30) NOT NULL CHECK (duty_type IN ('BLOCK_PROPOSAL', 'CHECKPOINT_PROPOSAL', 'ATTESTATION', 'ATTESTATIONS_AND_SIGNERS')),
   status VARCHAR(20) NOT NULL CHECK (status IN ('signing', 'signed', 'failed')),
   message_hash VARCHAR(66) NOT NULL,
   signature VARCHAR(132),

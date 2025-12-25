@@ -74,10 +74,10 @@
   },
   "dependencies": {
     "@aztec/foundation": "workspace:^",
-    "@aztec/node-keystore": "workspace:^",
     "node-pg-migrate": "^8.0.4",
     "pg": "^8.11.3",
-    "tslib": "^2.4.0"
+    "tslib": "^2.4.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.2.17",

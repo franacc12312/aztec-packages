@@ -1,3 +1,4 @@
+import { BlockNumber, SlotNumber } from '@aztec/foundation/branded-types';
 import { Buffer32 } from '@aztec/foundation/buffer';
 import { EthAddress } from '@aztec/foundation/eth-address';
 import type { Signature } from '@aztec/foundation/eth-signature';
@@ -7,7 +8,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Pool } from '@middle-management/pglite-pg-adapter';
 
-import { type CreateHASignerConfig, defaultSlashingProtectionConfig } from './config.js';
+import { type ValidatorHASignerConfig, defaultValidatorHASignerConfig } from './config.js';
 import { PostgresSlashingProtectionDatabase } from './db/postgres.js';
 import { setupTestSchema } from './db/test_helper.js';
 import { DutyStatus, DutyType } from './db/types.js';
@@ -30,7 +31,7 @@ describe('ValidatorHASigner', () => {
   let pglite: PGlite;
   let pool: Pool;
   let db: PostgresSlashingProtectionDatabase;
-  let config: CreateHASignerConfig;
+  let config: ValidatorHASignerConfig;
 
   beforeEach(async () => {
     pglite = new PGlite();
@@ -41,7 +42,7 @@ describe('ValidatorHASigner', () => {
     await db.initialize();
 
     config = {
-      enabled: true,
+      haSigningEnabled: true,
       nodeId: NODE_ID,
       pollingIntervalMs: 50,
       signingTimeoutMs: 1000,
@@ -62,7 +63,7 @@ describe('ValidatorHASigner', () => {
     });
 
     it('should not initialize when nodeId is not explicitly set', () => {
-      const defaultConfig = { ...defaultSlashingProtectionConfig };
+      const defaultConfig = { ...defaultValidatorHASignerConfig };
       expect(
         () =>
           new ValidatorHASigner(db, { ...defaultConfig, databaseUrl: 'postgresql://user:pass@localhost:5432/testdb' }),
@@ -70,7 +71,7 @@ describe('ValidatorHASigner', () => {
     });
 
     it('should initialize without slashing protection when disabled', () => {
-      const disabledConfig = { ...config, enabled: false };
+      const disabledConfig = { ...config, haSigningEnabled: false };
       const signer = new ValidatorHASigner(db, disabledConfig);
       expect(signer.isEnabled).toBe(false);
       expect(signer.nodeId).toBe(NODE_ID);
@@ -91,7 +92,7 @@ describe('ValidatorHASigner', () => {
     });
 
     it('should start and stop without error when disabled', async () => {
-      const disabledConfig = { ...config, enabled: false };
+      const disabledConfig = { ...config, haSigningEnabled: false };
       const signer = new ValidatorHASigner(db, disabledConfig);
       signer.start(); // No-op
       await signer.stop(); // No-op
@@ -124,8 +125,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -138,8 +139,8 @@ describe('ValidatorHASigner', () => {
       // Verify duty was recorded
       const dutyResult = await db.tryInsertOrGetExisting({
         validatorAddress: VALIDATOR_ADDRESS,
-        slot: 100n,
-        blockNumber: 50n,
+        slot: SlotNumber(100),
+        blockNumber: BlockNumber(50),
         dutyType: DutyType.BLOCK_PROPOSAL,
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
@@ -158,8 +159,8 @@ describe('ValidatorHASigner', () => {
           VALIDATOR_ADDRESS,
           MESSAGE_HASH,
           {
-            slot: 100n,
-            blockNumber: 50n,
+            slot: SlotNumber(100),
+            blockNumber: BlockNumber(50),
             dutyType: DutyType.BLOCK_PROPOSAL,
           },
           signFn,
@@ -169,8 +170,8 @@ describe('ValidatorHASigner', () => {
       // Verify duty was recorded as failed
       const dutyResult = await db.tryInsertOrGetExisting({
         validatorAddress: VALIDATOR_ADDRESS,
-        slot: 100n,
-        blockNumber: 50n,
+        slot: SlotNumber(100),
+        blockNumber: BlockNumber(50),
         dutyType: DutyType.BLOCK_PROPOSAL,
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
@@ -186,8 +187,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -199,8 +200,8 @@ describe('ValidatorHASigner', () => {
           VALIDATOR_ADDRESS,
           MESSAGE_HASH,
           {
-            slot: 100n,
-            blockNumber: 50n,
+            slot: SlotNumber(100),
+            blockNumber: BlockNumber(50),
             dutyType: DutyType.BLOCK_PROPOSAL,
           },
           signFn,
@@ -217,8 +218,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -230,8 +231,8 @@ describe('ValidatorHASigner', () => {
           VALIDATOR_ADDRESS,
           MESSAGE_HASH_2,
           {
-            slot: 100n,
-            blockNumber: 50n,
+            slot: SlotNumber(100),
+            blockNumber: BlockNumber(50),
             dutyType: DutyType.BLOCK_PROPOSAL,
           },
           signFn,
@@ -249,8 +250,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -261,8 +262,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         messageHash,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.ATTESTATION,
         },
         signFn,
@@ -273,16 +274,16 @@ describe('ValidatorHASigner', () => {
       // Verify both duties exist
       const blockDutyResult = await db.tryInsertOrGetExisting({
         validatorAddress: VALIDATOR_ADDRESS,
-        slot: 100n,
-        blockNumber: 50n,
+        slot: SlotNumber(100),
+        blockNumber: BlockNumber(50),
         dutyType: DutyType.BLOCK_PROPOSAL,
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
       });
       const attestationDutyResult = await db.tryInsertOrGetExisting({
         validatorAddress: VALIDATOR_ADDRESS,
-        slot: 100n,
-        blockNumber: 50n,
+        slot: SlotNumber(100),
+        blockNumber: BlockNumber(50),
         dutyType: DutyType.ATTESTATION,
         messageHash: messageHash.toString(),
         nodeId: NODE_ID,
@@ -298,8 +299,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -310,8 +311,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 101n,
-          blockNumber: 51n,
+          slot: SlotNumber(101),
+          blockNumber: BlockNumber(51),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -326,7 +327,7 @@ describe('ValidatorHASigner', () => {
         await signer.signWithProtection(
           VALIDATOR_ADDRESS,
           MESSAGE_HASH,
-          { slot: 100n, blockNumber: 50n, dutyType },
+          { slot: SlotNumber(100), blockNumber: BlockNumber(50), dutyType },
           signFn,
         );
       }
@@ -342,8 +343,8 @@ describe('ValidatorHASigner', () => {
         validator1,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -353,8 +354,8 @@ describe('ValidatorHASigner', () => {
         validator2,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -377,8 +378,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         localSignFn,
@@ -392,8 +393,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         localSignFn,
@@ -426,8 +427,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         localSignFn,
@@ -441,8 +442,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         localSignFn,
@@ -460,8 +461,8 @@ describe('ValidatorHASigner', () => {
       // Verify the duty is marked as signed by the second signer
       const dutyResult = await db.tryInsertOrGetExisting({
         validatorAddress: VALIDATOR_ADDRESS,
-        slot: 100n,
-        blockNumber: 50n,
+        slot: SlotNumber(100),
+        blockNumber: BlockNumber(50),
         dutyType: DutyType.BLOCK_PROPOSAL,
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
@@ -476,7 +477,7 @@ describe('ValidatorHASigner', () => {
     let signFn: jest.Mock<(messageHash: Buffer32) => Promise<Signature>>;
 
     beforeEach(() => {
-      const disabledConfig = { ...config, enabled: false };
+      const disabledConfig = { ...config, haSigningEnabled: false };
       signer = new ValidatorHASigner(db, disabledConfig);
       signer.start(); // No-op when disabled
       signFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
@@ -492,8 +493,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -505,8 +506,8 @@ describe('ValidatorHASigner', () => {
       // Verify no duty was recorded
       const dutyResult = await db.tryInsertOrGetExisting({
         validatorAddress: VALIDATOR_ADDRESS,
-        slot: 100n,
-        blockNumber: 50n,
+        slot: SlotNumber(100),
+        blockNumber: BlockNumber(50),
         dutyType: DutyType.BLOCK_PROPOSAL,
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
@@ -520,8 +521,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -531,8 +532,8 @@ describe('ValidatorHASigner', () => {
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
         {
-          slot: 100n,
-          blockNumber: 50n,
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
         signFn,
@@ -550,8 +551,8 @@ describe('ValidatorHASigner', () => {
           VALIDATOR_ADDRESS,
           MESSAGE_HASH,
           {
-            slot: 100n,
-            blockNumber: 50n,
+            slot: SlotNumber(100),
+            blockNumber: BlockNumber(50),
             dutyType: DutyType.BLOCK_PROPOSAL,
           },
           signFn,

@@ -1,4 +1,5 @@
 import { getAddressFromPrivateKey } from '@aztec/ethereum/account';
+import { BlockNumber } from '@aztec/foundation/branded-types';
 import { Buffer32 } from '@aztec/foundation/buffer';
 import { EthAddress } from '@aztec/foundation/eth-address';
 import { makeBlockProposal } from '@aztec/stdlib/testing';
@@ -27,9 +28,17 @@ describe('ValidationService', () => {
     const {
       payload: { header, archive },
     } = makeBlockProposal({ txs });
-    const proposal = await service.createBlockProposal(header, archive, txs, addresses[0], {
-      publishFullTxs: true,
-    });
+    const blockNumber = BlockNumber(50);
+    const proposal = await service.createBlockProposal(
+      header,
+      archive,
+      txs,
+      addresses[0],
+      {
+        publishFullTxs: true,
+      },
+      blockNumber,
+    );
     expect(proposal!.getSender()).toEqual(store.getAddress(0));
     expect(proposal!.txs).toBeDefined();
     expect(proposal!.txs).toBe(txs);
@@ -40,9 +49,17 @@ describe('ValidationService', () => {
     const {
       payload: { header, archive },
     } = makeBlockProposal({ txs });
-    const proposal = await service.createBlockProposal(header, archive, txs, addresses[0], {
-      publishFullTxs: false,
-    });
+    const blockNumber = BlockNumber(50);
+    const proposal = await service.createBlockProposal(
+      header,
+      archive,
+      txs,
+      addresses[0],
+      {
+        publishFullTxs: false,
+      },
+      blockNumber,
+    );
     expect(proposal!.getSender()).toEqual(addresses[0]);
     expect(proposal!.txs).toBeUndefined();
   });
@@ -50,7 +67,8 @@ describe('ValidationService', () => {
   it('attests to proposal', async () => {
     const txs = await Promise.all([Tx.random(), Tx.random()]);
     const proposal = makeBlockProposal({ txs });
-    const attestations = await service.attestToProposal(proposal, addresses);
+    const blockNumber = BlockNumber(50);
+    const attestations = await service.attestToProposal(proposal, addresses, blockNumber);
     expect(attestations.length).toBe(2);
     expect(attestations[0].getSender()).toEqual(addresses[0]);
     expect(attestations[1].getSender()).toEqual(addresses[1]);

@@ -38,7 +38,7 @@ describe('createHASigner', () => {
     const { signer, db } = await createHASigner(
       {
         databaseUrl: 'postgresql://user:pass@localhost:5432/testdb',
-        enabled: true,
+        haSigningEnabled: true,
         nodeId: 'test-node',
         pollingIntervalMs: 100,
         signingTimeoutMs: 3000,
@@ -57,7 +57,7 @@ describe('createHASigner', () => {
     const { signer, db } = await createHASigner(
       {
         databaseUrl: 'postgresql://user:pass@localhost:5432/testdb',
-        enabled: false,
+        haSigningEnabled: false,
         nodeId: 'test-node',
         pollingIntervalMs: 100,
         signingTimeoutMs: 3000,
@@ -75,7 +75,7 @@ describe('createHASigner', () => {
     const { db } = await createHASigner(
       {
         databaseUrl: 'postgresql://user:pass@localhost:5432/testdb',
-        enabled: true,
+        haSigningEnabled: true,
         nodeId: 'test-node',
         pollingIntervalMs: 100,
         signingTimeoutMs: 3000,

@@ -214,8 +214,8 @@ export class HAKeyStore implements ExtendedValidatorKeyStore {
       this.log.warn(`Duty already signed by another node with different payload`, {
         dutyType: context.dutyType,
         slot: context.slot,
-        existingSigningRoot: error.existingSigningRoot,
-        attemptedSigningRoot: error.attemptedSigningRoot,
+        existingMessageHash: error.existingMessageHash,
+        attemptedMessageHash: error.attemptedMessageHash,
       });
       return;
     }

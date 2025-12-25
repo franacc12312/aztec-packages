@@ -3,7 +3,7 @@
  */
 import { Pool } from 'pg';
 
-import type { CreateHASignerConfig } from './config.js';
+import type { ValidatorHASignerConfig } from './config.js';
 import { PostgresSlashingProtectionDatabase } from './db/postgres.js';
 import { runMigrations } from './migrations.js';
 import type { CreateHASignerDeps, SlashingProtectionDatabase } from './types.js';
@@ -24,7 +24,7 @@ import { ValidatorHASigner } from './validator_ha_signer.js';
  * ```typescript
  * const { signer, db } = await createHASigner({
  *   databaseUrl: process.env.DATABASE_URL,
- *   enabled: true,
+ *   haSigningEnabled: true,
  *   nodeId: 'validator-node-1',
  *   pollingIntervalMs: 100,
  *   signingTimeoutMs: 3000,
@@ -40,7 +40,7 @@ import { ValidatorHASigner } from './validator_ha_signer.js';
  * ```typescript
  * const { signer, db } = await createHASigner({
  *   databaseUrl: process.env.DATABASE_URL,
- *   enabled: true,
+ *   haSigningEnabled: true,
  *   nodeId: 'validator-node-1',
  *   runMigrations: true, // Auto-run migrations on startup
  * });
@@ -52,7 +52,7 @@ import { ValidatorHASigner } from './validator_ha_signer.js';
  * @returns An object containing the signer and database instances
  */
 export async function createHASigner(
-  config: CreateHASignerConfig,
+  config: ValidatorHASignerConfig,
   deps?: CreateHASignerDeps,
 ): Promise<{
   signer: ValidatorHASigner;
@@ -67,6 +67,10 @@ export async function createHASigner(
     poolConnectionTimeoutMs,
     ...signerConfig
   } = config;
+
+  if (!databaseUrl) {
+    throw new Error('databaseUrl is required for createHASigner');
+  }
 
   // Run migrations if requested
   if (shouldRunMigrations) {

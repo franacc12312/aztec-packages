@@ -1,3 +1,4 @@
+import type { BlockNumber, CheckpointNumber, SlotNumber } from '@aztec/foundation/branded-types';
 import type { SecretValue } from '@aztec/foundation/config';
 import { Fr } from '@aztec/foundation/curves/bn254';
 import type { EthAddress } from '@aztec/foundation/eth-address';
@@ -93,9 +94,18 @@ export interface Validator {
   attestToProposal(proposal: BlockProposal, sender: PeerId): Promise<BlockAttestation[] | undefined>;
 
   broadcastBlockProposal(proposal: BlockProposal): Promise<void>;
-  collectAttestations(proposal: BlockProposal, required: number, deadline: Date): Promise<BlockAttestation[]>;
+  collectAttestations(
+    proposal: BlockProposal,
+    required: number,
+    deadline: Date,
+    blockNumber: BlockNumber | CheckpointNumber,
+  ): Promise<BlockAttestation[]>;
   /**
    * Sign attestations and signers payload
+   * @param attestationsAndSigners - The attestations and signers to sign
+   * @param proposer - The proposer address to sign with
+   * @param slot - The slot number for HA signing context
+   * @param blockNumber - The block or checkpoint number for HA signing context
    * @returns signature
    * @throws DutyAlreadySignedError if already signed by another HA node
    * @throws SlashingProtectionError if attempting to sign different data for same slot
@@ -103,5 +113,7 @@ export interface Validator {
   signAttestationsAndSigners(
     attestationsAndSigners: CommitteeAttestationsAndSigners,
     proposer: EthAddress,
+    slot: SlotNumber,
+    blockNumber: BlockNumber | CheckpointNumber,
   ): Promise<Signature>;
 }

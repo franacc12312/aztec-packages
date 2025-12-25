@@ -1,6 +1,7 @@
 /**
  * PostgreSQL implementation of SlashingProtectionDatabase
  */
+import type { SlotNumber } from '@aztec/foundation/branded-types';
 import { randomBytes } from '@aztec/foundation/crypto/random';
 import { EthAddress } from '@aztec/foundation/eth-address';
 import { type Logger, createLogger } from '@aztec/foundation/log';
@@ -108,7 +109,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
    */
   async updateDutySigned(
     validatorAddress: EthAddress,
-    slot: bigint,
+    slot: SlotNumber,
     dutyType: DutyType,
     signature: string,
     lockToken: string,
@@ -140,7 +141,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
    */
   async updateDutyFailed(
     validatorAddress: EthAddress,
-    slot: bigint,
+    slot: SlotNumber,
     dutyType: DutyType,
     errorMessage: string,
     lockToken: string,
@@ -168,7 +169,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
    * Delete a failed duty to allow retry
    * @returns true if a record was deleted, false otherwise
    */
-  async deleteFailedDuty(validatorAddress: EthAddress, slot: bigint, dutyType: DutyType): Promise<boolean> {
+  async deleteFailedDuty(validatorAddress: EthAddress, slot: SlotNumber, dutyType: DutyType): Promise<boolean> {
     const result = await this.pool.query(DELETE_FAILED_DUTY, [validatorAddress.toString(), slot.toString(), dutyType]);
 
     return (result.rowCount ?? 0) > 0;

@@ -169,6 +169,7 @@ class MockAztecNodeAdmin implements AztecNodeAdmin {
       nodeId: 'test-node-id',
       pollingIntervalMs: 50,
       signingTimeoutMs: 3000,
+      maxStuckDutiesAgeMs: 72000,
     });
   }
   startSnapshotUpload(_location: string): Promise<void> {

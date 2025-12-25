@@ -1,7 +1,7 @@
 import type { FileStoreBlobClient } from '@aztec/blob-client/filestore';
 import { getBlobsPerL1Block } from '@aztec/blob-lib';
 import type { EpochCache } from '@aztec/epoch-cache';
-import { BlockNumber, EpochNumber } from '@aztec/foundation/branded-types';
+import { BlockNumber, CheckpointNumber, EpochNumber, SlotNumber } from '@aztec/foundation/branded-types';
 import { Fr } from '@aztec/foundation/curves/bn254';
 import type { EthAddress } from '@aztec/foundation/eth-address';
 import type { Signature } from '@aztec/foundation/eth-signature';
@@ -440,10 +440,17 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     // }
 
     this.log.info(`Assembling block proposal for block ${blockNumber} slot ${header.slotNumber}`);
-    const newProposal = await this.validationService.createBlockProposal(header, archive, txs, proposerAddress, {
-      ...options,
-      broadcastInvalidBlockProposal: this.config.broadcastInvalidBlockProposal,
-    });
+    const newProposal = await this.validationService.createBlockProposal(
+      header,
+      archive,
+      txs,
+      proposerAddress,
+      {
+        ...options,
+        broadcastInvalidBlockProposal: this.config.broadcastInvalidBlockProposal,
+      },
+      blockNumber,
+    );
     this.previousProposal = newProposal;
     return newProposal;
   }
@@ -467,15 +474,20 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
   async signAttestationsAndSigners(
     attestationsAndSigners: CommitteeAttestationsAndSigners,
     proposer: EthAddress,
+    slot: SlotNumber,
+    blockNumber: BlockNumber | CheckpointNumber,
   ): Promise<Signature> {
-    return await this.validationService.signAttestationsAndSigners(attestationsAndSigners, proposer);
+    return await this.validationService.signAttestationsAndSigners(attestationsAndSigners, proposer, slot, blockNumber);
   }
 
-  async collectOwnAttestations(proposal: BlockProposal): Promise<BlockAttestation[]> {
+  async collectOwnAttestations(
+    proposal: BlockProposal,
+    blockNumber?: BlockNumber | CheckpointNumber,
+  ): Promise<BlockAttestation[]> {
     const slot = proposal.payload.header.slotNumber;
     const inCommittee = await this.epochCache.filterInCommittee(slot, this.getValidatorAddresses());
     this.log.debug(`Collecting ${inCommittee.length} self-attestations for slot ${slot}`, { inCommittee });
-    const attestations = await this.createBlockAttestationsFromProposal(proposal, inCommittee);
+    const attestations = await this.createBlockAttestationsFromProposal(proposal, inCommittee, blockNumber);
 
     // We broadcast our own attestations to our peers so, in case our block does not get mined on L1,
     // other nodes can see that our validators did attest to this block proposal, and do not slash us
@@ -486,7 +498,12 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     return attestations;
   }
 
-  async collectAttestations(proposal: BlockProposal, required: number, deadline: Date): Promise<BlockAttestation[]> {
+  async collectAttestations(
+    proposal: BlockProposal,
+    required: number,
+    deadline: Date,
+    blockNumber?: BlockNumber | CheckpointNumber,
+  ): Promise<BlockAttestation[]> {
     // Wait and poll the p2pClient's attestation pool for this block until we have enough attestations
     const slot = proposal.payload.header.slotNumber;
     this.log.debug(`Collecting ${required} attestations for slot ${slot} with deadline ${deadline.toISOString()}`);
@@ -498,7 +515,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
       throw new AttestationTimeoutError(0, required, slot);
     }
 
-    await this.collectOwnAttestations(proposal);
+    await this.collectOwnAttestations(proposal, blockNumber);
 
     const proposalId = proposal.archive.toString();
     const myAddresses = this.getValidatorAddresses();
@@ -556,8 +573,9 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
   private async createBlockAttestationsFromProposal(
     proposal: BlockProposal,
     attestors: EthAddress[] = [],
+    blockNumber?: BlockNumber | CheckpointNumber,
   ): Promise<BlockAttestation[]> {
-    const attestations = await this.validationService.attestToProposal(proposal, attestors);
+    const attestations = await this.validationService.attestToProposal(proposal, attestors, blockNumber);
     await this.p2pClient.addAttestations(attestations);
     return attestations;
   }

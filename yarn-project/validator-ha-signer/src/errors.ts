@@ -1,6 +1,8 @@
 /**
  * Custom errors for the validator HA signer
  */
+import type { SlotNumber } from '@aztec/foundation/branded-types';
+
 import type { DutyType } from './db/types.js';
 
 /**
@@ -10,7 +12,7 @@ import type { DutyType } from './db/types.js';
  */
 export class DutyAlreadySignedError extends Error {
   constructor(
-    public readonly slot: bigint,
+    public readonly slot: SlotNumber,
     public readonly dutyType: DutyType,
     public readonly signedByNode: string,
   ) {
@@ -28,7 +30,7 @@ export class DutyAlreadySignedError extends Error {
  */
 export class SlashingProtectionError extends Error {
   constructor(
-    public readonly slot: bigint,
+    public readonly slot: SlotNumber,
     public readonly dutyType: DutyType,
     public readonly existingMessageHash: string,
     public readonly attemptedMessageHash: string,

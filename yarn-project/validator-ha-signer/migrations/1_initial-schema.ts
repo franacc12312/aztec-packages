@@ -34,7 +34,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     duty_type: {
       type: 'varchar(30)',
       notNull: true,
-      check: "duty_type IN ('BLOCK_PROPOSAL', 'ATTESTATION', 'ATTESTATIONS_AND_SIGNERS')",
+      check: "duty_type IN ('BLOCK_PROPOSAL', 'CHECKPOINT_PROPOSAL', 'ATTESTATION', 'ATTESTATIONS_AND_SIGNERS')",
     },
     status: {
       type: 'varchar(20)',

@@ -1,8 +1,9 @@
+import type { BlockNumber, CheckpointNumber, SlotNumber } from '@aztec/foundation/branded-types';
 import type { EthAddress } from '@aztec/foundation/eth-address';
 
 import type { Pool } from 'pg';
 
-import type { CreateHASignerConfig, SlashingProtectionConfig } from './config.js';
+import type { ValidatorHASignerConfig } from './config.js';
 import type {
   CheckAndRecordParams,
   DutyIdentifier,
@@ -14,12 +15,11 @@ import type {
 
 export type {
   CheckAndRecordParams,
-  CreateHASignerConfig,
   DutyIdentifier,
   RecordFailureParams,
   RecordSuccessParams,
-  SlashingProtectionConfig,
   ValidatorDutyRecord,
+  ValidatorHASignerConfig,
 };
 export { DutyStatus, DutyType } from './db/types.js';
 
@@ -49,9 +49,13 @@ export interface CreateHASignerDeps {
  */
 export interface SigningContext {
   /** Slot number for this duty */
-  slot: bigint;
-  /** Block number for this duty */
-  blockNumber: bigint;
+  slot: SlotNumber;
+  /**
+   * Block or checkpoint number for this duty.
+   * For block proposals, this is the block number.
+   * For checkpoint proposals, this is the checkpoint number.
+   */
+  blockNumber: BlockNumber | CheckpointNumber;
   /** Type of duty being performed */
   dutyType: DutyType;
 }
@@ -83,7 +87,7 @@ export interface SlashingProtectionDatabase {
    */
   updateDutySigned(
     validatorAddress: EthAddress,
-    slot: bigint,
+    slot: SlotNumber,
     dutyType: DutyType,
     signature: string,
     lockToken: string,
@@ -97,7 +101,7 @@ export interface SlashingProtectionDatabase {
    */
   updateDutyFailed(
     validatorAddress: EthAddress,
-    slot: bigint,
+    slot: SlotNumber,
     dutyType: DutyType,
     errorMessage: string,
     lockToken: string,
@@ -106,7 +110,7 @@ export interface SlashingProtectionDatabase {
   /**
    * Delete a failed duty to allow retry
    */
-  deleteFailedDuty(validatorAddress: EthAddress, slot: bigint, dutyType: DutyType): Promise<boolean>;
+  deleteFailedDuty(validatorAddress: EthAddress, slot: SlotNumber, dutyType: DutyType): Promise<boolean>;
 
   /**
    * Cleanup own stuck duties
