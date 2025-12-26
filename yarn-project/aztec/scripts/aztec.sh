@@ -12,9 +12,13 @@ cmd=${1:-}
 
 export AZTEC_SHELL_WRAPPER=1
 
+if [ -f .aztecrc ] && command -v aztec-up &>/dev/null; then
+  aztec-up use
+fi
+
 case $cmd in
   test)
-    export LOG_LEVEL="${LOG_LEVEL:-info}"
+    export LOG_LEVEL="${LOG_LEVEL:-error}"
     aztec start --txe --port 8081 &
     server_pid=$!
     trap 'kill $server_pid &>/dev/null || true' EXIT
