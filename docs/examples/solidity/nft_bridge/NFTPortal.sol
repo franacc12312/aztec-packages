@@ -2,13 +2,13 @@
 pragma solidity >=0.8.27;
 
 // docs:start:portal_setup
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {IRegistry} from "@aztec/l1-contracts/src/governance/interfaces/IRegistry.sol";
-import {IInbox} from "@aztec/l1-contracts/src/core/interfaces/messagebridge/IInbox.sol";
-import {IOutbox} from "@aztec/l1-contracts/src/core/interfaces/messagebridge/IOutbox.sol";
-import {IRollup} from "@aztec/l1-contracts/src/core/interfaces/IRollup.sol";
-import {DataStructures} from "@aztec/l1-contracts/src/core/libraries/DataStructures.sol";
-import {Hash} from "@aztec/l1-contracts/src/core/libraries/crypto/Hash.sol";
+import {IERC721} from "@oz/token/ERC721/IERC721.sol";
+import {IRegistry} from "@aztec/governance/interfaces/IRegistry.sol";
+import {IInbox} from "@aztec/core/interfaces/messagebridge/IInbox.sol";
+import {IOutbox} from "@aztec/core/interfaces/messagebridge/IOutbox.sol";
+import {IRollup} from "@aztec/core/interfaces/IRollup.sol";
+import {DataStructures} from "@aztec/core/libraries/DataStructures.sol";
+import {Hash} from "@aztec/core/libraries/crypto/Hash.sol";
 
 contract NFTPortal {
     IRegistry public registry;

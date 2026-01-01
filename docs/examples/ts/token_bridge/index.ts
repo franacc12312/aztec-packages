@@ -1,17 +1,8 @@
-// @ts-nocheck
-
 // docs:start:setup
 import { privateKeyToAccount } from "viem/accounts";
-import {
-  createPublicClient,
-  createWalletClient,
-  http,
-  pad,
-  getAbiItem,
-  toEventHash,
-} from "viem";
+import { decodeEventLog, getContract, pad } from "viem";
 import { foundry } from "viem/chains";
-import { EthAddress } from "@aztec/aztec.js/addresses";
+import { AztecAddress, EthAddress } from "@aztec/aztec.js/addresses";
 import { Fr } from "@aztec/aztec.js/fields";
 import { createAztecNodeClient } from "@aztec/aztec.js/node";
 import { computeSecretHash } from "@aztec/stdlib/hash";
@@ -20,24 +11,22 @@ import { sha256ToField } from "@aztec/foundation/crypto/sha256";
 import { computeL2ToL1MessageHash } from "@aztec/stdlib/hash";
 import { TestWallet } from "@aztec/test-wallet/server";
 import { getInitialTestAccountsData } from "@aztec/accounts/testing";
-import SimpleNFT from "../artifacts/contracts/SimpleNFT.sol/SimpleNFT.json";
-import NFTPortal from "../artifacts/contracts/NFTPortal.sol/NFTPortal.json";
-import { NFTPunkContract } from "../contracts/aztec/artifacts/NFTPunk.js";
-import { NFTBridgeContract } from "../contracts/aztec/artifacts/NFTBridge.js";
+import { createExtendedL1Client } from "@aztec/ethereum/client";
+import { deployL1Contract } from "@aztec/ethereum/deploy-l1-contract";
+import SimpleNFT from "../../../target/solidity/nft_bridge/SimpleNFT.sol/SimpleNFT.json" with { type: "json" };
+import NFTPortal from "../../../target/solidity/nft_bridge/NFTPortal.sol/NFTPortal.json" with { type: "json" };
+import { NFTPunkContract } from "./artifacts/NFTPunk.js";
+import { NFTBridgeContract } from "./artifacts/NFTBridge.js";
 
-// Setup L1 clients using anvil's 1st account which should have a ton of ETH already
+// Setup L1 client using anvil's 1st account which should have a ton of ETH already
 const l1Account = privateKeyToAccount(
   "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 );
-const publicClient = createPublicClient({
-  chain: foundry,
-  transport: http("http://localhost:8545"),
-});
-const ethWallet = createWalletClient({
-  account: l1Account,
-  chain: foundry,
-  transport: http("http://localhost:8545"),
-});
+const l1Client = createExtendedL1Client(
+  ["http://localhost:8545"],
+  l1Account,
+  foundry
+);
 
 // Setup L2 using Aztec's local network and one of its initial accounts
 console.log("🔮 Setting up L2...\n");
@@ -59,23 +48,17 @@ const inboxAddress = nodeInfo.l1ContractAddresses.inboxAddress.toString();
 // docs:start:deploy_l1_contracts
 console.log("📦 Deploying L1 contracts...\n");
 
-const nftDeploymentHash = await ethWallet.deployContract({
-  abi: SimpleNFT.abi,
-  bytecode: SimpleNFT.bytecode as `0x${string}`,
-});
-const nftReceipt = await publicClient.waitForTransactionReceipt({
-  hash: nftDeploymentHash,
-});
-const nftAddress = nftReceipt.contractAddress!;
+const { address: nftAddress } = await deployL1Contract(
+  l1Client,
+  SimpleNFT.abi,
+  SimpleNFT.bytecode.object as `0x${string}`
+);
 
-const portalDeploymentHash = await ethWallet.deployContract({
-  abi: NFTPortal.abi,
-  bytecode: NFTPortal.bytecode as `0x${string}`,
-});
-const portalReceipt = await publicClient.waitForTransactionReceipt({
-  hash: portalDeploymentHash,
-});
-const portalAddress = portalReceipt.contractAddress!;
+const { address: portalAddress } = await deployL1Contract(
+  l1Client,
+  NFTPortal.abi,
+  NFTPortal.bytecode.object as `0x${string}`
+);
 
 console.log(`✅ SimpleNFT: ${nftAddress}`);
 console.log(`✅ NFTPortal: ${portalAddress}\n`);
@@ -99,17 +82,23 @@ console.log(`✅ L2 Bridge: ${l2Bridge.address.toString()}\n`);
 // docs:start:initialize_portal
 console.log("🔧 Initializing portal...");
 
-const hash = await ethWallet.writeContract({
-  address: portalAddress as `0x${string}`,
-  abi: NFTPortal.abi,
-  functionName: "initialize",
-  args: [
-    registryAddress as `0x${string}`,
-    nftAddress as `0x${string}`,
-    l2Bridge.address.toString() as `0x${string}`,
-  ],
+const nftContract = getContract({
+  address: nftAddress.toString() as `0x${string}`,
+  abi: SimpleNFT.abi,
+  client: l1Client,
 });
-await publicClient.waitForTransactionReceipt({ hash });
+const portalContract = getContract({
+  address: portalAddress.toString() as `0x${string}`,
+  abi: NFTPortal.abi,
+  client: l1Client,
+});
+
+const hash = await portalContract.write.initialize([
+  registryAddress as `0x${string}`,
+  nftAddress.toString() as `0x${string}`,
+  l2Bridge.address.toString() as `0x${string}`,
+]);
+await l1Client.waitForTransactionReceipt({ hash });
 
 console.log("✅ Portal initialized\n");
 // docs:end:initialize_portal
@@ -118,7 +107,7 @@ console.log("✅ Portal initialized\n");
 console.log("🔧 Setting up L2 bridge...");
 
 await l2Bridge.methods
-  .set_portal(EthAddress.fromString(portalAddress))
+  .set_portal(EthAddress.fromString(portalAddress.toString()))
   .send({ from: account.address })
   .wait();
 
@@ -133,13 +122,8 @@ console.log("✅ Bridge configured\n");
 // docs:start:mint_nft_l1
 console.log("🎨 Minting NFT on L1...");
 
-const mintHash = await ethWallet.writeContract({
-  address: nftAddress as `0x${string}`,
-  abi: SimpleNFT.abi,
-  functionName: "mint",
-  args: [l1Account.address],
-});
-await publicClient.waitForTransactionReceipt({ hash: mintHash });
+const mintHash = await nftContract.write.mint([l1Account.address]);
+await l1Client.waitForTransactionReceipt({ hash: mintHash });
 
 // no need to parse logs, this will be tokenId 0 since it's a fresh contract
 const tokenId = 0n;
@@ -153,24 +137,17 @@ console.log("🌉 Depositing NFT to Aztec...");
 const secret = Fr.random();
 const secretHash = await computeSecretHash(secret);
 
-const approveHash = await ethWallet.writeContract({
-  address: nftAddress as `0x${string}`,
-  abi: SimpleNFT.abi,
-  functionName: "approve",
-  args: [portalAddress as `0x${string}`, tokenId],
-});
-await publicClient.waitForTransactionReceipt({ hash: approveHash });
+const approveHash = await nftContract.write.approve([
+  portalAddress.toString() as `0x${string}`,
+  tokenId,
+]);
+await l1Client.waitForTransactionReceipt({ hash: approveHash });
 
-const depositHash = await ethWallet.writeContract({
-  address: portalAddress as `0x${string}`,
-  abi: NFTPortal.abi,
-  functionName: "depositToAztec",
-  args: [
-    tokenId,
-    pad(secretHash.toString() as `0x${string}`, { dir: "left", size: 32 }),
-  ],
-});
-const depositReceipt = await publicClient.waitForTransactionReceipt({
+const depositHash = await portalContract.write.depositToAztec([
+  tokenId,
+  pad(secretHash.toString() as `0x${string}`, { dir: "left", size: 32 }),
+]);
+const depositReceipt = await l1Client.waitForTransactionReceipt({
   hash: depositHash,
 });
 // docs:end:deposit_to_aztec
@@ -188,19 +165,28 @@ const INBOX_ABI = [
     ],
   },
 ] as const;
-const messageSentTopic = toEventHash(INBOX_ABI[0]);
-const messageSentLog = depositReceipt.logs!.find(
-  (log: any) =>
-    log.address.toLowerCase() === inboxAddress.toLowerCase() &&
-    log.topics[0] === messageSentTopic
-);
 
-const indexHex = messageSentLog!.data!.slice(0, 66);
-const messageLeafIndex = new Fr(BigInt(indexHex));
+// Find and decode the MessageSent event from the Inbox contract
+const messageSentLog = depositReceipt.logs
+  .filter((log) => log.address.toLowerCase() === inboxAddress.toLowerCase())
+  .map((log) => {
+    try {
+      return decodeEventLog({
+        abi: INBOX_ABI,
+        data: log.data,
+        topics: log.topics,
+      });
+    } catch {
+      return null;
+    }
+  })
+  .find((decoded) => decoded?.eventName === "MessageSent");
+
+const messageLeafIndex = new Fr(messageSentLog!.args.index);
 // docs:end:get_message_leaf_index
 
 // docs:start:mine_blocks
-async function mine2Blocks(aztecWallet: TestWallet, accountAddress: any) {
+async function mine2Blocks(aztecWallet: TestWallet, accountAddress: AztecAddress) {
   await NFTPunkContract.deploy(aztecWallet, accountAddress)
     .send({ from: accountAddress, contractAddressSalt: Fr.random() })
     .deployed();
@@ -272,16 +258,12 @@ const content = sha256ToField([
 ]);
 
 // Get rollup version from the portal contract (it stores it during initialize)
-const version = (await publicClient.readContract({
-  address: portalAddress as `0x${string}`,
-  abi: NFTPortal.abi,
-  functionName: "rollupVersion",
-})) as number;
+const version = await portalContract.read.rollupVersion();
 
 // Compute the L2→L1 message hash
 const msgLeaf = computeL2ToL1MessageHash({
   l2Sender: l2Bridge.address,
-  l1Recipient: EthAddress.fromString(portalAddress),
+  l1Recipient: EthAddress.fromString(portalAddress.toString()),
   content,
   rollupVersion: new Fr(version),
   chainId: new Fr(foundry.id),
@@ -318,17 +300,12 @@ const siblingPathHex = witness!.siblingPath
 
 // docs:start:withdraw_on_l1
 console.log("💰 Withdrawing NFT on L1...");
-const withdrawHash = await ethWallet.writeContract({
-  address: portalAddress as `0x${string}`,
-  abi: NFTPortal.abi,
-  functionName: "withdraw",
-  args: [
-    tokenId,
-    BigInt(exitReceipt.blockNumber!),
-    BigInt(witness!.leafIndex),
-    siblingPathHex,
-  ],
-});
-await publicClient.waitForTransactionReceipt({ hash: withdrawHash });
+const withdrawHash = await portalContract.write.withdraw([
+  tokenId,
+  BigInt(exitReceipt.blockNumber!),
+  BigInt(witness!.leafIndex),
+  siblingPathHex,
+]);
+await l1Client.waitForTransactionReceipt({ hash: withdrawHash });
 console.log("✅ NFT withdrawn to L1\n");
 // docs:end:withdraw_on_l1
