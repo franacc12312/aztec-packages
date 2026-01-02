@@ -33,7 +33,7 @@ export class ProxiedNodeFactory {
             return { perMethod, roundTrips };
           };
         } else {
-          return async function (...args: any[]) {
+          return function (...args: any[]) {
             // Track per-method stats
             if (!perMethod[prop]) {
               perMethod[prop] = { times: [] };
@@ -47,9 +47,11 @@ export class ProxiedNodeFactory {
             inFlightCount++;
 
             const callTimer = new Timer();
+            // Use try/finally to ensure cleanup even if the RPC call throws.
+            // Without this, a failed call would leave inFlightCount incremented,
+            // breaking round trip tracking for all subsequent calls.
             try {
-              const result = await (target[prop] as any).apply(target, args);
-              return result;
+              return (target[prop] as any).apply(target, args);
             } finally {
               const callTime = callTimer.ms();
               perMethod[prop].times.push(callTime);
