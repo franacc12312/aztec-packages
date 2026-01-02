@@ -20,12 +20,35 @@ jobs:
       release-pr: ${{ steps.release.outputs.pr }}
       release-version: ${{ steps.release.outputs.tag_name }}
     steps:
+      - name: Checkout to check config files
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          sparse-checkout: .github
+          token: ${{ secrets.AZTEC_BOT_GITHUB_TOKEN }}
+
+      - name: Determine release-please config
+        id: config
+        run: |
+          BRANCH_CONFIG=".github/release-please-${{ github.ref_name }}.json"
+          DEFAULT_CONFIG=".github/release-please.json"
+
+          if [[ -f "$BRANCH_CONFIG" ]]; then
+            echo "Using branch-specific config: $BRANCH_CONFIG"
+            echo "config-file=$BRANCH_CONFIG" >> $GITHUB_OUTPUT
+          elif [[ -f "$DEFAULT_CONFIG" ]]; then
+            echo "Branch config not found, using default: $DEFAULT_CONFIG"
+            echo "config-file=$DEFAULT_CONFIG" >> $GITHUB_OUTPUT
+          else
+            echo "::error::No release-please config found. Expected $BRANCH_CONFIG or $DEFAULT_CONFIG"
+            exit 1
+          fi
+
       - name: Run Release Please
         id: release
         uses: googleapis/release-please-action@7d28262f14160787a44a6be36146a18e6f575a3f
         with:
           token: ${{ secrets.AZTEC_BOT_GITHUB_TOKEN }}
-          config-file: .github/release-please-${{ github.ref_name }}.json
+          config-file: ${{ steps.config.outputs.config-file }}
           target-branch: ${{ github.ref_name }}
 
   auto-tag:
@@ -79,10 +102,12 @@ jobs:
             exit 1
           fi
 
-          if [[ "$MANIFEST_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+          # Accept stable versions (X.Y.Z) and prerelease versions (X.Y.Z-suffix.N)
+          if [[ "$MANIFEST_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-[a-zA-Z0-9.]+)?$ ]]; then
             NEXT_VERSION="$MANIFEST_VERSION"
           else
-            echo "Error: Invalid manifest version format"
+            echo "Error: Invalid manifest version format: $MANIFEST_VERSION"
+            echo "Expected: X.Y.Z or X.Y.Z-prerelease.N"
             exit 1
           fi
 
@@ -179,6 +204,37 @@ jobs:
           ./scripts/aztec_nr_docs_generation/generate_aztec_nr_docs.sh ${{ steps.version.outputs.semver }}
           echo "Generated Aztec.nr API docs for: ${{ steps.version.outputs.semver }}"
 
+      - name: Build bb (uses cache if available)
+        working-directory: ./barretenberg/cpp
+        run: |
+          ./bootstrap.sh build_native
+          echo "BB_PATH=$(pwd)/build/bin" >> $GITHUB_ENV
+
+      - name: Build aztec CLI
+        working-directory: ./yarn-project
+        run: |
+          ./bootstrap.sh
+          echo "AZTEC_CLI_PATH=$(pwd)/aztec/dest/bin" >> $GITHUB_ENV
+
+      - name: Generate CLI documentation
+        working-directory: ./docs
+        run: |
+          # Add locally built binaries to PATH
+          export PATH="${BB_PATH}:${PATH}"
+
+          # Create wrapper for aztec CLI that runs the local build
+          mkdir -p /tmp/cli-bin
+          cat > /tmp/cli-bin/aztec << 'EOF'
+          #!/bin/bash
+          node "$AZTEC_CLI_PATH/index.js" "$@"
+          EOF
+          chmod +x /tmp/cli-bin/aztec
+          export PATH="/tmp/cli-bin:${PATH}"
+
+          # Generate CLI docs using locally built binaries
+          ./scripts/cli_reference_generation/generate_all_cli_docs.sh
+          echo "Generated CLI documentation for: ${{ steps.version.outputs.semver }}"
+
       - name: Cut Aztec Developer Docs version
         working-directory: ./docs
         run: |
@@ -207,6 +263,8 @@ jobs:
 
       - name: Commit new Aztec Docs version
         run: |
+          # Reset non-versioned CLI docs (only versioned copies should be committed)
+          git checkout -- docs/docs-developers/docs/cli/*_cli_reference.md || true
           git add .
           git commit -m "chore(docs): cut new aztec docs version for tag ${{ steps.version.outputs.semver }}"
           git push

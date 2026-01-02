@@ -126,7 +126,7 @@ python3 "$SCRIPT_DIR/transform_to_markdown.py" \
 cat > "$TEMP_WITH_FRONTMATTER" << EOF
 ---
 title: ${CLI_TITLE}
-description: Comprehensive auto-generated reference for the ${CLI_DISPLAY_NAME} command-line interface with all commands and options.
+description: ${CLI_DESCRIPTION}
 tags: ${CLI_TAGS}
 sidebar_position: ${CLI_SIDEBAR_POSITION}
 ---
