@@ -6,9 +6,32 @@ import { z } from 'zod';
 import type { AztecNode } from '../interfaces/aztec-node.js';
 import { type PrivateExecutionStep, PrivateExecutionStepSchema } from '../kernel/private_kernel_prover_output.js';
 
-export type NodeStats = Partial<Record<keyof AztecNode, { times: number[] }>>;
+export type RoundTripStats = {
+  /** Number of round trips (times we blocked waiting for node responses) */
+  roundTrips: number;
+  /** Total wall-clock time spent waiting on node (excludes parallel overlap) */
+  totalBlockingTime: number;
+  /** Individual round trip durations */
+  roundTripDurations: number[];
+};
 
-const NodeStatsSchema = z.record(z.string(), z.object({ times: z.array(z.number()) }));
+const RoundTripStatsSchema = z.object({
+  roundTrips: z.number(),
+  totalBlockingTime: z.number(),
+  roundTripDurations: z.array(z.number()),
+});
+
+export type NodeStats = {
+  /** Per-method call stats */
+  perMethod: Partial<Record<keyof AztecNode, { times: number[] }>>;
+  /** Round trip stats tracking actual blocking waits */
+  roundTrips: RoundTripStats;
+};
+
+const NodeStatsSchema = z.object({
+  perMethod: z.record(z.string(), z.object({ times: z.array(z.number()) })),
+  roundTrips: RoundTripStatsSchema,
+});
 
 type FunctionTiming = {
   functionName: string;
@@ -105,7 +128,10 @@ export class TxProfileResult {
         },
       ],
       {
-        nodeRPCCalls: { getBlockHeader: { times: [1] } },
+        nodeRPCCalls: {
+          perMethod: { getBlockHeader: { times: [1] } },
+          roundTrips: { roundTrips: 1, totalBlockingTime: 1, roundTripDurations: [1] },
+        },
         timings: {
           sync: 1,
           proving: 1,
@@ -140,7 +166,10 @@ export class UtilitySimulationResult {
 
   static random(): UtilitySimulationResult {
     return new UtilitySimulationResult([Fr.random()], {
-      nodeRPCCalls: { getBlockHeader: { times: [1] } },
+      nodeRPCCalls: {
+        perMethod: { getBlockHeader: { times: [1] } },
+        roundTrips: { roundTrips: 1, totalBlockingTime: 1, roundTripDurations: [1] },
+      },
       timings: {
         sync: 1,
         publicSimulation: 1,

@@ -325,7 +325,9 @@ export class ContractFunctionSimulator {
    */
   getStats() {
     const nodeRPCCalls =
-      typeof (this.aztecNode as ProxiedNode).getStats === 'function' ? (this.aztecNode as ProxiedNode).getStats() : {};
+      typeof (this.aztecNode as ProxiedNode).getStats === 'function'
+        ? (this.aztecNode as ProxiedNode).getStats()
+        : { perMethod: {}, roundTrips: { roundTrips: 0, totalBlockingTime: 0, roundTripDurations: [] } };
 
     return { nodeRPCCalls };
   }
