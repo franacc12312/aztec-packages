@@ -1,33 +1,33 @@
 #!/bin/bash
-# Script to regenerate auto-generated CLI documentation for both aztec and aztec-wallet
+# Script to regenerate auto-generated CLI documentation for all supported CLIs
 # Usage: ./scripts/cli_reference_generation/update_all_cli_docs.sh [target_version] [output_dir]
 #
 # Examples:
 #   ./scripts/cli_reference_generation/update_all_cli_docs.sh                    # Updates all versions
 #   ./scripts/cli_reference_generation/update_all_cli_docs.sh v2.0.2             # Updates only v2.0.2
 #   ./scripts/cli_reference_generation/update_all_cli_docs.sh current            # Updates only main docs folder
-#   ./scripts/cli_reference_generation/update_all_cli_docs.sh v2.0.2 /tmp/       # Outputs both to /tmp/
+#   ./scripts/cli_reference_generation/update_all_cli_docs.sh v2.0.2 /tmp/       # Outputs all to /tmp/
 
 set -euo pipefail
 
+# Get script directory and source shared config
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/cli_config.sh"
+
 TARGET_VERSION="${1:-all}"
 OUTPUT_DIR="${2:-}"
 readonly SCRIPT_DIR TARGET_VERSION OUTPUT_DIR
 
-# Array of CLIs to process
-readonly CLIS=("aztec" "aztec-wallet")
-
 echo "=== Update All CLI Documentation Script ==="
 echo ""
 echo "This script will update documentation for:"
-for cli in "${CLIS[@]}"; do
+for cli in "${VALID_CLIS[@]}"; do
   echo "  - $cli CLI"
 done
 echo ""
 
 # Process each CLI using the unified script
-for cli in "${CLIS[@]}"; do
+for cli in "${VALID_CLIS[@]}"; do
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "Updating $cli CLI Documentation"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -47,16 +47,12 @@ echo "✅ All CLI Documentation Updated"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "Files updated:"
-for cli in "${CLIS[@]}"; do
-  if [[ "$cli" == "aztec" ]]; then
-    filename="aztec_cli_reference.md"
-  else
-    filename="aztec_wallet_cli_reference.md"
-  fi
+for cli in "${VALID_CLIS[@]}"; do
+  get_cli_config "$cli"
   if [[ -n "$OUTPUT_DIR" ]]; then
-    echo "  - $OUTPUT_DIR/$filename"
+    echo "  - $OUTPUT_DIR/$CLI_OUTPUT_FILE"
   else
-    echo "  - $filename"
+    echo "  - $CLI_OUTPUT_FILE"
   fi
 done
 echo ""
