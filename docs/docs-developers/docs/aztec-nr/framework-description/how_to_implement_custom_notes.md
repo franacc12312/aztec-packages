@@ -161,7 +161,7 @@ impl NoteHash for CustomHashNote {
     ) -> Field {
         // Standard nullifier using owner's nullifier secret key
         let owner_npk_m = aztec::keys::getters::get_public_keys(owner).npk_m;
-        let secret = context.request_nsk_app(owner_npk_m.hash());
+        let secret = self.context.request_nsk_app(owner_npk_m.hash());
         poseidon2_hash_with_separator(
             [note_hash_for_nullification, secret],
             DOM_SEP__NOTE_NULLIFIER,
