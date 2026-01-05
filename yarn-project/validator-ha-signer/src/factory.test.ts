@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { Pool, PoolClient } from 'pg';
 
 import { PostgresSlashingProtectionDatabase } from './db/postgres.js';
+import { SCHEMA_VERSION } from './db/schema.js';
 import { createHASigner } from './factory.js';
 import { ValidatorHASigner } from './validator_ha_signer.js';
 
@@ -19,10 +20,16 @@ describe('createHASigner', () => {
       release: jest.fn<() => void>(),
     } as unknown as PoolClient;
 
-    // Create mock pool
+    // Create mock pool that returns correct schema version for initialize()
     mockPool = {
       connect: jest.fn<() => Promise<PoolClient>>().mockResolvedValue(mockClient),
-      query: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue({ rows: [], rowCount: 0 }),
+      query: jest.fn<(...args: any[]) => Promise<any>>().mockImplementation((sql: string) => {
+        // Return schema version when queried
+        if (sql.includes('schema_version')) {
+          return Promise.resolve({ rows: [{ version: SCHEMA_VERSION }], rowCount: 1 });
+        }
+        return Promise.resolve({ rows: [], rowCount: 0 });
+      }),
       end: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     } as unknown as Pool;
   });

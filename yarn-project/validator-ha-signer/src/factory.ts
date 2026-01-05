@@ -81,6 +81,9 @@ export async function createHASigner(
   // Create database instance
   const db = new PostgresSlashingProtectionDatabase(pool);
 
+  // Verify database schema is initialized and version matches
+  await db.initialize();
+
   // Create signer
   const signer = new ValidatorHASigner(db, { ...signerConfig, databaseUrl });
 
