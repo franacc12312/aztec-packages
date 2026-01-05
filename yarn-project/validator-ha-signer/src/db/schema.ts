@@ -201,6 +201,16 @@ WHERE status IN ('signing', 'signed', 'failed')
 `;
 
 /**
+ * SQL to drop the validator_duties table
+ */
+export const DROP_VALIDATOR_DUTIES_TABLE = `DROP TABLE IF EXISTS validator_duties;`;
+
+/**
+ * SQL to drop the schema_version table
+ */
+export const DROP_SCHEMA_VERSION_TABLE = `DROP TABLE IF EXISTS schema_version;`;
+
+/**
  * Query to get stuck duties (for monitoring/alerting)
  * Returns duties in 'signing' status that have been stuck for too long
  */

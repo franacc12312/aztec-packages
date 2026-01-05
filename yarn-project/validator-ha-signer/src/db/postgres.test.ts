@@ -3,7 +3,9 @@ import { EthAddress } from '@aztec/foundation/eth-address';
 
 import { PGlite } from '@electric-sql/pglite';
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { Pool } from '@middle-management/pglite-pg-adapter';
 
+import { PostgresSlashingProtectionDatabase } from './postgres.js';
 import {
   DELETE_FAILED_DUTY,
   INSERT_OR_GET_DUTY,
@@ -440,6 +442,86 @@ describe('PostgreSQL Queries', () => {
 
       const row = result.rows[0] as { block_number: string };
       expect(BigInt(row.block_number)).toBe(largeBlockNumber);
+    });
+  });
+});
+
+describe('PostgresSlashingProtectionDatabase', () => {
+  let pglite: PGlite;
+  let pool: Pool;
+
+  beforeEach(() => {
+    pglite = new PGlite();
+    pool = new Pool({ pglite });
+  });
+
+  afterEach(async () => {
+    await pool.end();
+  });
+
+  describe('initialize', () => {
+    it('should succeed when schema_version table exists with correct version', async () => {
+      // Set up schema with correct version
+      for (const statement of SCHEMA_SETUP) {
+        await pglite.query(statement);
+      }
+      await pglite.query(INSERT_SCHEMA_VERSION, [SCHEMA_VERSION]);
+
+      const db = new PostgresSlashingProtectionDatabase(pool as any);
+
+      await expect(db.initialize()).resolves.not.toThrow();
+    });
+
+    it('should throw when schema_version table does not exist', async () => {
+      const db = new PostgresSlashingProtectionDatabase(pool as any);
+
+      await expect(db.initialize()).rejects.toThrow(
+        'Database schema not initialized. Please run migrations first: aztec migrate up --database-url <url>',
+      );
+    });
+
+    it('should throw when schema_version table is empty', async () => {
+      // Create schema_version table but don't insert any version
+      await pglite.query(`
+        CREATE TABLE schema_version (
+          version INTEGER PRIMARY KEY,
+          applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      const db = new PostgresSlashingProtectionDatabase(pool as any);
+
+      await expect(db.initialize()).rejects.toThrow(
+        'Database schema not initialized. Please run migrations first: aztec migrate up --database-url <url>',
+      );
+    });
+
+    it('should throw when schema version is lower than expected', async () => {
+      // Set up schema with outdated version
+      for (const statement of SCHEMA_SETUP) {
+        await pglite.query(statement);
+      }
+      await pglite.query(INSERT_SCHEMA_VERSION, [SCHEMA_VERSION - 1]);
+
+      const db = new PostgresSlashingProtectionDatabase(pool as any);
+
+      await expect(db.initialize()).rejects.toThrow(
+        `Database schema version ${SCHEMA_VERSION - 1} is outdated (expected ${SCHEMA_VERSION}). Please run migrations: aztec migrate up --database-url <url>`,
+      );
+    });
+
+    it('should throw when schema version is higher than expected', async () => {
+      // Set up schema with newer version
+      for (const statement of SCHEMA_SETUP) {
+        await pglite.query(statement);
+      }
+      await pglite.query(INSERT_SCHEMA_VERSION, [SCHEMA_VERSION + 1]);
+
+      const db = new PostgresSlashingProtectionDatabase(pool as any);
+
+      await expect(db.initialize()).rejects.toThrow(
+        `Database schema version ${SCHEMA_VERSION + 1} is newer than expected (${SCHEMA_VERSION}). Please update your application.`,
+      );
     });
   });
 });

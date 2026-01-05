@@ -6,6 +6,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { Pool } from '@middle-management/pglite-pg-adapter';
 
 import { PostgresSlashingProtectionDatabase } from './db/postgres.js';
+import { setupTestSchema } from './db/test_helper.js';
 import { DutyAlreadySignedError, SlashingProtectionError } from './errors.js';
 import { SlashingProtectionService } from './slashing_protection_service.js';
 import { type CheckAndRecordParams, DutyStatus, DutyType, type SlashingProtectionConfig } from './types.js';
@@ -32,6 +33,7 @@ describe('SlashingProtectionService', () => {
     pglite = new PGlite();
     pool = new Pool({ pglite });
 
+    await setupTestSchema(pglite);
     db = new PostgresSlashingProtectionDatabase(pool as any);
     await db.initialize();
 

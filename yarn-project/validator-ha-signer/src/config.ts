@@ -58,7 +58,7 @@ export interface CreateHASignerConfig extends SlashingProtectionConfig {
    * @default false
    *
    * Set to true for simple deployments where you want automatic schema setup.
-   * Set to false (recommended for production HA) and run migrations separately
+   * Set to false (recommended for production High-Availability setups) and run migrations separately
    * using an init container or migration job.
    */
   runMigrations?: boolean;

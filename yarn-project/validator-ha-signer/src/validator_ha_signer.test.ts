@@ -9,6 +9,7 @@ import { Pool } from '@middle-management/pglite-pg-adapter';
 
 import type { CreateHASignerConfig } from './config.js';
 import { PostgresSlashingProtectionDatabase } from './db/postgres.js';
+import { setupTestSchema } from './db/test_helper.js';
 import { DutyStatus, DutyType } from './db/types.js';
 import { DutyAlreadySignedError, SlashingProtectionError } from './errors.js';
 import { ValidatorHASigner } from './validator_ha_signer.js';
@@ -35,6 +36,7 @@ describe('ValidatorHASigner', () => {
     pglite = new PGlite();
     pool = new Pool({ pglite });
 
+    await setupTestSchema(pglite);
     db = new PostgresSlashingProtectionDatabase(pool as any);
     await db.initialize();
 

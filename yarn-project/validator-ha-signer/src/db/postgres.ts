@@ -10,8 +10,6 @@ import type { SlashingProtectionDatabase, TryInsertOrGetResult } from '../types.
 import {
   DELETE_FAILED_DUTY,
   INSERT_OR_GET_DUTY,
-  INSERT_SCHEMA_VERSION,
-  SCHEMA_SETUP,
   SCHEMA_VERSION,
   UPDATE_DUTY_FAILED,
   UPDATE_DUTY_SIGNED,
@@ -53,31 +51,43 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
   }
 
   /**
-   * Initialize the database schema
-   * Should be called once at startup
+   * Verify that database migrations have been run and schema version matches.
+   * Should be called once at startup.
+   *
+   * @throws Error if migrations haven't been run or schema version is outdated
    */
   async initialize(): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
+    let dbVersion: number;
 
-      // Run all schema setup statements
-      for (const statement of SCHEMA_SETUP) {
-        await client.query(statement);
+    try {
+      const result = await this.pool.query<{ version: number }>(
+        `SELECT version FROM schema_version ORDER BY version DESC LIMIT 1`,
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error('No version found');
       }
 
-      // Record schema version
-      await client.query(INSERT_SCHEMA_VERSION, [SCHEMA_VERSION]);
-
-      await client.query('COMMIT');
-      this.log.info('Database schema initialized', { version: SCHEMA_VERSION });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      this.log.error('Failed to initialize database schema', error);
-      throw error;
-    } finally {
-      client.release();
+      dbVersion = result.rows[0].version;
+    } catch {
+      throw new Error(
+        'Database schema not initialized. Please run migrations first: aztec migrate up --database-url <url>',
+      );
     }
+
+    if (dbVersion < SCHEMA_VERSION) {
+      throw new Error(
+        `Database schema version ${dbVersion} is outdated (expected ${SCHEMA_VERSION}). Please run migrations: aztec migrate up --database-url <url>`,
+      );
+    }
+
+    if (dbVersion > SCHEMA_VERSION) {
+      throw new Error(
+        `Database schema version ${dbVersion} is newer than expected (${SCHEMA_VERSION}). Please update your application.`,
+      );
+    }
+
+    this.log.info('Database schema verified', { version: dbVersion });
   }
 
   /**

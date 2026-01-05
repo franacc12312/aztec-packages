@@ -10,14 +10,24 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+export interface RunMigrationsOptions {
+  /** Migration direction ('up' to apply, 'down' to rollback). Defaults to 'up'. */
+  direction?: 'up' | 'down';
+  /** Enable verbose output. Defaults to false. */
+  verbose?: boolean;
+}
+
 /**
  * Run database migrations programmatically
  *
  * @param databaseUrl - PostgreSQL connection string
- * @param direction - Migration direction ('up' to apply, 'down' to rollback)
+ * @param options - Migration options (direction, verbose)
  * @returns Array of applied migration names
  */
-export async function runMigrations(databaseUrl: string, direction: 'up' | 'down' = 'up'): Promise<string[]> {
+export async function runMigrations(databaseUrl: string, options: RunMigrationsOptions = {}): Promise<string[]> {
+  const direction = options.direction ?? 'up';
+  const verbose = options.verbose ?? false;
+
   const log = createLogger('validator-ha-signer:migrations');
 
   try {
@@ -25,12 +35,12 @@ export async function runMigrations(databaseUrl: string, direction: 'up' | 'down
 
     const appliedMigrations = await runner({
       databaseUrl,
-      dir: join(__dirname, '..', 'migrations'),
+      dir: join(__dirname, 'db', 'migrations'),
       direction,
       migrationsTable: 'pgmigrations',
       count: direction === 'down' ? 1 : Infinity,
-      verbose: false,
-      log: msg => log.debug(msg),
+      verbose,
+      log: msg => (verbose ? log.info(msg) : log.debug(msg)),
     });
 
     if (appliedMigrations.length === 0) {
