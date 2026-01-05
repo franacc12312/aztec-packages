@@ -3,36 +3,39 @@ import type { EthAddress } from '@aztec/foundation/eth-address';
 import {
   type CheckAndRecordParams,
   DutyStatus,
-  DutyType,
+  type DutyType,
   type SlashingProtectionDatabase,
+  type TryInsertOrGetResult,
   type ValidatorDutyRecord,
 } from '../types.js';
 
-// Mock database implementation
+/**
+ * Mock database implementation for testing
+ */
 export class MockDatabase implements SlashingProtectionDatabase {
   private duties = new Map<string, ValidatorDutyRecord>();
 
-  findDuty(validatorAddress: EthAddress, slot: bigint, dutyType: DutyType): Promise<ValidatorDutyRecord | null> {
-    const key = this.getKey(validatorAddress, slot, dutyType);
-    return Promise.resolve(this.duties.get(key) || null);
-  }
-
-  insertDuty(params: CheckAndRecordParams): Promise<boolean> {
+  // try to insert a new duty record, or get the existing one if present
+  tryInsertOrGetExisting(params: CheckAndRecordParams): Promise<TryInsertOrGetResult> {
     const key = this.getKey(params.validatorAddress, params.slot, params.dutyType);
-    if (this.duties.has(key)) {
-      return Promise.resolve(false);
+    const existing = this.duties.get(key);
+
+    if (existing) {
+      return Promise.resolve({ isNew: false, record: existing });
     }
-    this.duties.set(key, {
+
+    const newRecord: ValidatorDutyRecord = {
       validatorAddress: params.validatorAddress,
       slot: params.slot,
       blockNumber: params.blockNumber,
       dutyType: params.dutyType,
       status: DutyStatus.SIGNING,
-      signingRoot: params.signingRoot,
+      messageHash: params.messageHash,
       nodeId: params.nodeId,
       startedAt: new Date(),
-    });
-    return Promise.resolve(true);
+    };
+    this.duties.set(key, newRecord);
+    return Promise.resolve({ isNew: true, record: newRecord });
   }
 
   updateDutySigned(validatorAddress: EthAddress, slot: bigint, dutyType: DutyType, signature: string): Promise<void> {
@@ -83,5 +86,11 @@ export class MockDatabase implements SlashingProtectionDatabase {
 
   getAllDuties(): ValidatorDutyRecord[] {
     return Array.from(this.duties.values());
+  }
+
+  // Get a specific duty for test assertions
+  getDuty(validatorAddress: EthAddress, slot: bigint, dutyType: DutyType): ValidatorDutyRecord | undefined {
+    const key = this.getKey(validatorAddress, slot, dutyType);
+    return this.duties.get(key);
   }
 }

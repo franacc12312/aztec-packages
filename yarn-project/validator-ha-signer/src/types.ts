@@ -6,11 +6,11 @@ import type { CreateHASignerConfig, SlashingProtectionConfig } from './config.js
 import type {
   CheckAndRecordParams,
   DutyIdentifier,
+  DutyType,
   RecordFailureParams,
   RecordSuccessParams,
   ValidatorDutyRecord,
 } from './db/types.js';
-import { DutyStatus, DutyType } from './db/types.js';
 
 export type {
   CheckAndRecordParams,
@@ -21,7 +21,17 @@ export type {
   SlashingProtectionConfig,
   ValidatorDutyRecord,
 };
-export { DutyStatus, DutyType };
+export { DutyStatus, DutyType } from './db/types.js';
+
+/**
+ * Result of tryInsertOrGetExisting operation
+ */
+export interface TryInsertOrGetResult {
+  /** True if we inserted a new record, false if we got an existing record */
+  isNew: boolean;
+  /** The record (either newly inserted or existing) */
+  record: ValidatorDutyRecord;
+}
 
 /**
  * deps for creating an HA signer
@@ -49,18 +59,21 @@ export interface SigningContext {
 /**
  * Database interface for slashing protection operations
  * This abstraction allows for different database implementations (PostgreSQL, SQLite, etc.)
+ *
+ * The interface is designed around 3 core operations:
+ * 1. tryInsertOrGetExisting - Atomically insert or get existing record (eliminates race conditions)
+ * 2. updateDutySigned - Update to signed status on success
+ * 3. deleteFailedDuty - Delete failed record to allow retry
+ * 4. updateDutyFailed - Update to failed status with error message (allows other nodes to see and clean up).
  */
 export interface SlashingProtectionDatabase {
   /**
-   * Find an existing duty record
+   * Atomically try to insert a new duty record, or get the existing one if present.
+   *
+   * @returns { isNew: true, record } if we successfully inserted and acquired the lock
+   * @returns { isNew: false, record } if a record already exists (caller should handle based on status)
    */
-  findDuty(validatorAddress: EthAddress, slot: bigint, dutyType: DutyType): Promise<ValidatorDutyRecord | null>;
-
-  /**
-   * Insert a new duty record with 'signing' status
-   * @returns true if insert succeeded, false if a record already exists (unique constraint violation)
-   */
-  insertDuty(params: CheckAndRecordParams): Promise<boolean>;
+  tryInsertOrGetExisting(params: CheckAndRecordParams): Promise<TryInsertOrGetResult>;
 
   /**
    * Update a duty to 'signed' status with the signature

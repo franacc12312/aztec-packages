@@ -34,7 +34,7 @@ export interface ValidatorDutyRecord {
   /** Current status of the duty */
   status: DutyStatus;
   /** The signing root (hash) for this duty */
-  signingRoot: string;
+  messageHash: string;
   /** The signature (populated after successful signing) */
   signature?: string;
   /** Unique identifier for the node that acquired the lock */
@@ -64,7 +64,7 @@ export interface CheckAndRecordParams {
   slot: bigint;
   blockNumber: bigint;
   dutyType: DutyType;
-  signingRoot: string;
+  messageHash: string;
   nodeId: string;
 }
 

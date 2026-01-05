@@ -6,11 +6,10 @@ import { type Logger, createLogger } from '@aztec/foundation/log';
 
 import type { Pool, QueryResult } from 'pg';
 
-import type { SlashingProtectionDatabase } from '../types.js';
+import type { SlashingProtectionDatabase, TryInsertOrGetResult } from '../types.js';
 import {
-  CHECK_DUTY_EXISTS,
   DELETE_FAILED_DUTY,
-  INSERT_DUTY,
+  INSERT_OR_GET_DUTY,
   INSERT_SCHEMA_VERSION,
   SCHEMA_SETUP,
   SCHEMA_VERSION,
@@ -28,12 +27,19 @@ interface DutyRow {
   block_number: string;
   duty_type: DutyType;
   status: DutyStatus;
-  signing_root: string;
+  message_hash: string;
   signature: string | null;
   node_id: string;
   started_at: Date;
   completed_at: Date | null;
   error_message: string | null;
+}
+
+/**
+ * Row type from INSERT_OR_GET_DUTY query (includes is_new flag)
+ */
+interface InsertOrGetRow extends DutyRow {
+  is_new: boolean;
 }
 
 /**
@@ -75,44 +81,31 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
   }
 
   /**
-   * Find an existing duty record
+   * Atomically try to insert a new duty record, or get the existing one if present.
+   *
+   * @returns { isNew: true, record } if we successfully inserted and acquired the lock
+   * @returns { isNew: false, record } if a record already exists
    */
-  async findDuty(validatorAddress: EthAddress, slot: bigint, dutyType: DutyType): Promise<ValidatorDutyRecord | null> {
-    const result: QueryResult<DutyRow> = await this.pool.query(CHECK_DUTY_EXISTS, [
-      validatorAddress.toString(),
-      slot.toString(),
-      dutyType,
+  async tryInsertOrGetExisting(params: CheckAndRecordParams): Promise<TryInsertOrGetResult> {
+    const result: QueryResult<InsertOrGetRow> = await this.pool.query(INSERT_OR_GET_DUTY, [
+      params.validatorAddress.toString(),
+      params.slot.toString(),
+      params.blockNumber.toString(),
+      params.dutyType,
+      params.messageHash,
+      params.nodeId,
     ]);
 
     if (result.rows.length === 0) {
-      return null;
+      // This shouldn't happen - the query always returns either the inserted or existing row
+      throw new Error('INSERT_OR_GET_DUTY returned no rows');
     }
 
-    return this.rowToRecord(result.rows[0]);
-  }
-
-  /**
-   * Insert a new duty record with 'signing' status
-   * @returns true if insert succeeded, false if a record already exists
-   */
-  async insertDuty(params: CheckAndRecordParams): Promise<boolean> {
-    try {
-      await this.pool.query(INSERT_DUTY, [
-        params.validatorAddress.toString(),
-        params.slot.toString(),
-        params.blockNumber.toString(),
-        params.dutyType,
-        params.signingRoot,
-        params.nodeId,
-      ]);
-      return true;
-    } catch (error: any) {
-      // Check for unique constraint violation (PostgreSQL error code 23505)
-      if (error.code === '23505') {
-        return false;
-      }
-      throw error;
-    }
+    const row = result.rows[0];
+    return {
+      isNew: row.is_new,
+      record: this.rowToRecord(row),
+    };
   }
 
   /**
@@ -185,7 +178,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
       blockNumber: BigInt(row.block_number),
       dutyType: row.duty_type,
       status: row.status,
-      signingRoot: row.signing_root,
+      messageHash: row.message_hash,
       signature: row.signature ?? undefined,
       nodeId: row.node_id,
       startedAt: row.started_at,

@@ -41,7 +41,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       notNull: true,
       check: "status IN ('signing', 'signed', 'failed')",
     },
-    signing_root: {
+    message_hash: {
       type: 'varchar(66)',
       notNull: true,
     },

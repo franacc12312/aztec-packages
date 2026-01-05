@@ -29,7 +29,7 @@ const { signer, db } = await createHASigner({
 // Sign with protection
 const signature = await signer.signWithProtection(
   validatorAddress,
-  signingRoot,
+  messageHash,
   { slot: 100n, blockNumber: 50n, dutyType: 'BLOCK_PROPOSAL' },
   async root => localSigner.signMessage(root),
 );

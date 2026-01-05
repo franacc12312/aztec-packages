@@ -2,7 +2,10 @@ import { Buffer32 } from '@aztec/foundation/buffer';
 import { EthAddress } from '@aztec/foundation/eth-address';
 import { sleep } from '@aztec/foundation/sleep';
 
-import { MockDatabase } from './db/mock.js';
+import { PGlite } from '@electric-sql/pglite';
+import { Pool } from '@middle-management/pglite-pg-adapter';
+
+import { PostgresSlashingProtectionDatabase } from './db/postgres.js';
 import { DutyAlreadySignedError, SlashingProtectionError } from './errors.js';
 import { SlashingProtectionService } from './slashing_protection_service.js';
 import { type CheckAndRecordParams, DutyStatus, DutyType, type SlashingProtectionConfig } from './types.js';
@@ -12,19 +15,26 @@ const VALIDATOR_ADDRESS = EthAddress.random();
 const SLOT = 100n;
 const BLOCK_NUMBER = 50n;
 const DUTY_TYPE: DutyType = DutyType.BLOCK_PROPOSAL;
-const SIGNING_ROOT = Buffer32.random().toString();
-const SIGNING_ROOT_2 = Buffer32.random().toString();
+const MESSAGE_HASH = Buffer32.random().toString();
+const MESSAGE_HASH_2 = Buffer32.random().toString();
 const NODE_ID = 'node-1';
 const NODE_ID_2 = 'node-2';
 const SIGNATURE = '0xsignature';
 
 describe('SlashingProtectionService', () => {
-  let db: MockDatabase;
+  let pglite: PGlite;
+  let pool: Pool;
+  let db: PostgresSlashingProtectionDatabase;
   let service: SlashingProtectionService;
   let config: SlashingProtectionConfig;
 
-  beforeEach(() => {
-    db = new MockDatabase();
+  beforeEach(async () => {
+    pglite = new PGlite();
+    pool = new Pool({ pglite });
+
+    db = new PostgresSlashingProtectionDatabase(pool as any);
+    await db.initialize();
+
     config = {
       enabled: true,
       nodeId: NODE_ID,
@@ -34,6 +44,10 @@ describe('SlashingProtectionService', () => {
     service = new SlashingProtectionService(db, config);
   });
 
+  afterEach(async () => {
+    await pool.end();
+  });
+
   describe('checkAndRecord', () => {
     it('should acquire lock on first attempt', async () => {
       const params: CheckAndRecordParams = {
@@ -41,17 +55,18 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
       };
 
       await service.checkAndRecord(params);
 
-      const duty = await db.findDuty(VALIDATOR_ADDRESS, SLOT, DUTY_TYPE);
-      expect(duty).not.toBeNull();
-      expect(duty!.status).toBe(DutyStatus.SIGNING);
-      expect(duty!.nodeId).toBe(NODE_ID);
-      expect(duty!.signingRoot).toBe(SIGNING_ROOT);
+      // Verify via tryInsertOrGetExisting - should return the existing record
+      const result = await db.tryInsertOrGetExisting(params);
+      expect(result.isNew).toBe(false); // Already exists
+      expect(result.record.status).toBe(DutyStatus.SIGNING);
+      expect(result.record.nodeId).toBe(NODE_ID);
+      expect(result.record.messageHash).toBe(MESSAGE_HASH);
     });
 
     it('should throw DutyAlreadySignedError when duty already signed with same data', async () => {
@@ -60,7 +75,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
       };
 
@@ -85,7 +100,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
       };
 
@@ -100,7 +115,7 @@ describe('SlashingProtectionService', () => {
       });
 
       // Second node tries to sign different data
-      const params2 = { ...params, signingRoot: SIGNING_ROOT_2, nodeId: NODE_ID_2 };
+      const params2 = { ...params, messageHash: MESSAGE_HASH_2, nodeId: NODE_ID_2 };
       await expect(service.checkAndRecord(params2)).rejects.toThrow(SlashingProtectionError);
     });
 
@@ -110,7 +125,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
       };
 
@@ -127,10 +142,10 @@ describe('SlashingProtectionService', () => {
       const params2 = { ...params, nodeId: NODE_ID_2 };
       await service.checkAndRecord(params2);
 
-      const duty = await db.findDuty(VALIDATOR_ADDRESS, SLOT, DUTY_TYPE);
-      expect(duty).not.toBeNull();
-      expect(duty!.status).toBe(DutyStatus.SIGNING);
-      expect(duty!.nodeId).toBe(NODE_ID_2);
+      const result = await db.tryInsertOrGetExisting(params2);
+      expect(result.isNew).toBe(false);
+      expect(result.record.status).toBe(DutyStatus.SIGNING);
+      expect(result.record.nodeId).toBe(NODE_ID_2);
     });
 
     it('should wait and throw when another node is signing same data', async () => {
@@ -139,7 +154,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
       };
 
@@ -170,7 +185,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
       };
 
@@ -178,7 +193,7 @@ describe('SlashingProtectionService', () => {
       await service.checkAndRecord(params);
 
       // Second node tries to acquire lock with different data
-      const params2 = { ...params, signingRoot: SIGNING_ROOT_2, nodeId: NODE_ID_2 };
+      const params2 = { ...params, messageHash: MESSAGE_HASH_2, nodeId: NODE_ID_2 };
       const promise = service.checkAndRecord(params2);
 
       // Complete first node's signing after a short delay
@@ -201,7 +216,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
       };
 
@@ -217,17 +232,17 @@ describe('SlashingProtectionService', () => {
       });
 
       // Verify duty is in failed state
-      let duty = await db.findDuty(VALIDATOR_ADDRESS, SLOT, DUTY_TYPE);
-      expect(duty!.status).toBe(DutyStatus.FAILED);
+      let result = await db.tryInsertOrGetExisting(params);
+      expect(result.record.status).toBe(DutyStatus.FAILED);
 
       // Second node should be able to acquire the lock (retry)
       const params2 = { ...params, nodeId: NODE_ID_2 };
       await service.checkAndRecord(params2);
 
-      duty = await db.findDuty(VALIDATOR_ADDRESS, SLOT, DUTY_TYPE);
-      expect(duty).not.toBeNull();
-      expect(duty!.status).toBe(DutyStatus.SIGNING);
-      expect(duty!.nodeId).toBe(NODE_ID_2);
+      result = await db.tryInsertOrGetExisting(params2);
+      expect(result.isNew).toBe(false);
+      expect(result.record.status).toBe(DutyStatus.SIGNING);
+      expect(result.record.nodeId).toBe(NODE_ID_2);
     });
 
     it('should timeout if signing takes too long', async () => {
@@ -239,7 +254,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
       };
 
@@ -259,7 +274,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
       };
 
@@ -272,11 +287,11 @@ describe('SlashingProtectionService', () => {
         nodeId: NODE_ID,
       });
 
-      const duty = await db.findDuty(VALIDATOR_ADDRESS, SLOT, DUTY_TYPE);
-      expect(duty).not.toBeNull();
-      expect(duty!.status).toBe(DutyStatus.SIGNED);
-      expect(duty!.signature).toBe(SIGNATURE);
-      expect(duty!.completedAt).toBeDefined();
+      const result = await db.tryInsertOrGetExisting(params);
+      expect(result.isNew).toBe(false);
+      expect(result.record.status).toBe(DutyStatus.SIGNED);
+      expect(result.record.signature).toBe(SIGNATURE);
+      expect(result.record.completedAt).toBeDefined();
     });
   });
 
@@ -287,7 +302,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
       };
 
@@ -299,11 +314,11 @@ describe('SlashingProtectionService', () => {
         error: 'Test error',
       });
 
-      const duty = await db.findDuty(VALIDATOR_ADDRESS, SLOT, DUTY_TYPE);
-      expect(duty).not.toBeNull();
-      expect(duty!.status).toBe(DutyStatus.FAILED);
-      expect(duty!.errorMessage).toBe('Test error');
-      expect(duty!.completedAt).toBeDefined();
+      const result = await db.tryInsertOrGetExisting(params);
+      expect(result.isNew).toBe(false);
+      expect(result.record.status).toBe(DutyStatus.FAILED);
+      expect(result.record.errorMessage).toBe('Test error');
+      expect(result.record.completedAt).toBeDefined();
     });
   });
 
@@ -314,7 +329,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
         dutyType: DUTY_TYPE,
-        signingRoot: SIGNING_ROOT,
+        messageHash: MESSAGE_HASH,
         nodeId: 'node-1',
       };
       const params2 = { ...params1, nodeId: 'node-2' };
@@ -329,8 +344,8 @@ describe('SlashingProtectionService', () => {
 
       // First one should succeed, let it complete signing
       await sleep(50);
-      const duty = await db.findDuty(VALIDATOR_ADDRESS, SLOT, DUTY_TYPE);
-      const winnerNodeId = duty!.nodeId;
+      const result = await db.tryInsertOrGetExisting(params1);
+      const winnerNodeId = result.record.nodeId;
       await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
@@ -366,7 +381,7 @@ describe('SlashingProtectionService', () => {
           slot: BigInt(100 + i),
           blockNumber: BigInt(50 + i),
           dutyType: DUTY_TYPE,
-          signingRoot: SIGNING_ROOT,
+          messageHash: MESSAGE_HASH,
           nodeId: NODE_ID,
         };
         promises.push(service.checkAndRecord(params));
@@ -374,12 +389,20 @@ describe('SlashingProtectionService', () => {
 
       await Promise.all(promises);
 
-      const duties = db.getAllDuties();
-      expect(duties.length).toBe(5);
-      duties.forEach(duty => {
-        expect(duty.status).toBe(DutyStatus.SIGNING);
-        expect(duty.nodeId).toBe(NODE_ID);
-      });
+      // Verify all duties were created
+      for (let i = 0; i < 5; i++) {
+        const result = await db.tryInsertOrGetExisting({
+          validatorAddress: VALIDATOR_ADDRESS,
+          slot: BigInt(100 + i),
+          blockNumber: BigInt(50 + i),
+          dutyType: DUTY_TYPE,
+          messageHash: MESSAGE_HASH,
+          nodeId: NODE_ID,
+        });
+        expect(result.isNew).toBe(false);
+        expect(result.record.status).toBe(DutyStatus.SIGNING);
+        expect(result.record.nodeId).toBe(NODE_ID);
+      }
     });
   });
 

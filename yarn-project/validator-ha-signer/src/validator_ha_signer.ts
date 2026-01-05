@@ -27,7 +27,7 @@ import type { SigningContext, SlashingProtectionDatabase } from './types.js';
  * // Sign with slashing protection
  * const signature = await signer.signWithProtection(
  *   validatorAddress,
- *   signingRoot,
+ *   messageHash,
  *   { slot: 100n, blockNumber: 50n, dutyType: 'BLOCK_PROPOSAL' },
  *   async (root) => localSigner.signMessage(root),
  * );
@@ -35,10 +35,10 @@ import type { SigningContext, SlashingProtectionDatabase } from './types.js';
  */
 export class ValidatorHASigner {
   private readonly log: Logger;
-  private readonly slashingProtection: SlashingProtectionService | null;
+  private readonly slashingProtection: SlashingProtectionService | undefined;
 
   constructor(
-    db: SlashingProtectionDatabase | null,
+    db: SlashingProtectionDatabase | undefined,
     private readonly config: CreateHASignerConfig,
   ) {
     this.log = createLogger('validator-ha-signer');
@@ -49,7 +49,7 @@ export class ValidatorHASigner {
         nodeId: config.nodeId,
       });
     } else {
-      this.slashingProtection = null;
+      this.slashingProtection = undefined;
       this.log.info('Validator HA Signer initialized WITHOUT slashing protection');
     }
   }
@@ -63,7 +63,7 @@ export class ValidatorHASigner {
    * 3. Records the result (success or failure)
    *
    * @param validatorAddress - The validator's Ethereum address
-   * @param signingRoot - The hash to be signed
+   * @param messageHash - The hash to be signed
    * @param context - The signing context (slot, block number, duty type)
    * @param signFn - Function that performs the actual signing
    * @returns The signature
@@ -73,9 +73,9 @@ export class ValidatorHASigner {
    */
   async signWithProtection(
     validatorAddress: EthAddress,
-    signingRoot: Buffer32,
+    messageHash: Buffer32,
     context: SigningContext,
-    signFn: (signingRoot: Buffer32) => Promise<Signature>,
+    signFn: (messageHash: Buffer32) => Promise<Signature>,
   ): Promise<Signature> {
     // If slashing protection is disabled, just sign directly
     if (!this.slashingProtection) {
@@ -86,7 +86,7 @@ export class ValidatorHASigner {
         slot: context.slot,
         blockNumber: context.blockNumber,
       });
-      return await signFn(signingRoot);
+      return await signFn(messageHash);
     }
 
     const { slot, blockNumber, dutyType } = context;
@@ -97,14 +97,14 @@ export class ValidatorHASigner {
       slot,
       blockNumber,
       dutyType,
-      signingRoot: signingRoot.toString(),
+      messageHash: messageHash.toString(),
       nodeId: this.config.nodeId,
     });
 
     // Perform signing
     let signature: Signature;
     try {
-      signature = await signFn(signingRoot);
+      signature = await signFn(messageHash);
     } catch (error: any) {
       // Record failure
       await this.slashingProtection.recordFailure({
@@ -132,7 +132,7 @@ export class ValidatorHASigner {
    * Check if slashing protection is enabled
    */
   get isEnabled(): boolean {
-    return this.slashingProtection !== null;
+    return this.slashingProtection !== undefined;
   }
 
   /**

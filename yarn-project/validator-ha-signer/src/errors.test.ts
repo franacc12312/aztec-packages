@@ -51,8 +51,8 @@ describe('SlashingProtectionError', () => {
     expect(error.name).toBe('SlashingProtectionError');
     expect(error.slot).toBe(slot);
     expect(error.dutyType).toBe(dutyType);
-    expect(error.existingSigningRoot).toBe(existingRoot);
-    expect(error.attemptedSigningRoot).toBe(attemptedRoot);
+    expect(error.existingMessageHash).toBe(existingRoot);
+    expect(error.attemptedMessageHash).toBe(attemptedRoot);
   });
 
   it('should include truncated signing roots in message', () => {
@@ -81,10 +81,10 @@ describe('SlashingProtectionError', () => {
 
   it('should preserve full signing roots in properties', () => {
     const error = new SlashingProtectionError(100n, DutyType.BLOCK_PROPOSAL, existingRoot, attemptedRoot);
-    expect(error.existingSigningRoot).toBe(existingRoot);
-    expect(error.attemptedSigningRoot).toBe(attemptedRoot);
+    expect(error.existingMessageHash).toBe(existingRoot);
+    expect(error.attemptedMessageHash).toBe(attemptedRoot);
     // Full roots should be in properties, not just truncated in message
-    expect(error.existingSigningRoot.length).toBe(existingRoot.length);
-    expect(error.attemptedSigningRoot.length).toBe(attemptedRoot.length);
+    expect(error.existingMessageHash.length).toBe(existingRoot.length);
+    expect(error.attemptedMessageHash.length).toBe(attemptedRoot.length);
   });
 });

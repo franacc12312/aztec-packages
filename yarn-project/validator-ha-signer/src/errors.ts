@@ -30,12 +30,12 @@ export class SlashingProtectionError extends Error {
   constructor(
     public readonly slot: bigint,
     public readonly dutyType: DutyType,
-    public readonly existingSigningRoot: string,
-    public readonly attemptedSigningRoot: string,
+    public readonly existingMessageHash: string,
+    public readonly attemptedMessageHash: string,
   ) {
     super(
       `Slashing protection: ${dutyType} for slot ${slot} was already signed with different data. ` +
-        `Existing: ${existingSigningRoot.slice(0, 10)}..., Attempted: ${attemptedSigningRoot.slice(0, 10)}...`,
+        `Existing: ${existingMessageHash.slice(0, 10)}..., Attempted: ${attemptedMessageHash.slice(0, 10)}...`,
     );
     this.name = 'SlashingProtectionError';
   }
