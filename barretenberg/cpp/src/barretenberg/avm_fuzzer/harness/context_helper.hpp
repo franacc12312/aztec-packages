@@ -19,7 +19,7 @@
 #include "barretenberg/vm2/simulation/interfaces/context.hpp"
 #include "barretenberg/vm2/simulation/lib/execution_id_manager.hpp"
 #include "barretenberg/vm2/simulation/lib/side_effect_tracker.hpp"
-#include "barretenberg/vm2/simulation/lib/side_effect_tracking_db.hpp"
+#include "barretenberg/vm2/simulation/standalone/concrete_dbs.hpp"
 
 namespace bb::avm2::fuzzing {
 
@@ -48,6 +48,7 @@ class GadgetFuzzerContextHelper {
     DeduplicatingEventEmitter<RangeCheckEvent> range_check_emitter;
     DeduplicatingEventEmitter<GreaterThanEvent> greater_than_emitter;
     DeduplicatingEventEmitter<FieldGreaterThanEvent> field_gt_emitter;
+    EventEmitter<InternalCallStackEvent> internal_call_stack_emitter;
 
     // Commonly used gadgets:
     ExecutionIdManager execution_id_manager;
@@ -62,8 +63,8 @@ class GadgetFuzzerContextHelper {
     std::unique_ptr<simulation::ContextProvider> context_provider;
     // Context:
     std::unique_ptr<simulation::ContextInterface> make_enqueued_fuzzing_context(
-        AztecAddress address,
-        AztecAddress msg_sender,
+        AztecAddress address = AztecAddress(0),
+        AztecAddress msg_sender = AztecAddress(0),
         bool is_static = false,
         FF transaction_fee = FF(0),
         std::span<const FF> calldata = {},
@@ -91,7 +92,6 @@ class GadgetFuzzerContextHelper {
     EventEmitter<BytecodeDecompositionEvent> bytecode_decomposition_emitter;
     EventEmitter<RetrievedBytecodesTreeCheckEvent> retrieved_bytecodes_tree_check_emitter;
     EventEmitter<CalldataEvent> calldata_event_emitter;
-    EventEmitter<InternalCallStackEvent> internal_call_stack_emitter;
     DeduplicatingEventEmitter<InstructionFetchingEvent> instruction_fetching_emitter;
 
     // Gadgets:
@@ -104,7 +104,7 @@ class GadgetFuzzerContextHelper {
     // Misc:
     GlobalVariables global_variables;
     ExecutionHints hints;
-    SideEffectTrackingDB make_empty_merkle_db();
+    PureMerkleDB make_empty_merkle_db();
 };
 
 } // namespace bb::avm2::fuzzing

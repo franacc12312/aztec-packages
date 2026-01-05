@@ -31,6 +31,7 @@ if [ "$COMMAND" = "list-targets" ]; then
     echo "Available fuzzing options (<target_name>):"
     echo "  avm - AVM fuzzer (avm_fuzzer_avm_fuzzer)"
     echo "  tx - Transaction fuzzer (avm_fuzzer_tx_fuzzer)"
+    echo "  prover - Prover fuzzer (avm_fuzzer_prover_fuzzer)"
     echo "  alu - ALU fuzzer (harness_alu_fuzzer)"
     echo "  bitwise - Bitwise fuzzer (harness_bitwise_fuzzer)"
     echo "  ecc - ECC fuzzer (harness_ecc_fuzzer)"
@@ -38,6 +39,7 @@ if [ "$COMMAND" = "list-targets" ]; then
     echo "  merkle_check - Merkle Check fuzzer (harness_merkle_check_fuzzer)"
     echo "  calldata - Calldata fuzzer (harness_calldata_fuzzer)"
     echo "  emit_unencrypted_log - Emit Unencrypted Log fuzzer (harness_emit_unencrypted_log_fuzzer)"
+    echo "  internal_call - Internal Call fuzzer (harness_internal_call_fuzzer)"
     exit 0
 fi
 
@@ -74,6 +76,7 @@ fi
 case "$FUZZER_ALIAS" in
     avm) FUZZER_TYPE="avm_fuzzer_avm_fuzzer" ;;
     tx) FUZZER_TYPE="avm_fuzzer_tx_fuzzer" ;;
+    prover) FUZZER_TYPE="avm_fuzzer_prover_fuzzer" ;;
     alu) FUZZER_TYPE="harness_alu_fuzzer" ;;
     bitwise) FUZZER_TYPE="harness_bitwise_fuzzer" ;;
     ecc) FUZZER_TYPE="harness_ecc_fuzzer" ;;
@@ -81,9 +84,10 @@ case "$FUZZER_ALIAS" in
     merkle_check) FUZZER_TYPE="harness_merkle_check_fuzzer" ;;
     calldata) FUZZER_TYPE="harness_calldata_fuzzer" ;;
     emit_unencrypted_log) FUZZER_TYPE="harness_emit_unencrypted_log_fuzzer" ;;
+    internal_call) FUZZER_TYPE="harness_internal_call_fuzzer" ;;
     *)
         echo "Error: Invalid fuzzer type '$FUZZER_ALIAS'"
-        echo "Valid options: 'avm', 'tx', 'alu', 'bitwise', 'ecc', 'gt', 'merkle_check', 'calldata', or 'emit_unencrypted_log'"
+        echo "Valid options: 'avm', 'tx', 'prover', 'alu', 'bitwise', 'ecc', 'gt', 'merkle_check', 'calldata', 'emit_unencrypted_log', or 'internal_call'"
         exit 1
         ;;
 esac
@@ -97,8 +101,8 @@ CPP_DIR="$BARRETENBERG_ROOT/cpp"
 # Set AVM_SIMULATOR_BIN environment variable (relative to PROJECT_ROOT)
 export AVM_SIMULATOR_BIN="${AVM_SIMULATOR_BIN:-$PROJECT_ROOT/yarn-project/simulator/dest/public/fuzzing/avm_simulator_bin.js}"
 
-# Check if AVM_SIMULATOR_BIN exists (only for avm and tx fuzzers)
-if [ "$COMMAND" = "fuzz" ] && { [ "$FUZZER_ALIAS" = "avm" ] || [ "$FUZZER_ALIAS" = "tx" ]; } && [ ! -f "$AVM_SIMULATOR_BIN" ]; then
+# Check if AVM_SIMULATOR_BIN exists (only for avm, tx, and prover fuzzers)
+if [ "$COMMAND" = "fuzz" ] && { [ "$FUZZER_ALIAS" = "avm" ] || [ "$FUZZER_ALIAS" = "tx" ] || [ "$FUZZER_ALIAS" = "prover" ]; } && [ ! -f "$AVM_SIMULATOR_BIN" ]; then
     echo "Error: AVM simulator binary not found at: $AVM_SIMULATOR_BIN"
     echo ""
     echo "To build the AVM simulator fuzzer binary:"
@@ -112,7 +116,7 @@ fi
 if [ "$COMMAND" = "coverage" ]; then
     BUILD_DIR="$CPP_DIR/build-coverage"
     BUILD_PRESET="clang20-coverage"
-    BUILD_CMAKE_FLAGS="-DFUZZING=ON -DFUZZING_AVM=ON"
+    BUILD_CMAKE_FLAGS="-DCOVERAGE_AVM=ON -DFUZZING=ON -DFUZZING_AVM=ON"
 else
     BUILD_DIR="$CPP_DIR/build-fuzzing-avm"
     BUILD_PRESET="fuzzing-avm"
@@ -170,6 +174,13 @@ fi
 CORPUS_DIR="$SCRIPT_DIR/corpus/$FUZZER_ALIAS"
 # Sync corpus is used for parallel fuzzing - allows multiple workers to share discovered inputs
 SYNC_CORPUS_DIR="$SCRIPT_DIR/sync_corpus/$FUZZER_ALIAS"
+
+# Prover fuzzer shares corpus with tx fuzzer
+if [ "$FUZZER_ALIAS" = "prover" ]; then
+    CORPUS_DIR="$SCRIPT_DIR/corpus/tx"
+    SYNC_CORPUS_DIR="$SCRIPT_DIR/sync_corpus/tx"
+fi
+
 CRASHES_DIR="$CORPUS_DIR/crashes"
 
 # Create corpus, sync_corpus, and crashes directories
@@ -213,6 +224,7 @@ echo ""
 if [ "$COMMAND" = "coverage" ]; then
     export LLVM_PROFILE_FILE="${LLVM_PROFILE_FILE:-coverage.profraw}"
     echo "Coverage profiling enabled: LLVM_PROFILE_FILE=$LLVM_PROFILE_FILE"
+    echo "COVERAGE_AVM: check_circuit is skipped in coverage builds"
     echo ""
 fi
 
@@ -279,10 +291,15 @@ if [ "$COMMAND" = "coverage" ] && [ -f "$LLVM_PROFILE_FILE" ]; then
     # Set path filter for vm2 directory
     VM2_PATH_FILTER="$CPP_DIR/src/barretenberg/vm2"
 
+    # Ignore patterns for generated and constraining directories
+    IGNORE_REGEX="(vm2/generated|vm2/constraining|vm2/testing|vm2/tooling)"
+
     if [ "$COVERAGE_FORMAT" = "html" ]; then
         REPORT_DIR="out/report"
         mkdir -p "$REPORT_DIR"
-        llvm-cov-20 show -output-dir="$REPORT_DIR" -format=html ./bin/$FUZZER_TYPE -instr-profile="$COVERAGE_DATA" "$VM2_PATH_FILTER"
+        llvm-cov-20 show -output-dir="$REPORT_DIR" -format=html \
+            -ignore-filename-regex="$IGNORE_REGEX" \
+            ./bin/$FUZZER_TYPE -instr-profile="$COVERAGE_DATA" "$VM2_PATH_FILTER"
 
         if [ $? -eq 0 ]; then
             REPORT_DIR_ABS="$(cd "$REPORT_DIR" && pwd)"
@@ -301,7 +318,9 @@ if [ "$COMMAND" = "coverage" ] && [ -f "$LLVM_PROFILE_FILE" ]; then
         fi
     else
         # report format
-        llvm-cov-20 report ./bin/$FUZZER_TYPE -instr-profile="$COVERAGE_DATA" "$VM2_PATH_FILTER"
+        llvm-cov-20 report \
+            -ignore-filename-regex="$IGNORE_REGEX" \
+            ./bin/$FUZZER_TYPE -instr-profile="$COVERAGE_DATA" "$VM2_PATH_FILTER"
 
         if [ $? -ne 0 ]; then
             echo "Error: Failed to generate coverage report"

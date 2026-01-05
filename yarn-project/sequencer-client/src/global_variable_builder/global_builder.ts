@@ -53,7 +53,7 @@ export class GlobalVariableBuilder implements GlobalVariableBuilderInterface {
 
     this.publicClient = createPublicClient({
       chain: chain.chainInfo,
-      transport: fallback(chain.rpcUrls.map(url => http(url))),
+      transport: fallback(chain.rpcUrls.map(url => http(url, { batch: false }))),
       pollingInterval: config.viemPollingIntervalMS,
     });
 
@@ -69,7 +69,7 @@ export class GlobalVariableBuilder implements GlobalVariableBuilderInterface {
     // we need to fetch the last block written, and estimate the earliest timestamp for the next block.
     // The timestamp of that last block will act as a lower bound for the next block.
 
-    const lastBlock = await this.rollupContract.getCheckpoint(await this.rollupContract.getCheckpointNumber());
+    const lastBlock = await this.rollupContract.getPendingCheckpoint();
     const earliestTimestamp = await this.rollupContract.getTimestampForSlot(
       SlotNumber.fromBigInt(lastBlock.slotNumber + 1n),
     );
