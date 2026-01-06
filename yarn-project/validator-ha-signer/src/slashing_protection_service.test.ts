@@ -82,13 +82,14 @@ describe('SlashingProtectionService', () => {
       };
 
       // First node signs
-      await service.checkAndRecord(params);
+      const lockToken = await service.checkAndRecord(params);
       await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
+        lockToken,
       });
 
       // Second node tries to sign same data
@@ -107,13 +108,14 @@ describe('SlashingProtectionService', () => {
       };
 
       // First node signs
-      await service.checkAndRecord(params);
+      const lockToken = await service.checkAndRecord(params);
       await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
+        lockToken,
       });
 
       // Second node tries to sign different data
@@ -132,12 +134,13 @@ describe('SlashingProtectionService', () => {
       };
 
       // First node fails
-      await service.checkAndRecord(params);
+      const lockToken = await service.checkAndRecord(params);
       await service.recordFailure({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
         error: 'Test error',
+        lockToken,
       });
 
       // Second node should be able to retry
@@ -161,7 +164,7 @@ describe('SlashingProtectionService', () => {
       };
 
       // First node acquires lock
-      await service.checkAndRecord(params);
+      const lockToken = await service.checkAndRecord(params);
 
       // Second node tries to acquire lock
       const params2 = { ...params, nodeId: NODE_ID_2 };
@@ -175,6 +178,7 @@ describe('SlashingProtectionService', () => {
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
+        lockToken,
       });
 
       // Second node should get DutyAlreadySignedError
@@ -192,7 +196,7 @@ describe('SlashingProtectionService', () => {
       };
 
       // First node acquires lock
-      await service.checkAndRecord(params);
+      const lockToken = await service.checkAndRecord(params);
 
       // Second node tries to acquire lock with different data
       const params2 = { ...params, messageHash: MESSAGE_HASH_2, nodeId: NODE_ID_2 };
@@ -206,6 +210,7 @@ describe('SlashingProtectionService', () => {
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
+        lockToken,
       });
 
       // Second node should get SlashingProtectionError
@@ -223,7 +228,7 @@ describe('SlashingProtectionService', () => {
       };
 
       // First node acquires lock
-      await service.checkAndRecord(params);
+      const lockToken = await service.checkAndRecord(params);
 
       // First node fails
       await service.recordFailure({
@@ -231,6 +236,7 @@ describe('SlashingProtectionService', () => {
         slot: SLOT,
         dutyType: DUTY_TYPE,
         error: 'Test error',
+        lockToken,
       });
 
       // Verify duty is in failed state
@@ -280,20 +286,48 @@ describe('SlashingProtectionService', () => {
         nodeId: NODE_ID,
       };
 
-      await service.checkAndRecord(params);
-      await service.recordSuccess({
+      const lockToken = await service.checkAndRecord(params);
+      const success = await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
+        lockToken,
       });
 
+      expect(success).toBe(true);
       const result = await db.tryInsertOrGetExisting(params);
       expect(result.isNew).toBe(false);
       expect(result.record.status).toBe(DutyStatus.SIGNED);
       expect(result.record.signature).toBe(SIGNATURE);
       expect(result.record.completedAt).toBeDefined();
+    });
+
+    it('should fail to update with wrong lockToken', async () => {
+      const params: CheckAndRecordParams = {
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: SLOT,
+        blockNumber: BLOCK_NUMBER,
+        dutyType: DUTY_TYPE,
+        messageHash: MESSAGE_HASH,
+        nodeId: NODE_ID,
+      };
+
+      await service.checkAndRecord(params);
+      const success = await service.recordSuccess({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: SLOT,
+        dutyType: DUTY_TYPE,
+        signature: { toString: () => SIGNATURE } as any,
+        nodeId: NODE_ID,
+        lockToken: 'wrong-token',
+      });
+
+      expect(success).toBe(false);
+      // Duty should still be in signing state
+      const result = await db.tryInsertOrGetExisting(params);
+      expect(result.record.status).toBe(DutyStatus.SIGNING);
     });
   });
 
@@ -308,19 +342,46 @@ describe('SlashingProtectionService', () => {
         nodeId: NODE_ID,
       };
 
-      await service.checkAndRecord(params);
-      await service.recordFailure({
+      const lockToken = await service.checkAndRecord(params);
+      const success = await service.recordFailure({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
         error: 'Test error',
+        lockToken,
       });
 
+      expect(success).toBe(true);
       const result = await db.tryInsertOrGetExisting(params);
       expect(result.isNew).toBe(false);
       expect(result.record.status).toBe(DutyStatus.FAILED);
       expect(result.record.errorMessage).toBe('Test error');
       expect(result.record.completedAt).toBeDefined();
+    });
+
+    it('should fail to update with wrong lockToken', async () => {
+      const params: CheckAndRecordParams = {
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: SLOT,
+        blockNumber: BLOCK_NUMBER,
+        dutyType: DUTY_TYPE,
+        messageHash: MESSAGE_HASH,
+        nodeId: NODE_ID,
+      };
+
+      await service.checkAndRecord(params);
+      const success = await service.recordFailure({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: SLOT,
+        dutyType: DUTY_TYPE,
+        error: 'Test error',
+        lockToken: 'wrong-token',
+      });
+
+      expect(success).toBe(false);
+      // Duty should still be in signing state
+      const result = await db.tryInsertOrGetExisting(params);
+      expect(result.record.status).toBe(DutyStatus.SIGNING);
     });
   });
 
@@ -348,12 +409,14 @@ describe('SlashingProtectionService', () => {
       await sleep(50);
       const result = await db.tryInsertOrGetExisting(params1);
       const winnerNodeId = result.record.nodeId;
+      const lockToken = result.record.lockToken;
       await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: winnerNodeId,
+        lockToken,
       });
 
       // Wait for all promises to complete

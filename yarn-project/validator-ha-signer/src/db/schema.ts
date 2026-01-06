@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS validator_duties (
   message_hash VARCHAR(66) NOT NULL,
   signature VARCHAR(132),
   node_id VARCHAR(255) NOT NULL,
+  lock_token VARCHAR(64) NOT NULL,
   started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   completed_at TIMESTAMP,
   error_message TEXT,
@@ -102,8 +103,9 @@ WITH inserted AS (
     status,
     message_hash,
     node_id,
+    lock_token,
     started_at
-  ) VALUES ($1, $2, $3, $4, 'signing', $5, $6, CURRENT_TIMESTAMP)
+  ) VALUES ($1, $2, $3, $4, 'signing', $5, $6, $7, CURRENT_TIMESTAMP)
   ON CONFLICT (validator_address, slot, duty_type) DO NOTHING
   RETURNING
     validator_address,
@@ -114,6 +116,7 @@ WITH inserted AS (
     message_hash,
     signature,
     node_id,
+    lock_token,
     started_at,
     completed_at,
     error_message,
@@ -130,6 +133,7 @@ SELECT
   message_hash,
   signature,
   node_id,
+  lock_token,
   started_at,
   completed_at,
   error_message,
@@ -152,7 +156,8 @@ SET status = 'signed',
 WHERE validator_address = $2
   AND slot = $3
   AND duty_type = $4
-  AND status = 'signing';
+  AND status = 'signing'
+  AND lock_token = $5;
 `;
 
 /**
@@ -166,7 +171,8 @@ SET status = 'failed',
 WHERE validator_address = $2
   AND slot = $3
   AND duty_type = $4
-  AND status = 'signing';
+  AND status = 'signing'
+  AND lock_token = $5;
 `;
 
 /**

@@ -7,7 +7,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Pool } from '@middle-management/pglite-pg-adapter';
 
-import type { CreateHASignerConfig } from './config.js';
+import { type CreateHASignerConfig, defaultSlashingProtectionConfig } from './config.js';
 import { PostgresSlashingProtectionDatabase } from './db/postgres.js';
 import { setupTestSchema } from './db/test_helper.js';
 import { DutyStatus, DutyType } from './db/types.js';
@@ -58,6 +58,14 @@ describe('ValidatorHASigner', () => {
       const signer = new ValidatorHASigner(db, config);
       expect(signer.isEnabled).toBe(true);
       expect(signer.nodeId).toBe(NODE_ID);
+    });
+
+    it('should not initialize when nodeId is not explicitly set', () => {
+      const defaultConfig = { ...defaultSlashingProtectionConfig };
+      expect(
+        () =>
+          new ValidatorHASigner(db, { ...defaultConfig, databaseUrl: 'postgresql://user:pass@localhost:5432/testdb' }),
+      ).toThrow('NODE_ID is required for high-availability setups');
     });
 
     it('should initialize without slashing protection when disabled', () => {

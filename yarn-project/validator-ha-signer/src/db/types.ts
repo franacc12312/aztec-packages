@@ -2,6 +2,31 @@ import type { EthAddress } from '@aztec/foundation/eth-address';
 import type { Signature } from '@aztec/foundation/eth-signature';
 
 /**
+ * Row type from PostgreSQL query
+ */
+export interface DutyRow {
+  validator_address: string;
+  slot: string;
+  block_number: string;
+  duty_type: DutyType;
+  status: DutyStatus;
+  message_hash: string;
+  signature: string | null;
+  node_id: string;
+  lock_token: string;
+  started_at: Date;
+  completed_at: Date | null;
+  error_message: string | null;
+}
+
+/**
+ * Row type from INSERT_OR_GET_DUTY query (includes is_new flag)
+ */
+export interface InsertOrGetRow extends DutyRow {
+  is_new: boolean;
+}
+
+/**
  * Type of validator duty being performed
  */
 export enum DutyType {
@@ -39,6 +64,8 @@ export interface ValidatorDutyRecord {
   signature?: string;
   /** Unique identifier for the node that acquired the lock */
   nodeId: string;
+  /** Secret token for verifying ownership of the duty lock */
+  lockToken: string;
   /** When the duty signing was started */
   startedAt: Date;
   /** When the duty signing was completed (success or failure) */
@@ -77,6 +104,7 @@ export interface RecordSuccessParams {
   dutyType: DutyType;
   signature: Signature;
   nodeId: string;
+  lockToken: string;
 }
 
 /**
@@ -87,4 +115,5 @@ export interface RecordFailureParams {
   slot: bigint;
   dutyType: DutyType;
   error: string;
+  lockToken: string;
 }

@@ -76,14 +76,32 @@ export interface SlashingProtectionDatabase {
   tryInsertOrGetExisting(params: CheckAndRecordParams): Promise<TryInsertOrGetResult>;
 
   /**
-   * Update a duty to 'signed' status with the signature
+   * Update a duty to 'signed' status with the signature.
+   * Only succeeds if the lockToken matches (caller must be the one who created the duty).
+   *
+   * @returns true if the update succeeded, false if token didn't match or duty not found
    */
-  updateDutySigned(validatorAddress: EthAddress, slot: bigint, dutyType: DutyType, signature: string): Promise<void>;
+  updateDutySigned(
+    validatorAddress: EthAddress,
+    slot: bigint,
+    dutyType: DutyType,
+    signature: string,
+    lockToken: string,
+  ): Promise<boolean>;
 
   /**
-   * Update a duty to 'failed' status with error message
+   * Update a duty to 'failed' status with error message.
+   * Only succeeds if the lockToken matches (caller must be the one who created the duty).
+   *
+   * @returns true if the update succeeded, false if token didn't match or duty not found
    */
-  updateDutyFailed(validatorAddress: EthAddress, slot: bigint, dutyType: DutyType, errorMessage: string): Promise<void>;
+  updateDutyFailed(
+    validatorAddress: EthAddress,
+    slot: bigint,
+    dutyType: DutyType,
+    errorMessage: string,
+    lockToken: string,
+  ): Promise<boolean>;
 
   /**
    * Delete a failed duty to allow retry

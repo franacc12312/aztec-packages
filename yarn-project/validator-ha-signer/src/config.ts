@@ -2,8 +2,8 @@ import {
   type ConfigMappingsType,
   booleanConfigHelper,
   getConfigFromMappings,
+  getDefaultConfig,
   numberConfigHelper,
-  secretStringConfigHelper,
 } from '@aztec/foundation/config';
 
 /**
@@ -29,7 +29,7 @@ export const slashingProtectionConfigMappings: ConfigMappingsType<SlashingProtec
   nodeId: {
     env: 'SLASHING_PROTECTION_NODE_ID',
     description: 'The unique identifier for this node',
-    ...secretStringConfigHelper(`high-availability-node-${Math.random().toString(36).substring(2, 6).toUpperCase()}`),
+    defaultValue: '',
   },
   pollingIntervalMs: {
     env: 'SLASHING_PROTECTION_POLLING_INTERVAL_MS',
@@ -42,6 +42,10 @@ export const slashingProtectionConfigMappings: ConfigMappingsType<SlashingProtec
     ...numberConfigHelper(3_000),
   },
 };
+
+export const defaultSlashingProtectionConfig: SlashingProtectionConfig = getDefaultConfig(
+  slashingProtectionConfigMappings,
+);
 
 /**
  * Configuration for creating an HA signer with PostgreSQL backend

@@ -15,7 +15,7 @@ import {
   UPDATE_DUTY_FAILED,
   UPDATE_DUTY_SIGNED,
 } from './schema.js';
-import { DutyStatus, DutyType } from './types.js';
+import { type DutyRow, DutyStatus, DutyType, type InsertOrGetRow } from './types.js';
 
 /**
  * Integration tests for PostgreSQL queries using PGlite.
@@ -29,6 +29,7 @@ describe('PostgreSQL Queries', () => {
   const DUTY_TYPE = DutyType.BLOCK_PROPOSAL;
   const MESSAGE_HASH = Buffer32.random().toString();
   const NODE_ID = 'node-1';
+  const LOCK_TOKEN = 'test-lock-token-12345';
   const SIGNATURE = '0xsignature';
 
   beforeEach(async () => {
@@ -47,7 +48,7 @@ describe('PostgreSQL Queries', () => {
 
   describe('schema setup', () => {
     it('should create validator_duties table with correct columns', async () => {
-      const result = await db.query<{ column_name: string }>(`
+      const result = await db.query<{ column_name: string; data_type: string; is_nullable: boolean }>(`
         SELECT column_name, data_type, is_nullable
         FROM information_schema.columns
         WHERE table_name = 'validator_duties'
@@ -63,45 +64,42 @@ describe('PostgreSQL Queries', () => {
       expect(columns).toContain('message_hash');
       expect(columns).toContain('signature');
       expect(columns).toContain('node_id');
+      expect(columns).toContain('lock_token');
       expect(columns).toContain('started_at');
       expect(columns).toContain('completed_at');
       expect(columns).toContain('error_message');
     });
 
     it('should create schema_version table', async () => {
-      const result = await db.query(`
+      const result = await db.query<{ version: number }>(`
         SELECT version FROM schema_version ORDER BY version DESC LIMIT 1
       `);
 
       expect(result.rows.length).toBe(1);
-      expect((result.rows[0] as { version: number }).version).toBe(SCHEMA_VERSION);
+      expect(result.rows[0].version).toBe(SCHEMA_VERSION);
     });
   });
 
   describe('INSERT_OR_GET_DUTY', () => {
     it('should insert new record and return is_new=true', async () => {
-      const result = await db.query(INSERT_OR_GET_DUTY, [
+      const result = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
 
       expect(result.rows.length).toBe(1);
-      const row = result.rows[0] as {
-        is_new: boolean;
-        status: string;
-        validator_address: string;
-        slot: number;
-        node_id: string;
-      };
+      const row = result.rows[0];
       expect(row.is_new).toBe(true);
       expect(row.status).toBe(DutyStatus.SIGNING);
       expect(row.validator_address).toBe(VALIDATOR_ADDRESS.toString());
       expect(BigInt(row.slot)).toBe(SLOT);
       expect(row.node_id).toBe(NODE_ID);
+      expect(row.lock_token).toBe(LOCK_TOKEN);
     });
 
     it('should return existing record with is_new=false on duplicate', async () => {
@@ -113,141 +111,188 @@ describe('PostgreSQL Queries', () => {
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
 
       // Second insert attempt with different node
-      const result = await db.query(INSERT_OR_GET_DUTY, [
+      const result = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
         DUTY_TYPE,
         MESSAGE_HASH,
         'node-2', // Different node trying to acquire
+        'different-token',
       ]);
 
       expect(result.rows.length).toBe(1);
-      const row = result.rows[0] as { is_new: boolean; node_id: string };
+      const row = result.rows[0];
       expect(row.is_new).toBe(false);
       expect(row.node_id).toBe(NODE_ID); // Original node still owns it
+      expect(row.lock_token).toBe(LOCK_TOKEN); // Original token preserved
     });
 
     it('should allow different duty types for same slot', async () => {
       // Insert BLOCK_PROPOSAL
-      const result1 = await db.query(INSERT_OR_GET_DUTY, [
+      const result1 = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
         DutyType.BLOCK_PROPOSAL,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
 
       // Insert ATTESTATION for same slot
-      const result2 = await db.query(INSERT_OR_GET_DUTY, [
+      const result2 = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
         DutyType.ATTESTATION,
         MESSAGE_HASH,
         NODE_ID,
+        'token-2',
       ]);
 
-      expect((result1.rows[0] as { is_new: boolean }).is_new).toBe(true);
-      expect((result2.rows[0] as { is_new: boolean }).is_new).toBe(true);
+      expect(result1.rows[0].is_new).toBe(true);
+      expect(result2.rows[0].is_new).toBe(true);
     });
 
     it('should allow same duty type for different slots', async () => {
-      const result1 = await db.query(INSERT_OR_GET_DUTY, [
+      const result1 = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         '100',
         BLOCK_NUMBER.toString(),
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        'token-1',
       ]);
 
-      const result2 = await db.query(INSERT_OR_GET_DUTY, [
+      const result2 = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         '101',
         BLOCK_NUMBER.toString(),
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        'token-2',
       ]);
 
-      expect((result1.rows[0] as { is_new: boolean }).is_new).toBe(true);
-      expect((result2.rows[0] as { is_new: boolean }).is_new).toBe(true);
+      expect(result1.rows[0].is_new).toBe(true);
+      expect(result2.rows[0].is_new).toBe(true);
     });
   });
 
   describe('UPDATE_DUTY_SIGNED', () => {
-    it('should update status to signed and set signature', async () => {
+    it('should update status to signed and set signature with correct token', async () => {
       // Insert a duty first
-      await db.query(INSERT_OR_GET_DUTY, [
+      await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
 
-      // Update to signed
+      // Update to signed with correct token
       const updateResult = await db.query(UPDATE_DUTY_SIGNED, [
         SIGNATURE,
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        LOCK_TOKEN,
       ]);
 
       expect(updateResult.affectedRows).toBe(1);
 
       // Verify the update
-      const selectResult = await db.query(
+      const selectResult = await db.query<DutyRow>(
         `SELECT status, signature, completed_at FROM validator_duties
          WHERE validator_address = $1 AND slot = $2 AND duty_type = $3`,
         [VALIDATOR_ADDRESS.toString(), SLOT.toString(), DUTY_TYPE],
       );
 
-      const row = selectResult.rows[0] as { status: string; signature: string; completed_at: Date };
+      const row = selectResult.rows[0];
       expect(row.status).toBe(DutyStatus.SIGNED);
       expect(row.signature).toBe(SIGNATURE);
       expect(row.completed_at).toBeTruthy();
     });
 
-    it('should not update if status is not signing', async () => {
-      // Insert and mark as signed
-      await db.query(INSERT_OR_GET_DUTY, [
+    it('should not update with wrong token', async () => {
+      await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
-      await db.query(UPDATE_DUTY_SIGNED, [SIGNATURE, VALIDATOR_ADDRESS.toString(), SLOT.toString(), DUTY_TYPE]);
 
-      // Try to update again
-      const result = await db.query(UPDATE_DUTY_SIGNED, [
+      // Try to update with wrong token
+      const updateResult = await db.query<DutyRow>(UPDATE_DUTY_SIGNED, [
+        SIGNATURE,
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        DUTY_TYPE,
+        'wrong-token',
+      ]);
+
+      expect(updateResult.affectedRows).toBe(0);
+
+      // Verify still in signing state
+      const selectResult = await db.query<DutyRow>(
+        `SELECT status FROM validator_duties WHERE validator_address = $1 AND slot = $2`,
+        [VALIDATOR_ADDRESS.toString(), SLOT.toString()],
+      );
+      expect(selectResult.rows[0].status).toBe(DutyStatus.SIGNING);
+    });
+
+    it('should not update if status is not signing', async () => {
+      // Insert and mark as signed
+      await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        BLOCK_NUMBER.toString(),
+        DUTY_TYPE,
+        MESSAGE_HASH,
+        NODE_ID,
+        LOCK_TOKEN,
+      ]);
+      await db.query<DutyRow>(UPDATE_DUTY_SIGNED, [
+        SIGNATURE,
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        DUTY_TYPE,
+        LOCK_TOKEN,
+      ]);
+
+      // Try to update again with correct token
+      const result = await db.query<DutyRow>(UPDATE_DUTY_SIGNED, [
         'new-signature',
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        LOCK_TOKEN,
       ]);
 
       expect(result.affectedRows).toBe(0);
 
       // Verify signature unchanged
-      const selectResult = await db.query(
+      const selectResult = await db.query<DutyRow>(
         `SELECT signature FROM validator_duties WHERE validator_address = $1 AND slot = $2`,
         [VALIDATOR_ADDRESS.toString(), SLOT.toString()],
       );
-      expect((selectResult.rows[0] as { signature: string }).signature).toBe(SIGNATURE);
+      expect(selectResult.rows[0].signature).toBe(SIGNATURE);
     });
   });
 
   describe('UPDATE_DUTY_FAILED', () => {
-    it('should update status to failed and set error message', async () => {
+    it('should update status to failed and set error message with correct token', async () => {
       await db.query(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
@@ -255,24 +300,31 @@ describe('PostgreSQL Queries', () => {
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
 
       const errorMessage = 'Connection timeout';
-      await db.query(UPDATE_DUTY_FAILED, [errorMessage, VALIDATOR_ADDRESS.toString(), SLOT.toString(), DUTY_TYPE]);
+      await db.query(UPDATE_DUTY_FAILED, [
+        errorMessage,
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        DUTY_TYPE,
+        LOCK_TOKEN,
+      ]);
 
-      const selectResult = await db.query(
+      const selectResult = await db.query<DutyRow>(
         `SELECT status, error_message, completed_at FROM validator_duties
          WHERE validator_address = $1 AND slot = $2`,
         [VALIDATOR_ADDRESS.toString(), SLOT.toString()],
       );
 
-      const row = selectResult.rows[0] as { status: string; error_message: string; completed_at: Date };
+      const row = selectResult.rows[0];
       expect(row.status).toBe(DutyStatus.FAILED);
       expect(row.error_message).toBe(errorMessage);
       expect(row.completed_at).toBeTruthy();
     });
 
-    it('should not update if status is not signing', async () => {
+    it('should not update with wrong token', async () => {
       await db.query(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
@@ -280,14 +332,51 @@ describe('PostgreSQL Queries', () => {
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
-      await db.query(UPDATE_DUTY_SIGNED, [SIGNATURE, VALIDATOR_ADDRESS.toString(), SLOT.toString(), DUTY_TYPE]);
 
       const result = await db.query(UPDATE_DUTY_FAILED, [
         'Some error',
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        'wrong-token',
+      ]);
+
+      expect(result.affectedRows).toBe(0);
+
+      // Verify still in signing state
+      const selectResult = await db.query<DutyRow>(
+        `SELECT status FROM validator_duties WHERE validator_address = $1 AND slot = $2`,
+        [VALIDATOR_ADDRESS.toString(), SLOT.toString()],
+      );
+      expect(selectResult.rows[0].status).toBe(DutyStatus.SIGNING);
+    });
+
+    it('should not update if status is not signing', async () => {
+      await db.query(INSERT_OR_GET_DUTY, [
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        BLOCK_NUMBER.toString(),
+        DUTY_TYPE,
+        MESSAGE_HASH,
+        NODE_ID,
+        LOCK_TOKEN,
+      ]);
+      await db.query(UPDATE_DUTY_SIGNED, [
+        SIGNATURE,
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        DUTY_TYPE,
+        LOCK_TOKEN,
+      ]);
+
+      const result = await db.query(UPDATE_DUTY_FAILED, [
+        'Some error',
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        DUTY_TYPE,
+        LOCK_TOKEN,
       ]);
 
       expect(result.affectedRows).toBe(0);
@@ -303,8 +392,15 @@ describe('PostgreSQL Queries', () => {
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
-      await db.query(UPDATE_DUTY_FAILED, ['Error', VALIDATOR_ADDRESS.toString(), SLOT.toString(), DUTY_TYPE]);
+      await db.query(UPDATE_DUTY_FAILED, [
+        'Error',
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        DUTY_TYPE,
+        LOCK_TOKEN,
+      ]);
 
       const deleteResult = await db.query(DELETE_FAILED_DUTY, [
         VALIDATOR_ADDRESS.toString(),
@@ -330,8 +426,15 @@ describe('PostgreSQL Queries', () => {
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
-      await db.query(UPDATE_DUTY_SIGNED, [SIGNATURE, VALIDATOR_ADDRESS.toString(), SLOT.toString(), DUTY_TYPE]);
+      await db.query(UPDATE_DUTY_SIGNED, [
+        SIGNATURE,
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        DUTY_TYPE,
+        LOCK_TOKEN,
+      ]);
 
       const deleteResult = await db.query(DELETE_FAILED_DUTY, [
         VALIDATOR_ADDRESS.toString(),
@@ -357,6 +460,7 @@ describe('PostgreSQL Queries', () => {
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
 
       const deleteResult = await db.query(DELETE_FAILED_DUTY, [
@@ -378,14 +482,23 @@ describe('PostgreSQL Queries', () => {
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
 
       // Direct insert should fail due to primary key constraint
       await expect(
         db.query(
-          `INSERT INTO validator_duties (validator_address, slot, block_number, duty_type, status, message_hash, node_id)
-           VALUES ($1, $2, $3, $4, 'signing', $5, $6)`,
-          [VALIDATOR_ADDRESS.toString(), SLOT.toString(), BLOCK_NUMBER.toString(), DUTY_TYPE, MESSAGE_HASH, 'node-2'],
+          `INSERT INTO validator_duties (validator_address, slot, block_number, duty_type, status, message_hash, node_id, lock_token)
+           VALUES ($1, $2, $3, $4, 'signing', $5, $6, $7)`,
+          [
+            VALIDATOR_ADDRESS.toString(),
+            SLOT.toString(),
+            BLOCK_NUMBER.toString(),
+            DUTY_TYPE,
+            MESSAGE_HASH,
+            'node-2',
+            'token-2',
+          ],
         ),
       ).rejects.toThrow();
     });
@@ -393,9 +506,9 @@ describe('PostgreSQL Queries', () => {
     it('should enforce duty_type check constraint', async () => {
       await expect(
         db.query(
-          `INSERT INTO validator_duties (validator_address, slot, block_number, duty_type, status, message_hash, node_id)
-           VALUES ($1, $2, $3, 'INVALID_TYPE', 'signing', $4, $5)`,
-          [VALIDATOR_ADDRESS.toString(), SLOT.toString(), BLOCK_NUMBER.toString(), MESSAGE_HASH, NODE_ID],
+          `INSERT INTO validator_duties (validator_address, slot, block_number, duty_type, status, message_hash, node_id, lock_token)
+           VALUES ($1, $2, $3, 'INVALID_TYPE', 'signing', $4, $5, $6)`,
+          [VALIDATOR_ADDRESS.toString(), SLOT.toString(), BLOCK_NUMBER.toString(), MESSAGE_HASH, NODE_ID, LOCK_TOKEN],
         ),
       ).rejects.toThrow();
     });
@@ -403,9 +516,17 @@ describe('PostgreSQL Queries', () => {
     it('should enforce status check constraint', async () => {
       await expect(
         db.query(
-          `INSERT INTO validator_duties (validator_address, slot, block_number, duty_type, status, message_hash, node_id)
-           VALUES ($1, $2, $3, $4, 'invalid_status', $5, $6)`,
-          [VALIDATOR_ADDRESS.toString(), SLOT.toString(), BLOCK_NUMBER.toString(), DUTY_TYPE, MESSAGE_HASH, NODE_ID],
+          `INSERT INTO validator_duties (validator_address, slot, block_number, duty_type, status, message_hash, node_id, lock_token)
+           VALUES ($1, $2, $3, $4, 'invalid_status', $5, $6, $7)`,
+          [
+            VALIDATOR_ADDRESS.toString(),
+            SLOT.toString(),
+            BLOCK_NUMBER.toString(),
+            DUTY_TYPE,
+            MESSAGE_HASH,
+            NODE_ID,
+            LOCK_TOKEN,
+          ],
         ),
       ).rejects.toThrow();
     });
@@ -415,32 +536,34 @@ describe('PostgreSQL Queries', () => {
     it('should handle large slot numbers correctly', async () => {
       const largeSlot = 9007199254740991n; // Max safe integer
 
-      const result = await db.query(INSERT_OR_GET_DUTY, [
+      const result = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         largeSlot.toString(),
         BLOCK_NUMBER.toString(),
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
 
-      const row = result.rows[0] as { slot: string };
+      const row = result.rows[0];
       expect(BigInt(row.slot)).toBe(largeSlot);
     });
 
     it('should handle large block numbers correctly', async () => {
       const largeBlockNumber = 9007199254740991n;
 
-      const result = await db.query(INSERT_OR_GET_DUTY, [
+      const result = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         largeBlockNumber.toString(),
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
+        LOCK_TOKEN,
       ]);
 
-      const row = result.rows[0] as { block_number: string };
+      const row = result.rows[0];
       expect(BigInt(row.block_number)).toBe(largeBlockNumber);
     });
   });
@@ -448,7 +571,9 @@ describe('PostgreSQL Queries', () => {
 
 describe('PostgresSlashingProtectionDatabase', () => {
   let pglite: PGlite;
-  let pool: Pool;
+  // pool needs to be 'any' due to some low-level discrepancies
+  // between pg's Pool & the adapter's implementation
+  let pool: any;
 
   beforeEach(() => {
     pglite = new PGlite();
@@ -467,13 +592,13 @@ describe('PostgresSlashingProtectionDatabase', () => {
       }
       await pglite.query(INSERT_SCHEMA_VERSION, [SCHEMA_VERSION]);
 
-      const db = new PostgresSlashingProtectionDatabase(pool as any);
+      const db = new PostgresSlashingProtectionDatabase(pool);
 
       await expect(db.initialize()).resolves.not.toThrow();
     });
 
     it('should throw when schema_version table does not exist', async () => {
-      const db = new PostgresSlashingProtectionDatabase(pool as any);
+      const db = new PostgresSlashingProtectionDatabase(pool);
 
       await expect(db.initialize()).rejects.toThrow(
         'Database schema not initialized. Please run migrations first: aztec migrate up --database-url <url>',
@@ -489,7 +614,7 @@ describe('PostgresSlashingProtectionDatabase', () => {
         )
       `);
 
-      const db = new PostgresSlashingProtectionDatabase(pool as any);
+      const db = new PostgresSlashingProtectionDatabase(pool);
 
       await expect(db.initialize()).rejects.toThrow(
         'Database schema not initialized. Please run migrations first: aztec migrate up --database-url <url>',
@@ -503,7 +628,7 @@ describe('PostgresSlashingProtectionDatabase', () => {
       }
       await pglite.query(INSERT_SCHEMA_VERSION, [SCHEMA_VERSION - 1]);
 
-      const db = new PostgresSlashingProtectionDatabase(pool as any);
+      const db = new PostgresSlashingProtectionDatabase(pool);
 
       await expect(db.initialize()).rejects.toThrow(
         `Database schema version ${SCHEMA_VERSION - 1} is outdated (expected ${SCHEMA_VERSION}). Please run migrations: aztec migrate up --database-url <url>`,
@@ -517,7 +642,7 @@ describe('PostgresSlashingProtectionDatabase', () => {
       }
       await pglite.query(INSERT_SCHEMA_VERSION, [SCHEMA_VERSION + 1]);
 
-      const db = new PostgresSlashingProtectionDatabase(pool as any);
+      const db = new PostgresSlashingProtectionDatabase(pool);
 
       await expect(db.initialize()).rejects.toThrow(
         `Database schema version ${SCHEMA_VERSION + 1} is newer than expected (${SCHEMA_VERSION}). Please update your application.`,

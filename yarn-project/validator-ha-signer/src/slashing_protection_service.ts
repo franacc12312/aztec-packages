@@ -51,16 +51,17 @@ export class SlashingProtectionService {
    * This method uses an atomic insert-or-get operation.
    * It will:
    * 1. Try to insert a new record with 'signing' status
-   * 2. If insert succeeds, we acquired the lock - return
+   * 2. If insert succeeds, we acquired the lock - return the lockToken
    * 3. If a record exists, handle based on status:
    *    - SIGNED: Throw appropriate error (already signed or slashing protection)
    *    - FAILED: Delete the failed record
    *    - SIGNING: Wait and poll until status changes, then handle result
    *
+   * @returns The lockToken that must be used for recordSuccess/recordFailure
    * @throws DutyAlreadySignedError if the duty was already completed
    * @throws SlashingProtectionError if attempting to sign different data for same slot/duty
    */
-  async checkAndRecord(params: CheckAndRecordParams): Promise<void> {
+  async checkAndRecord(params: CheckAndRecordParams): Promise<string> {
     const { validatorAddress, slot, dutyType, messageHash, nodeId } = params;
     const startTime = Date.now();
 
@@ -79,7 +80,7 @@ export class SlashingProtectionService {
           validatorAddress: validatorAddress.toString(),
           nodeId,
         });
-        return;
+        return record.lockToken;
       }
 
       // Record already exists - handle based on status
@@ -131,32 +132,56 @@ export class SlashingProtectionService {
   /**
    * Record a successful signing operation.
    * Updates the duty status to 'signed' and stores the signature.
+   * Only succeeds if the lockToken matches (caller must be the one who created the duty).
+   *
+   * @returns true if the update succeeded, false if token didn't match
    */
-  async recordSuccess(params: RecordSuccessParams): Promise<void> {
-    const { validatorAddress, slot, dutyType, signature, nodeId } = params;
+  async recordSuccess(params: RecordSuccessParams): Promise<boolean> {
+    const { validatorAddress, slot, dutyType, signature, nodeId, lockToken } = params;
 
-    await this.db.updateDutySigned(validatorAddress, slot, dutyType, signature.toString());
+    const success = await this.db.updateDutySigned(validatorAddress, slot, dutyType, signature.toString(), lockToken);
 
-    this.log.info(`Recorded successful signing for duty ${dutyType} at slot ${slot}`, {
-      validatorAddress: validatorAddress.toString(),
-      nodeId,
-    });
+    if (success) {
+      this.log.info(`Recorded successful signing for duty ${dutyType} at slot ${slot}`, {
+        validatorAddress: validatorAddress.toString(),
+        nodeId,
+      });
+    } else {
+      this.log.warn(`Failed to record successful signing for duty ${dutyType} at slot ${slot}: invalid token`, {
+        validatorAddress: validatorAddress.toString(),
+        nodeId,
+      });
+    }
+
+    return success;
   }
 
   /**
    * Record a failed signing operation.
    * Updates the duty status to 'failed' with the error message.
+   * Only succeeds if the lockToken matches (caller must be the one who created the duty).
    * A future attempt can retry after this.
+   *
+   * @returns true if the update succeeded, false if token didn't match
    */
-  async recordFailure(params: RecordFailureParams): Promise<void> {
-    const { validatorAddress, slot, dutyType, error } = params;
+  async recordFailure(params: RecordFailureParams): Promise<boolean> {
+    const { validatorAddress, slot, dutyType, error, lockToken } = params;
 
-    await this.db.updateDutyFailed(validatorAddress, slot, dutyType, error);
+    const success = await this.db.updateDutyFailed(validatorAddress, slot, dutyType, error, lockToken);
 
-    this.log.warn(`Recorded failed signing for duty ${dutyType} at slot ${slot}`, {
-      validatorAddress: validatorAddress.toString(),
-      error,
-    });
+    if (success) {
+      this.log.warn(`Recorded failed signing for duty ${dutyType} at slot ${slot}`, {
+        validatorAddress: validatorAddress.toString(),
+        error,
+      });
+    } else {
+      this.log.warn(`Failed to record failure for duty ${dutyType} at slot ${slot}: invalid token`, {
+        validatorAddress: validatorAddress.toString(),
+        error,
+      });
+    }
+
+    return success;
   }
 
   /**

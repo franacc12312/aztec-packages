@@ -44,6 +44,9 @@ export class ValidatorHASigner {
     this.log = createLogger('validator-ha-signer');
 
     if (config.enabled && db) {
+      if (!config.nodeId || config.nodeId === '') {
+        throw new Error('NODE_ID is required for high-availability setups');
+      }
       this.slashingProtection = new SlashingProtectionService(db, config);
       this.log.info('Validator HA Signer initialized with slashing protection', {
         nodeId: config.nodeId,
@@ -91,8 +94,8 @@ export class ValidatorHASigner {
 
     const { slot, blockNumber, dutyType } = context;
 
-    // Acquire lock
-    await this.slashingProtection.checkAndRecord({
+    // Acquire lock and get the token for ownership verification
+    const lockToken = await this.slashingProtection.checkAndRecord({
       validatorAddress,
       slot,
       blockNumber,
@@ -106,23 +109,25 @@ export class ValidatorHASigner {
     try {
       signature = await signFn(messageHash);
     } catch (error: any) {
-      // Record failure
+      // Record failure (only succeeds if we own the lock)
       await this.slashingProtection.recordFailure({
         validatorAddress,
         slot,
         dutyType,
         error: error.message ?? String(error),
+        lockToken,
       });
       throw error;
     }
 
-    // Record success
+    // Record success (only succeeds if we own the lock)
     await this.slashingProtection.recordSuccess({
       validatorAddress,
       slot,
       dutyType,
       signature,
       nodeId: this.config.nodeId,
+      lockToken,
     });
 
     return signature;

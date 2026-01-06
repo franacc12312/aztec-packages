@@ -1,6 +1,7 @@
 /**
  * PostgreSQL implementation of SlashingProtectionDatabase
  */
+import { randomBytes } from '@aztec/foundation/crypto/random';
 import { EthAddress } from '@aztec/foundation/eth-address';
 import { type Logger, createLogger } from '@aztec/foundation/log';
 
@@ -14,31 +15,7 @@ import {
   UPDATE_DUTY_FAILED,
   UPDATE_DUTY_SIGNED,
 } from './schema.js';
-import type { CheckAndRecordParams, DutyStatus, DutyType, ValidatorDutyRecord } from './types.js';
-
-/**
- * Row type from PostgreSQL query
- */
-interface DutyRow {
-  validator_address: string;
-  slot: string;
-  block_number: string;
-  duty_type: DutyType;
-  status: DutyStatus;
-  message_hash: string;
-  signature: string | null;
-  node_id: string;
-  started_at: Date;
-  completed_at: Date | null;
-  error_message: string | null;
-}
-
-/**
- * Row type from INSERT_OR_GET_DUTY query (includes is_new flag)
- */
-interface InsertOrGetRow extends DutyRow {
-  is_new: boolean;
-}
+import type { CheckAndRecordParams, DutyRow, DutyType, InsertOrGetRow, ValidatorDutyRecord } from './types.js';
 
 /**
  * PostgreSQL implementation of the slashing protection database
@@ -97,6 +74,9 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
    * @returns { isNew: false, record } if a record already exists
    */
   async tryInsertOrGetExisting(params: CheckAndRecordParams): Promise<TryInsertOrGetResult> {
+    // create a token for ownership verification
+    const lockToken = randomBytes(16).toString('hex');
+
     const result: QueryResult<InsertOrGetRow> = await this.pool.query(INSERT_OR_GET_DUTY, [
       params.validatorAddress.toString(),
       params.slot.toString(),
@@ -104,6 +84,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
       params.dutyType,
       params.messageHash,
       params.nodeId,
+      lockToken,
     ]);
 
     if (result.rows.length === 0) {
@@ -119,53 +100,67 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
   }
 
   /**
-   * Update a duty to 'signed' status with the signature
+   * Update a duty to 'signed' status with the signature.
+   * Only succeeds if the lockToken matches (caller must be the one who created the duty).
+   *
+   * @returns true if the update succeeded, false if token didn't match or duty not found
    */
   async updateDutySigned(
     validatorAddress: EthAddress,
     slot: bigint,
     dutyType: DutyType,
     signature: string,
-  ): Promise<void> {
+    lockToken: string,
+  ): Promise<boolean> {
     const result = await this.pool.query(UPDATE_DUTY_SIGNED, [
       signature,
       validatorAddress.toString(),
       slot.toString(),
       dutyType,
+      lockToken,
     ]);
 
     if (result.rowCount === 0) {
-      this.log.warn('No duty found to update to signed status', {
+      this.log.warn('Failed to update duty to signed status: invalid token or duty not found', {
         validatorAddress: validatorAddress.toString(),
         slot: slot.toString(),
         dutyType,
       });
+      return false;
     }
+    return true;
   }
 
   /**
-   * Update a duty to 'failed' status with error message
+   * Update a duty to 'failed' status with error message.
+   * Only succeeds if the lockToken matches (caller must be the one who created the duty).
+   *
+   * @returns true if the update succeeded, false if token didn't match or duty not found
    */
   async updateDutyFailed(
     validatorAddress: EthAddress,
     slot: bigint,
     dutyType: DutyType,
     errorMessage: string,
-  ): Promise<void> {
+    lockToken: string,
+  ): Promise<boolean> {
     const result = await this.pool.query(UPDATE_DUTY_FAILED, [
       errorMessage,
       validatorAddress.toString(),
       slot.toString(),
       dutyType,
+      lockToken,
     ]);
 
     if (result.rowCount === 0) {
-      this.log.warn('No duty found to update to failed status', {
+      this.log.warn('Failed to update duty to failed status: invalid token or duty not found', {
         validatorAddress: validatorAddress.toString(),
         slot: slot.toString(),
         dutyType,
       });
+      return false;
     }
+    return true;
   }
 
   /**
@@ -191,6 +186,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
       messageHash: row.message_hash,
       signature: row.signature ?? undefined,
       nodeId: row.node_id,
+      lockToken: row.lock_token,
       startedAt: row.started_at,
       completedAt: row.completed_at ?? undefined,
       errorMessage: row.error_message ?? undefined,
