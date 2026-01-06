@@ -105,7 +105,7 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
    * @returns The index and sibling path concatenated [index, sibling_path]
    */
   public utilityGetMembershipWitness(blockHash: Fr, treeId: MerkleTreeId, leafValue: Fr): Promise<Fr[]> {
-    const treeMembershipService = new TreeMembershipService(this.aztecNode, this.anchorBlockStore);
+    const treeMembershipService = new TreeMembershipService(this.aztecNode);
     return treeMembershipService.getMembershipWitness(blockHash, treeId, leafValue);
   }
 
@@ -135,7 +135,7 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
     blockHash: Fr,
     nullifier: Fr,
   ): Promise<NullifierMembershipWitness | undefined> {
-    const treeMembershipService = new TreeMembershipService(this.aztecNode, this.anchorBlockStore);
+    const treeMembershipService = new TreeMembershipService(this.aztecNode);
     return await treeMembershipService.getLowNullifierMembershipWitness(blockHash, nullifier);
   }
 
@@ -146,7 +146,7 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
    * @returns - The witness
    */
   public async utilityGetPublicDataWitness(blockHash: Fr, leafSlot: Fr): Promise<PublicDataWitness | undefined> {
-    const treeMembershipService = new TreeMembershipService(this.aztecNode, this.anchorBlockStore);
+    const treeMembershipService = new TreeMembershipService(this.aztecNode);
     return await treeMembershipService.getPublicDataWitness(blockHash, leafSlot);
   }
 
@@ -277,7 +277,7 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
    */
   public async utilityCheckNullifierExists(innerNullifier: Fr) {
     const nullifier = await siloNullifier(this.contractAddress, innerNullifier!);
-    const treeMembershipService = new TreeMembershipService(this.aztecNode, this.anchorBlockStore);
+    const treeMembershipService = new TreeMembershipService(this.aztecNode);
     const index = await treeMembershipService.getNullifierIndex(nullifier);
     return index !== undefined;
   }
@@ -291,7 +291,7 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
    * @returns The l1 to l2 membership witness (index of message in the tree and sibling path).
    */
   public async utilityGetL1ToL2MembershipWitness(contractAddress: AztecAddress, messageHash: Fr, secret: Fr) {
-    const treeMembershipService = new TreeMembershipService(this.aztecNode, this.anchorBlockStore);
+    const treeMembershipService = new TreeMembershipService(this.aztecNode);
     const [messageIndex, siblingPath] = await treeMembershipService.getL1ToL2MembershipWitness(
       contractAddress,
       messageHash,
