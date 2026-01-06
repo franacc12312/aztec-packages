@@ -104,7 +104,6 @@ describe('e2e_node_rpc_perf', () => {
   let blockNumber: number;
   let contractAddress: AztecAddress;
   let contractClassId: Fr;
-  let blockHash: Fr;
   let blockArchive: Fr;
   const txHashes: TxHash[] = [];
   let tokenContract: TokenContract;
@@ -164,7 +163,6 @@ describe('e2e_node_rpc_perf', () => {
 
     // Get block hash and archive for benchmarking getBlockByHash/getBlockByArchive
     const block = await aztecNode.getBlock(BlockNumber(blockNumber));
-    blockHash = await block!.hash();
     blockArchive = block!.header.lastArchive.root;
 
     // Create a sample tx for benchmarking simulation/validation APIs
