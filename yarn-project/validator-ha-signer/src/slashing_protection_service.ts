@@ -5,6 +5,7 @@
  * Uses an external database to coordinate across multiple validator nodes.
  */
 import { type Logger, createLogger } from '@aztec/foundation/log';
+import { RunningPromise } from '@aztec/foundation/promise';
 import { sleep } from '@aztec/foundation/sleep';
 
 import {
@@ -36,6 +37,8 @@ export class SlashingProtectionService {
   private readonly pollingIntervalMs: number;
   private readonly signingTimeoutMs: number;
 
+  private cleanupRunningPromise: RunningPromise;
+
   constructor(
     private readonly db: SlashingProtectionDatabase,
     private readonly config: SlashingProtectionConfig,
@@ -43,6 +46,12 @@ export class SlashingProtectionService {
     this.log = createLogger('slashing-protection');
     this.pollingIntervalMs = config.pollingIntervalMs;
     this.signingTimeoutMs = config.signingTimeoutMs;
+
+    this.cleanupRunningPromise = new RunningPromise(
+      this.cleanupStuckDuties.bind(this),
+      this.log,
+      this.config.maxStuckDutiesAgeMs,
+    );
   }
 
   /**
@@ -189,5 +198,35 @@ export class SlashingProtectionService {
    */
   get nodeId(): string {
     return this.config.nodeId;
+  }
+
+  /**
+   * Start running tasks.
+   * Cleanup runs immediately on start to recover from any previous crashes.
+   */
+  start() {
+    this.cleanupRunningPromise.start();
+    this.log.info('Slashing protection service started', { nodeId: this.config.nodeId });
+  }
+
+  /**
+   * Stop the background cleanup task.
+   */
+  async stop() {
+    await this.cleanupRunningPromise.stop();
+    this.log.info('Slashing protection service stopped', { nodeId: this.config.nodeId });
+  }
+
+  /**
+   * Cleanup own stuck duties
+   */
+  private async cleanupStuckDuties() {
+    const numDuties = await this.db.cleanupOwnStuckDuties(this.config.nodeId, this.config.maxStuckDutiesAgeMs);
+    if (numDuties > 0) {
+      this.log.info(`Cleaned up ${numDuties} stuck duties`, {
+        nodeId: this.config.nodeId,
+        maxStuckDutiesAgeMs: this.config.maxStuckDutiesAgeMs,
+      });
+    }
   }
 }

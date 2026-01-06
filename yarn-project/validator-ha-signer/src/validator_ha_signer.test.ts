@@ -45,6 +45,7 @@ describe('ValidatorHASigner', () => {
       nodeId: NODE_ID,
       pollingIntervalMs: 50,
       signingTimeoutMs: 1000,
+      maxStuckDutiesAgeMs: 60_000,
       databaseUrl: 'postgresql://user:pass@localhost:5432/testdb',
     };
   });
@@ -82,14 +83,40 @@ describe('ValidatorHASigner', () => {
     });
   });
 
+  describe('lifecycle', () => {
+    it('should start and stop without error when enabled', async () => {
+      const signer = new ValidatorHASigner(db, config);
+      signer.start();
+      await signer.stop();
+    });
+
+    it('should start and stop without error when disabled', async () => {
+      const disabledConfig = { ...config, enabled: false };
+      const signer = new ValidatorHASigner(db, disabledConfig);
+      signer.start(); // No-op
+      await signer.stop(); // No-op
+    });
+
+    it('should start and stop without error when db is undefined', async () => {
+      const signer = new ValidatorHASigner(undefined, config);
+      signer.start(); // No-op
+      await signer.stop(); // No-op
+    });
+  });
+
   describe('signWithProtection - enabled', () => {
     let signer: ValidatorHASigner;
     let signFn: jest.Mock<(messageHash: Buffer32) => Promise<Signature>>;
 
     beforeEach(() => {
       signer = new ValidatorHASigner(db, config);
+      signer.start();
       signFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
       signFn.mockResolvedValue(mockSignature);
+    });
+
+    afterEach(async () => {
+      await signer.stop();
     });
 
     it('should sign successfully on first attempt', async () => {
@@ -307,10 +334,6 @@ describe('ValidatorHASigner', () => {
     });
 
     it('should handle multiple validator addresses', async () => {
-      const signer = new ValidatorHASigner(db, config);
-      const signFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
-      signFn.mockResolvedValue(mockSignature);
-
       const validator1 = EthAddress.fromString('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266');
       const validator2 = EthAddress.fromString('0x70997970c51812dc3a010c7d01b50e0d17dc79c8');
 
@@ -341,11 +364,10 @@ describe('ValidatorHASigner', () => {
     });
 
     it('should handle concurrent signing attempts - first succeeds', async () => {
-      const signer = new ValidatorHASigner(db, config);
-      const signFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
+      const localSignFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
 
       // First call sleeps for 200ms then succeeds
-      signFn.mockImplementationOnce(async () => {
+      localSignFn.mockImplementationOnce(async () => {
         await sleep(200);
         return mockSignature;
       });
@@ -359,7 +381,7 @@ describe('ValidatorHASigner', () => {
           blockNumber: 50n,
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
-        signFn,
+        localSignFn,
       );
 
       // Wait a bit to ensure first signing has started
@@ -374,7 +396,7 @@ describe('ValidatorHASigner', () => {
           blockNumber: 50n,
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
-        signFn,
+        localSignFn,
       );
 
       // First should succeed
@@ -384,21 +406,20 @@ describe('ValidatorHASigner', () => {
       await expect(secondSign).rejects.toThrow(DutyAlreadySignedError);
 
       // Only first signer should have called the signing function
-      expect(signFn).toHaveBeenCalledTimes(1);
+      expect(localSignFn).toHaveBeenCalledTimes(1);
     });
 
     it('should handle concurrent signing attempts - first fails, second succeeds', async () => {
-      const signer = new ValidatorHASigner(db, config);
-      const signFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
+      const localSignFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
 
       // First call sleeps for 200ms then fails
-      signFn.mockImplementationOnce(async () => {
+      localSignFn.mockImplementationOnce(async () => {
         await sleep(200);
         throw new Error('Signing failed');
       });
 
       // Second call succeeds
-      signFn.mockImplementationOnce(() => Promise.resolve(mockSignature));
+      localSignFn.mockImplementationOnce(() => Promise.resolve(mockSignature));
 
       // Start first signing (don't await)
       const firstSign = signer.signWithProtection(
@@ -409,7 +430,7 @@ describe('ValidatorHASigner', () => {
           blockNumber: 50n,
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
-        signFn,
+        localSignFn,
       );
 
       // Wait a bit to ensure first signing has started
@@ -424,7 +445,7 @@ describe('ValidatorHASigner', () => {
           blockNumber: 50n,
           dutyType: DutyType.BLOCK_PROPOSAL,
         },
-        signFn,
+        localSignFn,
       );
 
       // First should fail
@@ -434,7 +455,7 @@ describe('ValidatorHASigner', () => {
       await expect(secondSign).resolves.toBe(mockSignature);
 
       // Both signers should have called the signing function
-      expect(signFn).toHaveBeenCalledTimes(2);
+      expect(localSignFn).toHaveBeenCalledTimes(2);
 
       // Verify the duty is marked as signed by the second signer
       const dutyResult = await db.tryInsertOrGetExisting({
@@ -457,8 +478,13 @@ describe('ValidatorHASigner', () => {
     beforeEach(() => {
       const disabledConfig = { ...config, enabled: false };
       signer = new ValidatorHASigner(db, disabledConfig);
+      signer.start(); // No-op when disabled
       signFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
       signFn.mockResolvedValue(mockSignature);
+    });
+
+    afterEach(async () => {
+      await signer.stop(); // No-op when disabled
     });
 
     it('should sign directly without slashing protection', async () => {

@@ -9,6 +9,7 @@ import type { Pool, QueryResult } from 'pg';
 
 import type { SlashingProtectionDatabase, TryInsertOrGetResult } from '../types.js';
 import {
+  CLEANUP_OWN_STUCK_DUTIES,
   DELETE_FAILED_DUTY,
   INSERT_OR_GET_DUTY,
   SCHEMA_VERSION,
@@ -199,5 +200,15 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
   async close(): Promise<void> {
     await this.pool.end();
     this.log.info('Database connection pool closed');
+  }
+
+  /**
+   * Cleanup own stuck duties
+   * @returns the number of duties cleaned up
+   */
+  async cleanupOwnStuckDuties(nodeId: string, maxAgeMs: number): Promise<number> {
+    const cutoff = new Date(Date.now() - maxAgeMs);
+    const result = await this.pool.query(CLEANUP_OWN_STUCK_DUTIES, [nodeId, cutoff]);
+    return result.rowCount ?? 0;
   }
 }

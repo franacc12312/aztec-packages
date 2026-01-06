@@ -18,6 +18,8 @@ export interface SlashingProtectionConfig {
   pollingIntervalMs: number;
   /** Maximum time to wait for a duty being signed to complete (ms) */
   signingTimeoutMs: number;
+  /** Maximum age of a stuck duty in ms */
+  maxStuckDutiesAgeMs: number;
 }
 
 export const slashingProtectionConfigMappings: ConfigMappingsType<SlashingProtectionConfig> = {
@@ -41,6 +43,12 @@ export const slashingProtectionConfigMappings: ConfigMappingsType<SlashingProtec
     description: 'The maximum time to wait for a duty being signed to complete',
     ...numberConfigHelper(3_000),
   },
+  maxStuckDutiesAgeMs: {
+    env: 'SLASHING_PROTECTION_MAX_STUCK_DUTIES_AGE_MS',
+    description: 'The maximum age of a stuck duty in ms',
+    // hard-coding at current 2 slot duration. This should be set by the validator on init
+    ...numberConfigHelper(72_000),
+  },
 };
 
 export const defaultSlashingProtectionConfig: SlashingProtectionConfig = getDefaultConfig(
@@ -63,7 +71,7 @@ export interface CreateHASignerConfig extends SlashingProtectionConfig {
    *
    * Set to true for simple deployments where you want automatic schema setup.
    * Set to false (recommended for production High-Availability setups) and run migrations separately
-   * using an init container or migration job.
+   * using: `aztec migrate-ha-db up --database-url <url>`
    */
   runMigrations?: boolean;
 

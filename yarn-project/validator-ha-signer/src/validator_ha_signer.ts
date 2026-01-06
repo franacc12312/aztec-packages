@@ -146,4 +146,20 @@ export class ValidatorHASigner {
   get nodeId(): string {
     return this.config.nodeId;
   }
+
+  /**
+   * Start the HA signer background tasks (cleanup of stuck duties).
+   * Should be called after construction and before signing operations.
+   */
+  start() {
+    this.slashingProtection?.start();
+  }
+
+  /**
+   * Stop the HA signer background tasks.
+   * Should be called during graceful shutdown.
+   */
+  async stop() {
+    await this.slashingProtection?.stop();
+  }
 }

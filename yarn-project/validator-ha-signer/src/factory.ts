@@ -12,6 +12,9 @@ import { ValidatorHASigner } from './validator_ha_signer.js';
 /**
  * Create a validator HA signer with PostgreSQL backend
  *
+ * After creating the signer, call `signer.start()` to begin background
+ * cleanup tasks. Call `signer.stop()` during graceful shutdown.
+ *
  * Example with manual migrations (recommended for production):
  * ```bash
  * # Run migrations separately
@@ -26,6 +29,11 @@ import { ValidatorHASigner } from './validator_ha_signer.js';
  *   pollingIntervalMs: 100,
  *   signingTimeoutMs: 3000,
  * });
+ * signer.start(); // Start background cleanup
+ *
+ * // ... use signer ...
+ *
+ * await signer.stop(); // On shutdown
  * ```
  *
  * Example with automatic migrations (simpler for dev/testing):
@@ -36,6 +44,7 @@ import { ValidatorHASigner } from './validator_ha_signer.js';
  *   nodeId: 'validator-node-1',
  *   runMigrations: true, // Auto-run migrations on startup
  * });
+ * signer.start();
  * ```
  *
  * @param config - Configuration for the HA signer
@@ -61,7 +70,7 @@ export async function createHASigner(
 
   // Run migrations if requested
   if (shouldRunMigrations) {
-    await runMigrations(databaseUrl, 'up');
+    await runMigrations(databaseUrl, { direction: 'up', verbose: true });
   }
 
   // Create connection pool (or use provided pool)

@@ -42,11 +42,13 @@ describe('SlashingProtectionService', () => {
       nodeId: NODE_ID,
       pollingIntervalMs: 50,
       signingTimeoutMs: 1000,
+      maxStuckDutiesAgeMs: 60_000,
     };
     service = new SlashingProtectionService(db, config);
   });
 
   afterEach(async () => {
+    await service.stop();
     await pool.end();
   });
 
@@ -257,21 +259,25 @@ describe('SlashingProtectionService', () => {
       const shortTimeoutConfig = { ...config, signingTimeoutMs: 200 };
       const serviceWithShortTimeout = new SlashingProtectionService(db, shortTimeoutConfig);
 
-      const params: CheckAndRecordParams = {
-        validatorAddress: VALIDATOR_ADDRESS,
-        slot: SLOT,
-        blockNumber: BLOCK_NUMBER,
-        dutyType: DUTY_TYPE,
-        messageHash: MESSAGE_HASH,
-        nodeId: NODE_ID,
-      };
+      try {
+        const params: CheckAndRecordParams = {
+          validatorAddress: VALIDATOR_ADDRESS,
+          slot: SLOT,
+          blockNumber: BLOCK_NUMBER,
+          dutyType: DUTY_TYPE,
+          messageHash: MESSAGE_HASH,
+          nodeId: NODE_ID,
+        };
 
-      // First node acquires lock but never completes
-      await serviceWithShortTimeout.checkAndRecord(params);
+        // First node acquires lock but never completes
+        await serviceWithShortTimeout.checkAndRecord(params);
 
-      // Second node tries to acquire lock
-      const params2 = { ...params, nodeId: NODE_ID_2 };
-      await expect(serviceWithShortTimeout.checkAndRecord(params2)).rejects.toThrow(DutyAlreadySignedError);
+        // Second node tries to acquire lock
+        const params2 = { ...params, nodeId: NODE_ID_2 };
+        await expect(serviceWithShortTimeout.checkAndRecord(params2)).rejects.toThrow(DutyAlreadySignedError);
+      } finally {
+        await serviceWithShortTimeout.stop();
+      }
     });
   });
 
@@ -474,6 +480,52 @@ describe('SlashingProtectionService', () => {
   describe('nodeId', () => {
     it('should return the configured node ID', () => {
       expect(service.nodeId).toBe(NODE_ID);
+    });
+  });
+
+  describe('lifecycle', () => {
+    it('should start and stop without error', async () => {
+      service.start();
+      await service.stop();
+    });
+
+    it('should cleanup stuck duties on start', async () => {
+      // Create a stuck duty by directly inserting (simulating a crash)
+      const params: CheckAndRecordParams = {
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: SLOT,
+        blockNumber: BLOCK_NUMBER,
+        dutyType: DUTY_TYPE,
+        messageHash: MESSAGE_HASH,
+        nodeId: NODE_ID,
+      };
+
+      // Insert a duty that will be "stuck"
+      await service.checkAndRecord(params);
+
+      // Verify duty exists and is in signing state
+      let result = await db.tryInsertOrGetExisting(params);
+      expect(result.isNew).toBe(false);
+      expect(result.record.status).toBe(DutyStatus.SIGNING);
+
+      // Create a new service with a very short maxStuckDutiesAgeMs
+      const shortAgeConfig = { ...config, maxStuckDutiesAgeMs: 1 };
+      const newService = new SlashingProtectionService(db, shortAgeConfig);
+
+      // Wait a bit for the duty to become "old"
+      await sleep(10);
+
+      // Start the new service - this should trigger immediate cleanup
+      newService.start();
+
+      // Give cleanup time to run
+      await sleep(100);
+
+      await newService.stop();
+
+      // Now the duty should be deleted, so we can insert again
+      result = await db.tryInsertOrGetExisting(params);
+      expect(result.isNew).toBe(true);
     });
   });
 });

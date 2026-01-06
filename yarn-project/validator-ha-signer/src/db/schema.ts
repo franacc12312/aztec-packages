@@ -207,6 +207,17 @@ WHERE status IN ('signing', 'signed', 'failed')
 `;
 
 /**
+ * Query to cleanup own stuck duties
+ * Removes duties in 'signing' status for a specific node that are older than maxAgeMs
+ */
+export const CLEANUP_OWN_STUCK_DUTIES = `
+DELETE FROM validator_duties
+WHERE node_id = $1
+  AND status = 'signing'
+  AND started_at < $2;
+`;
+
+/**
  * SQL to drop the validator_duties table
  */
 export const DROP_VALIDATOR_DUTIES_TABLE = `DROP TABLE IF EXISTS validator_duties;`;

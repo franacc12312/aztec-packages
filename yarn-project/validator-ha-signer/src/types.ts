@@ -107,4 +107,10 @@ export interface SlashingProtectionDatabase {
    * Delete a failed duty to allow retry
    */
   deleteFailedDuty(validatorAddress: EthAddress, slot: bigint, dutyType: DutyType): Promise<boolean>;
+
+  /**
+   * Cleanup own stuck duties
+   * @returns the number of duties cleaned up
+   */
+  cleanupOwnStuckDuties(nodeId: string, maxAgeMs: number): Promise<number>;
 }
