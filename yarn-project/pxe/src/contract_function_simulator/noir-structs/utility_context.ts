@@ -35,7 +35,7 @@ export class UtilityContext {
     // TODO(#12874): remove the stupid as string conversion by modifying ForeignCallOutput type in acvm.js
     const blockHeaderFields = this.blockHeader.toFields().map(toACVMField);
     return [
-      blockHeaderFields,
+      ...blockHeaderFields,
       new Fr(this.timestamp).toString() as string,
       this.contractAddress.toString() as string,
       this.version.toString() as string,
