@@ -313,22 +313,10 @@ describe('e2e_node_rpc_perf', () => {
       expect(stats.avg).toBeLessThan(5000);
     });
 
-    it('benchmarks getBlockByHash', async () => {
-      const { stats } = await benchmark('getBlockByHash', () => aztecNode.getBlockByHash(blockHash));
-      addResult('getBlockByHash', stats);
-      expect(stats.avg).toBeLessThan(3000);
-    });
-
     it('benchmarks getBlockByArchive', async () => {
       const { stats } = await benchmark('getBlockByArchive', () => aztecNode.getBlockByArchive(blockArchive));
       addResult('getBlockByArchive', stats);
       expect(stats.avg).toBeLessThan(3000);
-    });
-
-    it('benchmarks getBlockHeaderByHash', async () => {
-      const { stats } = await benchmark('getBlockHeaderByHash', () => aztecNode.getBlockHeaderByHash(blockHash));
-      addResult('getBlockHeaderByHash', stats);
-      expect(stats.avg).toBeLessThan(2000);
     });
 
     it('benchmarks getBlockHeaderByArchive', async () => {
