@@ -129,7 +129,34 @@ describe('PostgreSQL Queries', () => {
       const row = result.rows[0];
       expect(row.is_new).toBe(false);
       expect(row.node_id).toBe(NODE_ID); // Original node still owns it
-      expect(row.lock_token).toBe(LOCK_TOKEN); // Original token preserved
+    });
+
+    it('should not expose lock_token for existing records', async () => {
+      // node acquires the lock
+      const insertResult = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        BLOCK_NUMBER.toString(),
+        DUTY_TYPE,
+        MESSAGE_HASH,
+        NODE_ID,
+        LOCK_TOKEN,
+      ]);
+      expect(insertResult.rows[0].is_new).toBe(true);
+      expect(insertResult.rows[0].lock_token).toBe(LOCK_TOKEN);
+
+      // Second insert attempt - should not get the original lock_token
+      const conflictResult = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        BLOCK_NUMBER.toString(),
+        DUTY_TYPE,
+        MESSAGE_HASH,
+        'competing-node',
+        'competing-token',
+      ]);
+      expect(conflictResult.rows[0].is_new).toBe(false);
+      expect(conflictResult.rows[0].lock_token).toBe(''); // Empty string, not the original token
     });
 
     it('should allow different duty types for same slot', async () => {

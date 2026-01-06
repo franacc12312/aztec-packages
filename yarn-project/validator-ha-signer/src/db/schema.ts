@@ -133,7 +133,7 @@ SELECT
   message_hash,
   signature,
   node_id,
-  lock_token,
+  '' as lock_token,
   started_at,
   completed_at,
   error_message,
