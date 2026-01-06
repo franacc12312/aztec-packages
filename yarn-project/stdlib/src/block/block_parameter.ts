@@ -2,7 +2,9 @@ import { BlockNumberSchema } from '@aztec/foundation/branded-types';
 
 import { z } from 'zod';
 
-export const BlockParameterSchema = z.union([BlockNumberSchema, z.literal('latest')]);
+import { schemas } from '../schemas/schemas.js';
 
-/** Block parameter - either a specific BlockNumber or 'latest' */
+export const BlockParameterSchema = z.union([BlockNumberSchema, schemas.Fr, z.literal('latest')]);
+
+/** Block parameter - either a specific BlockNumber, block hash (Fr), or 'latest' */
 export type BlockParameter = z.infer<typeof BlockParameterSchema>;

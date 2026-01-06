@@ -9,13 +9,25 @@ Aztec is in full-speed development. Literally every version breaks compatibility
 
 ## TBD
 
+### [Aztec Node] `getBlockByHash` and `getBlockHeaderByHash` removed
+
+The `getBlockByHash` and `getBlockHeaderByHash` methods have been removed from the `AztecNode` interface. The `BlockParameter` type now accepts a block hash (`Fr`) in addition to block number and `'latest'`, so `getBlock` and `getBlockHeader` can be used directly with a block hash.
+
+```diff
+- const block = await aztecNode.getBlockByHash(blockHash);
++ const block = await aztecNode.getBlock(blockHash);
+
+- const header = await aztecNode.getBlockHeaderByHash(blockHash);
++ const header = await aztecNode.getBlockHeader(blockHash);
+```
+
 ### [Aztec.nr] Renamed message delivery options
 
 The following terms have been renamed:
 
- - `MessageDelivery::UNCONSTRAINED_OFFCHAIN` -> `MessageDelivery::OFFCHAIN`
- - `MessageDelivery::UNCONSTRAINED_ONCHAIN` -> `MessageDelivery::OFFCHAIN_UNCONSTRAINED`
- - `MessageDelivery::CONSTRAINED_ONCHAIN` -> `MessageDelivery::ONCHAIN_CONSTRAINED`
+- `MessageDelivery::UNCONSTRAINED_OFFCHAIN` -> `MessageDelivery::OFFCHAIN`
+- `MessageDelivery::UNCONSTRAINED_ONCHAIN` -> `MessageDelivery::OFFCHAIN_UNCONSTRAINED`
+- `MessageDelivery::CONSTRAINED_ONCHAIN` -> `MessageDelivery::ONCHAIN_CONSTRAINED`
 
 We believe these names will better convey the meaning of the concepts.
 

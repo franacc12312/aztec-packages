@@ -78,7 +78,7 @@ export class PrivateKernelOracleImpl implements PrivateKernelOracle {
   }
 
   async getNoteHashTreeRoot(): Promise<Fr> {
-    const header = await this.node.getBlockHeaderByHash(this.blockHash);
+    const header = await this.node.getBlockHeader(this.blockHash);
     if (!header) {
       throw new Error(`No block header found for block hash ${this.blockHash.toString()}`);
     }
