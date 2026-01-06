@@ -42,6 +42,7 @@ describe('createHASigner', () => {
         nodeId: 'test-node',
         pollingIntervalMs: 100,
         signingTimeoutMs: 3000,
+        maxStuckDutiesAgeMs: 1000,
       },
       { pool: mockPool },
     );
@@ -60,6 +61,7 @@ describe('createHASigner', () => {
         nodeId: 'test-node',
         pollingIntervalMs: 100,
         signingTimeoutMs: 3000,
+        maxStuckDutiesAgeMs: 1000,
       },
       { pool: mockPool },
     );
@@ -77,6 +79,7 @@ describe('createHASigner', () => {
         nodeId: 'test-node',
         pollingIntervalMs: 100,
         signingTimeoutMs: 3000,
+        maxStuckDutiesAgeMs: 1000,
       },
       { pool: mockPool },
     );
