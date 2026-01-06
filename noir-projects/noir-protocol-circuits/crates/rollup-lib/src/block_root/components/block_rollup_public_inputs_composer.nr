@@ -53,7 +53,7 @@ impl BlockRollupPublicInputsComposer {
             end_tree_snapshots: previous_state.partial,
             start_sponge_blob,
             end_sponge_blob: start_sponge_blob,
-            timestamp,
+            timestamp, // Will be constrained to be > the previous.
             // The followings are 0 since there are no tx effects in this block.
             out_hash: 0,
             accumulated_fees: 0,
