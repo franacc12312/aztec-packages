@@ -78,13 +78,7 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
   }
 
   public utilityGetUtilityContext(): UtilityContext {
-    return UtilityContext.from({
-      blockHeader: this.anchorBlockHeader,
-      timestamp: this.anchorBlockHeader.globalVariables.timestamp,
-      contractAddress: this.contractAddress,
-      version: this.anchorBlockHeader.globalVariables.version,
-      chainId: this.anchorBlockHeader.globalVariables.chainId,
-    });
+    return new UtilityContext(this.anchorBlockHeader, this.contractAddress);
   }
 
   /**

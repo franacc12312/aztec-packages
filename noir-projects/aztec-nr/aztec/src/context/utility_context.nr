@@ -4,10 +4,7 @@ use protocol_types::{abis::block_header::BlockHeader, address::AztecAddress, tra
 // If you'll modify this struct don't forget to update utility_context.ts as well.
 pub struct UtilityContext {
     block_header: BlockHeader,
-    timestamp: u64,
     contract_address: AztecAddress,
-    version: Field,
-    chain_id: Field,
 }
 
 impl UtilityContext {
@@ -20,25 +17,19 @@ impl UtilityContext {
         // contract address.
         let default_context = get_utility_context();
 
-        Self {
-            block_header: default_context.block_header,
-            timestamp: default_context.timestamp,
-            contract_address,
-            version: default_context.version,
-            chain_id: default_context.chain_id,
-        }
-    }
-
-    pub fn block_number(self) -> u32 {
-        self.block_header.global_variables.block_number
+        Self { block_header: default_context.block_header, contract_address }
     }
 
     pub fn block_header(self) -> BlockHeader {
         self.block_header
     }
 
+    pub fn block_number(self) -> u32 {
+        self.block_header.global_variables.block_number
+    }
+
     pub fn timestamp(self) -> u64 {
-        self.timestamp
+        self.block_header.global_variables.timestamp
     }
 
     pub fn this_address(self) -> AztecAddress {
@@ -46,11 +37,11 @@ impl UtilityContext {
     }
 
     pub fn version(self) -> Field {
-        self.version
+        self.block_header.global_variables.version
     }
 
     pub fn chain_id(self) -> Field {
-        self.chain_id
+        self.block_header.global_variables.chain_id
     }
 
     pub unconstrained fn raw_storage_read<let N: u32>(
