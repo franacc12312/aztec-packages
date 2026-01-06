@@ -20,7 +20,6 @@ import { EventService } from '../../events/event_service.js';
 import { LogService } from '../../logs/log_service.js';
 import { NoteService } from '../../notes/note_service.js';
 import { ORACLE_VERSION } from '../../oracle_version.js';
-import { PublicStorageService } from '../../public_storage/public_storage_service.js';
 import type { AddressStore } from '../../storage/address_store/address_store.js';
 import type { AnchorBlockStore } from '../../storage/anchor_block_store/anchor_block_store.js';
 import type { CapsuleStore } from '../../storage/capsule_store/capsule_store.js';
@@ -80,7 +79,7 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
 
   public utilityGetUtilityContext(): UtilityContext {
     return UtilityContext.from({
-      blockNumber: this.anchorBlockHeader.globalVariables.blockNumber,
+      blockHeader: this.anchorBlockHeader,
       timestamp: this.anchorBlockHeader.globalVariables.timestamp,
       contractAddress: this.contractAddress,
       version: this.anchorBlockHeader.globalVariables.version,
@@ -100,32 +99,32 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
 
   /**
    * Fetches the index and sibling path of a leaf at a given block from a given tree.
-   * @param blockNumber - The block number at which to get the membership witness.
+   * @param blockHash - The block hash at which to get the membership witness.
    * @param treeId - Id of the tree to get the sibling path from.
    * @param leafValue - The leaf value
    * @returns The index and sibling path concatenated [index, sibling_path]
    */
-  public utilityGetMembershipWitness(blockNumber: BlockNumber, treeId: MerkleTreeId, leafValue: Fr): Promise<Fr[]> {
+  public utilityGetMembershipWitness(blockHash: Fr, treeId: MerkleTreeId, leafValue: Fr): Promise<Fr[]> {
     const treeMembershipService = new TreeMembershipService(this.aztecNode, this.anchorBlockStore);
-    return treeMembershipService.getMembershipWitness(blockNumber, treeId, leafValue);
+    return treeMembershipService.getMembershipWitness(blockHash, treeId, leafValue);
   }
 
   /**
    * Returns a nullifier membership witness for a given nullifier at a given block.
-   * @param blockNumber - The block number at which to get the index.
+   * @param blockHash - The block hash at which to get the index.
    * @param nullifier - Nullifier we try to find witness for.
    * @returns The nullifier membership witness (if found).
    */
   public async utilityGetNullifierMembershipWitness(
-    blockNumber: BlockNumber,
+    blockHash: Fr,
     nullifier: Fr,
   ): Promise<NullifierMembershipWitness | undefined> {
-    return await this.aztecNode.getNullifierMembershipWitness(blockNumber, nullifier);
+    return await this.aztecNode.getNullifierMembershipWitness(blockHash, nullifier);
   }
 
   /**
    * Returns a low nullifier membership witness for a given nullifier at a given block.
-   * @param blockNumber - The block number at which to get the index.
+   * @param blockHash - The block hash at which to get the index.
    * @param nullifier - Nullifier we try to find the low nullifier witness for.
    * @returns The low nullifier membership witness (if found).
    * @remarks Low nullifier witness can be used to perform a nullifier non-inclusion proof by leveraging the "linked
@@ -133,25 +132,22 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
    * we are trying to prove non-inclusion for.
    */
   public async utilityGetLowNullifierMembershipWitness(
-    blockNumber: BlockNumber,
+    blockHash: Fr,
     nullifier: Fr,
   ): Promise<NullifierMembershipWitness | undefined> {
     const treeMembershipService = new TreeMembershipService(this.aztecNode, this.anchorBlockStore);
-    return await treeMembershipService.getLowNullifierMembershipWitness(blockNumber, nullifier);
+    return await treeMembershipService.getLowNullifierMembershipWitness(blockHash, nullifier);
   }
 
   /**
    * Returns a public data tree witness for a given leaf slot at a given block.
-   * @param blockNumber - The block number at which to get the index.
+   * @param blockHash - The block hash at which to get the index.
    * @param leafSlot - The slot of the public data tree to get the witness for.
    * @returns - The witness
    */
-  public async utilityGetPublicDataWitness(
-    blockNumber: BlockNumber,
-    leafSlot: Fr,
-  ): Promise<PublicDataWitness | undefined> {
+  public async utilityGetPublicDataWitness(blockHash: Fr, leafSlot: Fr): Promise<PublicDataWitness | undefined> {
     const treeMembershipService = new TreeMembershipService(this.aztecNode, this.anchorBlockStore);
-    return await treeMembershipService.getPublicDataWitness(blockNumber, leafSlot);
+    return await treeMembershipService.getPublicDataWitness(blockHash, leafSlot);
   }
 
   /**
@@ -310,23 +306,22 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
    * Read the public storage data.
    * @param contractAddress - The address to read storage from.
    * @param startStorageSlot - The starting storage slot.
-   * @param blockNumber - The block number to read storage at.
+   * @param blockHash - The block hash to read storage at.
    * @param numberOfElements - Number of elements to read from the starting storage slot.
    */
   public async utilityStorageRead(
     contractAddress: AztecAddress,
     startStorageSlot: Fr,
-    blockNumber: BlockNumber,
+    blockHash: Fr,
     numberOfElements: number,
   ) {
     const values = [];
-    const publicStorageService = new PublicStorageService(this.anchorBlockStore, this.aztecNode);
 
     // TODO: why do we serialize these requests? This should probably a single call
     // Privacy considerations?
     for (let i = 0n; i < numberOfElements; i++) {
       const storageSlot = new Fr(startStorageSlot.value + i);
-      const value = await publicStorageService.getPublicStorageAt(blockNumber, contractAddress, storageSlot);
+      const value = await this.aztecNode.getPublicStorageAt(blockHash, contractAddress, storageSlot);
 
       this.log.debug(
         `Oracle storage read: slot=${storageSlot.toString()} address-${contractAddress.toString()} value=${value}`,

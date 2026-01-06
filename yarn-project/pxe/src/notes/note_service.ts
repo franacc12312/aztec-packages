@@ -69,7 +69,7 @@ export class NoteService {
    * @param contractAddress - The contract whose notes should be checked and nullified.
    */
   public async syncNoteNullifiers(contractAddress: AztecAddress): Promise<void> {
-    const syncedBlockNumber = (await this.anchorBlockStore.getBlockHeader()).getBlockNumber();
+    const anchorBlockHash = await (await this.anchorBlockStore.getBlockHeader()).hash();
 
     const contractNotes = await this.noteStore.getNotes({ contractAddress });
 
@@ -92,7 +92,7 @@ export class NoteService {
     const nullifierIndexes = (
       await Promise.all(
         nullifierBatches.map(batch =>
-          this.aztecNode.findLeavesIndexes(syncedBlockNumber, MerkleTreeId.NULLIFIER_TREE, batch),
+          this.aztecNode.findLeavesIndexes(anchorBlockHash, MerkleTreeId.NULLIFIER_TREE, batch),
         ),
       )
     ).flat();
@@ -139,7 +139,9 @@ export class NoteService {
     // number which *should* be recent enough to be available, even for non-archive nodes.
     // Also note that the note should never be ahead of the synced block here since `fetchTaggedLogs` only processes
     // logs up to the synced block making this only an additional safety check.
-    const syncedBlockNumber = (await this.anchorBlockStore.getBlockHeader()).getBlockNumber();
+    const anchorBlockHeader = await this.anchorBlockStore.getBlockHeader();
+    const anchorBlockNumber = anchorBlockHeader.getBlockNumber();
+    const anchorBlockHash = await anchorBlockHeader.hash();
 
     // By computing siloed and unique note hashes ourselves we prevent contracts from interfering with the note storage
     // of other contracts, which would constitute a security breach.
@@ -151,8 +153,8 @@ export class NoteService {
       throw new Error(`Could not find tx effect for tx hash ${txHash}`);
     }
 
-    if (txEffect.l2BlockNumber > syncedBlockNumber) {
-      throw new Error(`Could not find tx effect for tx hash ${txHash} as of block number ${syncedBlockNumber}`);
+    if (txEffect.l2BlockNumber > anchorBlockNumber) {
+      throw new Error(`Could not find tx effect for tx hash ${txHash} as of block number ${anchorBlockNumber}`);
     }
 
     const noteInTx = txEffect.data.noteHashes.some(nh => nh.equals(uniqueNoteHash));
@@ -164,13 +166,13 @@ export class NoteService {
     // note existence in said tree. We concurrently also check if the note's nullifier exists, performing all node
     // queries in a single round-trip.
     const [[uniqueNoteHashTreeIndexInBlock], [nullifierIndex]] = await Promise.all([
-      this.aztecNode.findLeavesIndexes(syncedBlockNumber, MerkleTreeId.NOTE_HASH_TREE, [uniqueNoteHash]),
-      this.aztecNode.findLeavesIndexes(syncedBlockNumber, MerkleTreeId.NULLIFIER_TREE, [siloedNullifier]),
+      this.aztecNode.findLeavesIndexes(anchorBlockHash, MerkleTreeId.NOTE_HASH_TREE, [uniqueNoteHash]),
+      this.aztecNode.findLeavesIndexes(anchorBlockHash, MerkleTreeId.NULLIFIER_TREE, [siloedNullifier]),
     ]);
 
     if (uniqueNoteHashTreeIndexInBlock === undefined) {
       throw new Error(
-        `Note hash ${noteHash} (uniqued as ${uniqueNoteHash}) is not present on the tree at block ${syncedBlockNumber} (from tx ${txHash})`,
+        `Note hash ${noteHash} (uniqued as ${uniqueNoteHash}) is not present on the tree at block ${anchorBlockHash} (from tx ${txHash})`,
       );
     }
 

@@ -390,8 +390,13 @@ export class EpochsTestContext {
     // We use `findLeavesIndexes` here, but could use any function that queries the world-state
     // at a particular block, so we know whether that historic block is available or has been
     // pruned. Note that `getBlock` would not work here, since it only hits the archiver.
+    const blockHeader = await this.context.aztecNode.getBlockHeader(blockNumber);
+    if (!blockHeader) {
+      throw new Error(`Block header not found for block ${blockNumber} when verifying historical block`);
+    }
+    const blockHash = await blockHeader.hash();
     const result = await this.context.aztecNode
-      .findLeavesIndexes(blockNumber, MerkleTreeId.NULLIFIER_TREE, [Fr.ZERO])
+      .findLeavesIndexes(blockHash, MerkleTreeId.NULLIFIER_TREE, [Fr.ZERO])
       .then(_ => true)
       .catch(_ => false);
     expect(result).toBe(expectedSuccess);

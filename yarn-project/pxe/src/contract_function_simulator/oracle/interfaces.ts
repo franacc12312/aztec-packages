@@ -65,14 +65,11 @@ export interface IUtilityExecutionOracle {
   utilityGetUtilityContext(): UtilityContext;
   utilityGetKeyValidationRequest(pkMHash: Fr): Promise<KeyValidationRequest>;
   utilityGetContractInstance(address: AztecAddress): Promise<ContractInstance>;
-  utilityGetMembershipWitness(blockNumber: BlockNumber, treeId: MerkleTreeId, leafValue: Fr): Promise<Fr[] | undefined>;
-  utilityGetNullifierMembershipWitness(
-    blockNumber: BlockNumber,
-    nullifier: Fr,
-  ): Promise<NullifierMembershipWitness | undefined>;
-  utilityGetPublicDataWitness(blockNumber: BlockNumber, leafSlot: Fr): Promise<PublicDataWitness | undefined>;
+  utilityGetMembershipWitness(blockHash: Fr, treeId: MerkleTreeId, leafValue: Fr): Promise<Fr[] | undefined>;
+  utilityGetNullifierMembershipWitness(blockHash: Fr, nullifier: Fr): Promise<NullifierMembershipWitness | undefined>;
+  utilityGetPublicDataWitness(blockHash: Fr, leafSlot: Fr): Promise<PublicDataWitness | undefined>;
   utilityGetLowNullifierMembershipWitness(
-    blockNumber: BlockNumber,
+    blockHash: Fr,
     nullifier: Fr,
   ): Promise<NullifierMembershipWitness | undefined>;
   utilityGetBlockHeader(blockNumber: BlockNumber): Promise<BlockHeader | undefined>;
@@ -104,7 +101,7 @@ export interface IUtilityExecutionOracle {
   utilityStorageRead(
     contractAddress: AztecAddress,
     startStorageSlot: Fr,
-    blockNumber: BlockNumber,
+    blockHash: Fr,
     numberOfElements: number,
   ): Promise<Fr[]>;
   utilityFetchTaggedLogs(pendingTaggedLogArrayBaseSlot: Fr): Promise<void>;

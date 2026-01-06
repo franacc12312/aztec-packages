@@ -4,6 +4,7 @@ import type { AztecNode } from '@aztec/aztec.js/node';
 import { MerkleTreeId } from '@aztec/aztec.js/trees';
 import type { Wallet } from '@aztec/aztec.js/wallet';
 import { CheatCodes } from '@aztec/aztec/testing';
+import { Fr } from '@aztec/foundation/curves/bn254';
 import { retryUntil } from '@aztec/foundation/retry';
 import { TokenContract } from '@aztec/noir-contracts.js/Token';
 import type { AztecNodeAdmin } from '@aztec/stdlib/interfaces/client';
@@ -89,8 +90,11 @@ describe('e2e_pruned_blocks', () => {
     // We now make a historical query for the leaf index at the block number in which this first note was created and
     // check that we get a valid result, which indirectly means that the queried block has not yet been pruned.
     expect(
-      (await aztecNode.findLeavesIndexes(firstMintReceipt.blockNumber!, MerkleTreeId.NOTE_HASH_TREE, [mintedNote!]))[0]!
-        .data,
+      (
+        await aztecNode.findLeavesIndexes(new Fr(firstMintReceipt.blockHash!.toBigInt()), MerkleTreeId.NOTE_HASH_TREE, [
+          mintedNote!,
+        ])
+      )[0]!.data,
     ).toBeGreaterThan(0);
 
     // We now mine dummy blocks, mark them as proven and wait for the node to process them, which should result in older
@@ -106,7 +110,11 @@ describe('e2e_pruned_blocks', () => {
     await retryUntil(
       async () => {
         try {
-          await aztecNode.findLeavesIndexes(firstMintReceipt.blockNumber!, MerkleTreeId.NOTE_HASH_TREE, [mintedNote!]);
+          await aztecNode.findLeavesIndexes(
+            new Fr(firstMintReceipt.blockHash!.toBigInt()),
+            MerkleTreeId.NOTE_HASH_TREE,
+            [mintedNote!],
+          );
           return false;
         } catch (error) {
           return (error as Error).message.includes('Unable to find leaf');

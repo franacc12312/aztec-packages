@@ -1,7 +1,6 @@
 import { NOTE_HASH_TREE_HEIGHT, PUBLIC_DATA_TREE_HEIGHT, VK_TREE_HEIGHT } from '@aztec/constants';
 import type { Fr } from '@aztec/foundation/curves/bn254';
 import type { GrumpkinScalar, Point } from '@aztec/foundation/curves/grumpkin';
-import { createLogger } from '@aztec/foundation/log';
 import type { Tuple } from '@aztec/foundation/serialize';
 import { MembershipWitness } from '@aztec/foundation/trees';
 import type { KeyStore } from '@aztec/key-store';
@@ -9,7 +8,6 @@ import { getVKIndex, getVKSiblingPath } from '@aztec/noir-protocol-circuits-type
 import { ProtocolContractAddress } from '@aztec/protocol-contracts';
 import type { FunctionSelector } from '@aztec/stdlib/abi';
 import type { AztecAddress } from '@aztec/stdlib/aztec-address';
-import type { BlockParameter } from '@aztec/stdlib/block';
 import { computeContractClassIdPreimage, computeSaltedInitializationHash } from '@aztec/stdlib/contract';
 import { DelayedPublicMutableValues, DelayedPublicMutableValuesWithHash } from '@aztec/stdlib/delayed-public-mutable';
 import { computePublicDataTreeLeafSlot } from '@aztec/stdlib/hash';
@@ -21,9 +19,6 @@ import type { VerificationKeyAsFields } from '@aztec/stdlib/vks';
 import type { ContractStore } from '../storage/contract_store/contract_store.js';
 import type { PrivateKernelOracle } from './private_kernel_oracle.js';
 
-// TODO: Block number should not be "latest".
-// It should be fixed at the time the proof is being simulated. I.e., it should be the same as the value defined in the constant data.
-
 /**
  * A data oracle that provides information needed for simulating a transaction.
  */
@@ -32,8 +27,7 @@ export class PrivateKernelOracleImpl implements PrivateKernelOracle {
     private contractStore: ContractStore,
     private keyStore: KeyStore,
     private node: AztecNode,
-    private blockNumber: BlockParameter = 'latest',
-    private log = createLogger('pxe:kernel_oracle'),
+    private blockHash: Fr,
   ) {}
 
   public async getContractAddressPreimage(address: AztecAddress) {
@@ -71,7 +65,7 @@ export class PrivateKernelOracleImpl implements PrivateKernelOracle {
   }
 
   async getNoteHashMembershipWitness(leafIndex: bigint): Promise<MembershipWitness<typeof NOTE_HASH_TREE_HEIGHT>> {
-    const path = await this.node.getNoteHashSiblingPath(this.blockNumber, leafIndex);
+    const path = await this.node.getNoteHashSiblingPath(this.blockHash, leafIndex);
     return new MembershipWitness<typeof NOTE_HASH_TREE_HEIGHT>(
       path.pathSize,
       leafIndex,
@@ -80,13 +74,13 @@ export class PrivateKernelOracleImpl implements PrivateKernelOracle {
   }
 
   getNullifierMembershipWitness(nullifier: Fr): Promise<NullifierMembershipWitness | undefined> {
-    return this.node.getNullifierMembershipWitness(this.blockNumber, nullifier);
+    return this.node.getNullifierMembershipWitness(this.blockHash, nullifier);
   }
 
   async getNoteHashTreeRoot(): Promise<Fr> {
-    const header = await this.node.getBlockHeader(this.blockNumber);
+    const header = await this.node.getBlockHeaderByHash(this.blockHash);
     if (!header) {
-      throw new Error(`No block header found for block number ${this.blockNumber}`);
+      throw new Error(`No block header found for block hash ${this.blockHash.toString()}`);
     }
     return header.state.partial.noteHashTree.root;
   }
@@ -107,14 +101,14 @@ export class PrivateKernelOracleImpl implements PrivateKernelOracle {
       ProtocolContractAddress.ContractInstanceRegistry,
       delayedPublicMutableHashSlot,
     );
-    const updatedClassIdWitness = await this.node.getPublicDataWitness(this.blockNumber, hashLeafSlot);
+    const updatedClassIdWitness = await this.node.getPublicDataWitness(this.blockHash, hashLeafSlot);
 
     if (!updatedClassIdWitness) {
       throw new Error(`No public data tree witness found for ${hashLeafSlot}`);
     }
 
     const readStorage = (storageSlot: Fr) =>
-      this.node.getPublicStorageAt(this.blockNumber, ProtocolContractAddress.ContractInstanceRegistry, storageSlot);
+      this.node.getPublicStorageAt(this.blockHash, ProtocolContractAddress.ContractInstanceRegistry, storageSlot);
     const delayedPublicMutableValues = await DelayedPublicMutableValues.readFromTree(
       delayedPublicMutableSlot,
       readStorage,

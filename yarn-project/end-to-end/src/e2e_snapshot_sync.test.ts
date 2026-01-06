@@ -110,8 +110,9 @@ describe('e2e_snapshot_sync', () => {
     const blockHash = await block!.hash();
 
     log.warn(`Checking for L2 block ${L2_TARGET_BLOCK_NUM} with hash ${blockHash} on both nodes`);
+    const targetBlockHash = await getBlockHash(L2_TARGET_BLOCK_NUM);
     const getBlockHashLeafIndex = (node: AztecNode) =>
-      node.findLeavesIndexes(BlockNumber(L2_TARGET_BLOCK_NUM), MerkleTreeId.ARCHIVE, [blockHash]).then(([i]) => i);
+      node.findLeavesIndexes(targetBlockHash, MerkleTreeId.ARCHIVE, [blockHash]).then(([i]) => i);
     expect(await getBlockHashLeafIndex(context.aztecNode)).toBeDefined();
     expect(await getBlockHashLeafIndex(node)).toBeDefined();
 
@@ -225,12 +226,21 @@ describe('e2e_snapshot_sync', () => {
     const blockHash = await block!.hash();
 
     log.warn(`Checking for L2 block ${L2_TARGET_BLOCK_NUM} with hash ${blockHash} on both nodes`);
+    const targetBlockHash = await getBlockHash(L2_TARGET_BLOCK_NUM);
     const getBlockHashLeafIndex = (node: AztecNode) =>
-      node.findLeavesIndexes(BlockNumber(L2_TARGET_BLOCK_NUM), MerkleTreeId.ARCHIVE, [blockHash]).then(([i]) => i);
+      node.findLeavesIndexes(targetBlockHash, MerkleTreeId.ARCHIVE, [blockHash]).then(([i]) => i);
     expect(await getBlockHashLeafIndex(context.aztecNode)).toBeDefined();
     expect(await getBlockHashLeafIndex(node)).toBeDefined();
 
     log.warn(`Stopping new node`);
     await node.stop();
   });
+
+  const getBlockHash = async (blockNumber: number) => {
+    const blockHeader = await context.aztecNode.getBlockHeader(BlockNumber(blockNumber));
+    if (!blockHeader) {
+      throw new Error(`Block header not found for block ${blockNumber}`);
+    }
+    return await blockHeader.hash();
+  };
 });

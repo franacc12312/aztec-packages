@@ -348,32 +348,32 @@ export class RPCTranslator {
   async utilityStorageRead(
     foreignContractAddress: ForeignCallSingle,
     foreignStartStorageSlot: ForeignCallSingle,
-    foreignBlockNumber: ForeignCallSingle,
+    foreignBlockHash: ForeignCallSingle,
     foreignNumberOfElements: ForeignCallSingle,
   ) {
     const contractAddress = addressFromSingle(foreignContractAddress);
     const startStorageSlot = fromSingle(foreignStartStorageSlot);
-    const blockNumber = BlockNumber(fromSingle(foreignBlockNumber).toNumber());
+    const blockHash = fromSingle(foreignBlockHash);
     const numberOfElements = fromSingle(foreignNumberOfElements).toNumber();
 
     const values = await this.handlerAsUtility().utilityStorageRead(
       contractAddress,
       startStorageSlot,
-      blockNumber,
+      blockHash,
       numberOfElements,
     );
 
     return toForeignCallResult([toArray(values)]);
   }
 
-  async utilityGetPublicDataWitness(foreignBlockNumber: ForeignCallSingle, foreignLeafSlot: ForeignCallSingle) {
-    const blockNumber = BlockNumber(fromSingle(foreignBlockNumber).toNumber());
+  async utilityGetPublicDataWitness(foreignBlockHash: ForeignCallSingle, foreignLeafSlot: ForeignCallSingle) {
+    const blockHash = fromSingle(foreignBlockHash);
     const leafSlot = fromSingle(foreignLeafSlot);
 
-    const witness = await this.handlerAsUtility().utilityGetPublicDataWitness(blockNumber, leafSlot);
+    const witness = await this.handlerAsUtility().utilityGetPublicDataWitness(blockHash, leafSlot);
 
     if (!witness) {
-      throw new Error(`Public data witness not found for slot ${leafSlot} at block ${blockNumber}.`);
+      throw new Error(`Public data witness not found for slot ${leafSlot} at block ${blockHash.toString()}.`);
     }
     return toForeignCallResult(witness.toNoirRepresentation());
   }
@@ -568,17 +568,14 @@ export class RPCTranslator {
     );
   }
 
-  async utilityGetNullifierMembershipWitness(
-    foreignBlockNumber: ForeignCallSingle,
-    foreignNullifier: ForeignCallSingle,
-  ) {
-    const blockNumber = BlockNumber(fromSingle(foreignBlockNumber).toNumber());
+  async utilityGetNullifierMembershipWitness(foreignBlockHash: ForeignCallSingle, foreignNullifier: ForeignCallSingle) {
+    const blockHash = fromSingle(foreignBlockHash);
     const nullifier = fromSingle(foreignNullifier);
 
-    const witness = await this.handlerAsUtility().utilityGetNullifierMembershipWitness(blockNumber, nullifier);
+    const witness = await this.handlerAsUtility().utilityGetNullifierMembershipWitness(blockHash, nullifier);
 
     if (!witness) {
-      throw new Error(`Nullifier membership witness not found at block ${blockNumber}.`);
+      throw new Error(`Nullifier membership witness not found at block ${blockHash}.`);
     }
     return toForeignCallResult(witness.toNoirRepresentation());
   }
@@ -640,35 +637,35 @@ export class RPCTranslator {
   }
 
   async utilityGetMembershipWitness(
-    foreignBlockNumber: ForeignCallSingle,
+    foreignBlockHash: ForeignCallSingle,
     foreignTreeId: ForeignCallSingle,
     foreignLeafValue: ForeignCallSingle,
   ) {
-    const blockNumber = BlockNumber(fromSingle(foreignBlockNumber).toNumber());
+    const blockHash = fromSingle(foreignBlockHash);
     const treeId = fromSingle(foreignTreeId).toNumber();
     const leafValue = fromSingle(foreignLeafValue);
 
-    const witness = await this.handlerAsUtility().utilityGetMembershipWitness(blockNumber, treeId, leafValue);
+    const witness = await this.handlerAsUtility().utilityGetMembershipWitness(blockHash, treeId, leafValue);
 
     if (!witness) {
       throw new Error(
-        `Membership witness in tree ${MerkleTreeId[treeId]} not found for value ${leafValue} at block ${blockNumber}.`,
+        `Membership witness in tree ${MerkleTreeId[treeId]} not found for value ${leafValue} at block ${blockHash}.`,
       );
     }
     return toForeignCallResult([toSingle(witness[0]), toArray(witness.slice(1))]);
   }
 
   async utilityGetLowNullifierMembershipWitness(
-    foreignBlockNumber: ForeignCallSingle,
+    foreignBlockHash: ForeignCallSingle,
     foreignNullifier: ForeignCallSingle,
   ) {
-    const blockNumber = BlockNumber(fromSingle(foreignBlockNumber).toNumber());
+    const blockHash = fromSingle(foreignBlockHash);
     const nullifier = fromSingle(foreignNullifier);
 
-    const witness = await this.handlerAsUtility().utilityGetLowNullifierMembershipWitness(blockNumber, nullifier);
+    const witness = await this.handlerAsUtility().utilityGetLowNullifierMembershipWitness(blockHash, nullifier);
 
     if (!witness) {
-      throw new Error(`Low nullifier witness not found for nullifier ${nullifier} at block ${blockNumber}.`);
+      throw new Error(`Low nullifier witness not found for nullifier ${nullifier} at block ${blockHash}.`);
     }
     return toForeignCallResult(witness.toNoirRepresentation());
   }

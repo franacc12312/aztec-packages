@@ -231,9 +231,12 @@ describe('NoteService', () => {
         Promise.resolve(queryTxHash == txHash ? indexedTxEffect : undefined),
       );
 
-      aztecNode.findLeavesIndexes.mockImplementation((queryBlockNum, treeId, leaves) => {
-        if (queryBlockNum != blockNumber) {
-          throw new Error(`Got a tree query for block ${queryBlockNum} but synced block is ${blockNumber}`);
+      aztecNode.findLeavesIndexes.mockImplementation(async (queryBlockHash, treeId, leaves) => {
+        const anchorBlockHash = await (await anchorBlockStore.getBlockHeader()).hash();
+        if (queryBlockHash !== 'latest' && !queryBlockHash.equals(anchorBlockHash)) {
+          throw new Error(
+            `Got a tree query for block hash ${queryBlockHash} but synced block hash is ${anchorBlockHash}`,
+          );
         }
 
         if (treeId == MerkleTreeId.NOTE_HASH_TREE && leaves[0].equals(uniqueNoteHash)) {

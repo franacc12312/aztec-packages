@@ -28,20 +28,20 @@ export class EventService {
     // (and thus we're less concerned about being ahead of the synced block), we use the synced block number to
     // maintain consistent behavior in the PXE. Additionally, events should never be ahead of the synced block here
     // since `fetchTaggedLogs` only processes logs up to the synced block.
-    const [syncedBlockHeader, siloedEventCommitment, txEffect] = await Promise.all([
+    const [anchorBlockHeader, siloedEventCommitment, txEffect] = await Promise.all([
       this.anchorBlockStore.getBlockHeader(),
       siloNullifier(contractAddress, eventCommitment),
       this.aztecNode.getTxEffect(txHash),
     ]);
 
-    const syncedBlockNumber = syncedBlockHeader.getBlockNumber();
+    const anchorBlockNumber = anchorBlockHeader.getBlockNumber();
 
     if (!txEffect) {
       throw new Error(`Could not find tx effect for tx hash ${txHash}`);
     }
 
-    if (txEffect.l2BlockNumber > syncedBlockNumber) {
-      throw new Error(`Could not find tx effect for tx hash ${txHash} as of block number ${syncedBlockNumber}`);
+    if (txEffect.l2BlockNumber > anchorBlockNumber) {
+      throw new Error(`Could not find tx effect for tx hash ${txHash} as of block number ${anchorBlockNumber}`);
     }
 
     const eventInTx = txEffect.data.nullifiers.some(n => n.equals(siloedEventCommitment));
@@ -51,13 +51,14 @@ export class EventService {
       );
     }
 
-    const [nullifierIndex] = await this.aztecNode.findLeavesIndexes(syncedBlockNumber, MerkleTreeId.NULLIFIER_TREE, [
+    const blockHash = await anchorBlockHeader.hash();
+    const [nullifierIndex] = await this.aztecNode.findLeavesIndexes(blockHash, MerkleTreeId.NULLIFIER_TREE, [
       siloedEventCommitment,
     ]);
 
     if (nullifierIndex === undefined) {
       throw new Error(
-        `Event commitment ${eventCommitment} (siloed as ${siloedEventCommitment}) is not present on the nullifier tree at block ${syncedBlockNumber} (from tx ${txHash})`,
+        `Event commitment ${eventCommitment} (siloed as ${siloedEventCommitment}) is not present on the nullifier tree at block ${anchorBlockNumber} (from tx ${txHash})`,
       );
     }
 

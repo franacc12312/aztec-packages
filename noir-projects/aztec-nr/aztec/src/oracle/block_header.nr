@@ -29,6 +29,9 @@ pub fn get_block_header_at(block_number: u32, context: PrivateContext) -> BlockH
         // 2) Check that the last archive block number is more than or equal to the block number we want to prove against
         // We could not perform the proof otherwise because the last archive root from the header would not "contain"
         // the header we want to prove against
+        // Note: The following check could be optimized, as this assertion does not need to be constrained. This is
+        // because constrain_get_block_header_at_internal would fail to prove that the block header inclusion if this
+        // assertion was false.
         assert(
             last_archive_block_number >= block_number,
             "Last archive block number is smaller than the block number we want to prove against",
@@ -40,12 +43,7 @@ pub fn get_block_header_at(block_number: u32, context: PrivateContext) -> BlockH
 
         // 4) We make sure that the header hint we received from the oracle exists in the state tree and is the actual header
         // at the desired block number
-        constrain_get_block_header_at_internal(
-            header,
-            block_number,
-            last_archive_block_number,
-            anchor_block_header.last_archive.root,
-        );
+        constrain_get_block_header_at_internal(header, block_number, anchor_block_header);
 
         // 5) Return the block header
         header
@@ -55,19 +53,18 @@ pub fn get_block_header_at(block_number: u32, context: PrivateContext) -> BlockH
 fn constrain_get_block_header_at_internal(
     header_hint: BlockHeader,
     block_number: u32,
-    last_archive_block_number: u32,
-    last_archive_root: Field,
+    anchor_block_header: BlockHeader,
 ) {
     // 1) Compute the block hash from the block header
     let block_hash = header_hint.hash();
 
     // 2) Get the membership witness of the block in the archive tree
     // Safety: The witness is only used as a "magical value" that makes the merkle proof below pass. Hence it's safe.
-    let witness = unsafe { get_archive_membership_witness(last_archive_block_number, block_hash) };
+    let witness = unsafe { get_archive_membership_witness(anchor_block_header, block_hash) };
 
     // 3) Check that the block is in the archive (i.e. the witness is valid)
     assert_eq(
-        last_archive_root,
+        anchor_block_header.last_archive.root,
         root_from_sibling_path(block_hash, witness.index, witness.path),
         "Proving membership of a block in archive failed",
     );
@@ -95,17 +92,16 @@ mod test {
 
         // We get our current header for the last archive values.
         env.private_context(|context| {
-            let current_header = context.anchor_block_header;
+            let anchor_block_header = context.anchor_block_header;
 
-            let target_block_number = current_header.global_variables.block_number - 2;
+            let target_block_number = anchor_block_header.global_variables.block_number - 2;
             let bad_header = get_block_header_at_internal(target_block_number);
 
             // We pass in a different block number than the header received
             constrain_get_block_header_at_internal(
                 bad_header,
                 target_block_number - 1,
-                current_header.global_variables.block_number - 1,
-                current_header.last_archive.root,
+                anchor_block_header,
             );
         });
     }

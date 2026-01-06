@@ -33,7 +33,7 @@ import {
   getFunctionArtifactByName,
 } from '@aztec/stdlib/abi';
 import { AztecAddress } from '@aztec/stdlib/aztec-address';
-import { type BlockParameter, L2BlockHash } from '@aztec/stdlib/block';
+import { L2BlockHash } from '@aztec/stdlib/block';
 import {
   CompleteAddress,
   type ContractInstanceWithAddress,
@@ -450,11 +450,9 @@ describe('Private Execution test suite', () => {
 
     capsuleStore.loadCapsule.mockImplementation((_, __) => Promise.resolve(null));
 
-    aztecNode.getPublicStorageAt.mockImplementation(
-      (_blockNumber: BlockParameter, _address: AztecAddress, _storageSlot: Fr) => {
-        return Promise.resolve(Fr.ZERO);
-      },
-    );
+    aztecNode.getPublicStorageAt.mockImplementation((_blockHash: Fr, _address: AztecAddress, _storageSlot: Fr) => {
+      return Promise.resolve(Fr.ZERO);
+    });
 
     acirSimulator = new ContractFunctionSimulator(
       contractStore,

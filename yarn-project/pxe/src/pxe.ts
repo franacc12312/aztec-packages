@@ -369,13 +369,9 @@ export class PXE {
     privateExecutionResult: PrivateExecutionResult,
     config: PrivateKernelExecutionProverConfig,
   ): Promise<PrivateKernelExecutionProofOutput<PrivateKernelTailCircuitPublicInputs>> {
-    const simulationAnchorBlock = privateExecutionResult.getSimulationAnchorBlockNumber();
-    const kernelOracle = new PrivateKernelOracleImpl(
-      this.contractStore,
-      this.keyStore,
-      this.node,
-      simulationAnchorBlock,
-    );
+    const anchorBlockHeader = await this.anchorBlockStore.getBlockHeader();
+    const anchorBlockHash = await anchorBlockHeader.hash();
+    const kernelOracle = new PrivateKernelOracleImpl(this.contractStore, this.keyStore, this.node, anchorBlockHash);
     const kernelTraceProver = new PrivateKernelExecutionProver(kernelOracle, proofCreator, !this.proverEnabled);
     this.log.debug(`Executing kernel trace prover (${JSON.stringify(config)})...`);
     return await kernelTraceProver.proveWithKernels(txExecutionRequest.toTxRequest(), privateExecutionResult, config);
@@ -620,13 +616,7 @@ export class PXE {
 
       const header = await this.anchorBlockStore.getBlockHeader();
 
-      const currentClassId = await readCurrentClassId(
-        contractAddress,
-        currentInstance,
-        this.node,
-        header.globalVariables.blockNumber,
-        header.globalVariables.timestamp,
-      );
+      const currentClassId = await readCurrentClassId(contractAddress, currentInstance, this.node, header);
       if (!contractClass.id.equals(currentClassId)) {
         throw new Error('Could not update contract to a class different from the current one.');
       }

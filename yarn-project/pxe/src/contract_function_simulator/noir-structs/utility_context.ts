@@ -1,6 +1,8 @@
 import { Fr } from '@aztec/foundation/curves/bn254';
 import type { FieldsOf } from '@aztec/foundation/types';
+import { toACVMField } from '@aztec/simulator/client';
 import type { AztecAddress } from '@aztec/stdlib/aztec-address';
+import type { BlockHeader } from '@aztec/stdlib/tx';
 import type { UInt64 } from '@aztec/stdlib/types';
 
 /**
@@ -8,7 +10,7 @@ import type { UInt64 } from '@aztec/stdlib/types';
  */
 export class UtilityContext {
   private constructor(
-    public readonly blockNumber: number,
+    public readonly blockHeader: BlockHeader,
     public readonly timestamp: UInt64,
     public readonly contractAddress: AztecAddress,
     public readonly version: Fr,
@@ -17,7 +19,7 @@ export class UtilityContext {
 
   static from(fields: FieldsOf<UtilityContext>) {
     return new UtilityContext(
-      fields.blockNumber,
+      fields.blockHeader,
       fields.timestamp,
       fields.contractAddress,
       fields.version,
@@ -31,8 +33,9 @@ export class UtilityContext {
    */
   public toNoirRepresentation(): (string | string[])[] {
     // TODO(#12874): remove the stupid as string conversion by modifying ForeignCallOutput type in acvm.js
+    const blockHeaderFields = this.blockHeader.toFields().map(toACVMField);
     return [
-      new Fr(this.blockNumber).toString() as string,
+      blockHeaderFields,
       new Fr(this.timestamp).toString() as string,
       this.contractAddress.toString() as string,
       this.version.toString() as string,
