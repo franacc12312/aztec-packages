@@ -1,6 +1,5 @@
 import { BlockNumber } from '@aztec/foundation/branded-types';
 import { timesParallel } from '@aztec/foundation/collection';
-import type { AztecAsyncKVStore } from '@aztec/kv-store';
 import { openTmpStore } from '@aztec/kv-store/lmdb-v2';
 import { L2TipsKVStore } from '@aztec/kv-store/stores';
 import { L2Block, type L2BlockStream } from '@aztec/stdlib/block';
@@ -17,7 +16,6 @@ import { BlockSynchronizer } from './block_synchronizer.js';
 
 describe('BlockSynchronizer', () => {
   let synchronizer: BlockSynchronizer;
-  let store: AztecAsyncKVStore;
   let tipsStore: L2TipsKVStore;
   let anchorBlockStore: AnchorBlockStore;
   let noteStore: NoteStore;
@@ -32,7 +30,7 @@ describe('BlockSynchronizer', () => {
   };
 
   beforeEach(async () => {
-    store = await openTmpStore('test');
+    const store = await openTmpStore('test');
     blockStream = mock<L2BlockStream>();
     aztecNode = mock<AztecNode>();
     tipsStore = new L2TipsKVStore(store, 'pxe');
