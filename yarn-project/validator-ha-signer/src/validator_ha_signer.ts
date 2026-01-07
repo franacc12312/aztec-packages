@@ -43,6 +43,11 @@ export class ValidatorHASigner {
   ) {
     this.log = createLogger('validator-ha-signer');
 
+    if (!config.enabled) {
+      // this shouldn't happen, the validator should use different signer for non-HA setups
+      throw new Error('Validator HA Signer is not enabled in config');
+    }
+
     if (!config.nodeId || config.nodeId === '') {
       throw new Error('NODE_ID is required for high-availability setups');
     }

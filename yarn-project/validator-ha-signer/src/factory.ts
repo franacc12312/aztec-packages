@@ -5,7 +5,6 @@ import { Pool } from 'pg';
 
 import type { CreateHASignerConfig } from './config.js';
 import { PostgresSlashingProtectionDatabase } from './db/postgres.js';
-import { runMigrations } from './migrations.js';
 import type { CreateHASignerDeps, SlashingProtectionDatabase } from './types.js';
 import { ValidatorHASigner } from './validator_ha_signer.js';
 
