@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Unified convenience script to generate CLI documentation in one step
 # Usage: ./scripts/cli_reference_generation/generate_cli_docs.sh <cli_name> [output_dir]
 #

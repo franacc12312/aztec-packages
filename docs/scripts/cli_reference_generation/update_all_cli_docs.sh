@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Script to regenerate auto-generated CLI documentation for both aztec and aztec-wallet
 # Usage: ./scripts/cli_reference_generation/update_all_cli_docs.sh [target_version] [output_dir]
 #

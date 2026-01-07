@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Unified script to regenerate auto-generated CLI documentation
 # Usage: ./scripts/cli_reference_generation/update_cli_docs.sh <cli_name> [target_version] [output_dir]
 #
