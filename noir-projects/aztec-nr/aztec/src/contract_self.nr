@@ -494,8 +494,8 @@ impl<Storage, CallSelf, CallSelfStatic, CallInternal> ContractSelf<PublicContext
     ///
     /// Important Note: If the calling function is a _private_ function, then it had the option of hiding its address
     /// when enqueuing this public function call. In such cases, call to this method will panic. If you want to
-    /// explicitly handle this case, you can use our low-level API exposed on context where the `msg_sender` method
-    /// returns an `Option<AztecAddress>`.
+    /// explicitly handle this case, you can use our low-level API exposed on `context` where the `msg_sender` method
+    /// returns an `Option<AztecAddress>` (e.g. `let msg_sender: Option<AztecAddress> = self.context.msg_sender();`).
     pub fn msg_sender(self: Self) -> AztecAddress {
         self.context.msg_sender().unwrap()
     }
