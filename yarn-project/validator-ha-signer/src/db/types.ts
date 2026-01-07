@@ -41,7 +41,6 @@ export enum DutyType {
 export enum DutyStatus {
   SIGNING = 'signing',
   SIGNED = 'signed',
-  FAILED = 'failed',
 }
 
 /**
@@ -108,12 +107,11 @@ export interface RecordSuccessParams {
 }
 
 /**
- * Parameters for recording a failed signing
+ * Parameters for deleting a duty
  */
-export interface RecordFailureParams {
+export interface DeleteDutyParams {
   validatorAddress: EthAddress;
   slot: bigint;
   dutyType: DutyType;
-  error: string;
   lockToken: string;
 }

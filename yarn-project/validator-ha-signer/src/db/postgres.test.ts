@@ -7,12 +7,11 @@ import { Pool } from '@middle-management/pglite-pg-adapter';
 
 import { PostgresSlashingProtectionDatabase } from './postgres.js';
 import {
-  DELETE_FAILED_DUTY,
+  DELETE_DUTY,
   INSERT_OR_GET_DUTY,
   INSERT_SCHEMA_VERSION,
   SCHEMA_SETUP,
   SCHEMA_VERSION,
-  UPDATE_DUTY_FAILED,
   UPDATE_DUTY_SIGNED,
 } from './schema.js';
 import { type DutyRow, DutyStatus, DutyType, type InsertOrGetRow } from './types.js';
@@ -318,8 +317,8 @@ describe('PostgreSQL Queries', () => {
     });
   });
 
-  describe('UPDATE_DUTY_FAILED', () => {
-    it('should update status to failed and set error message with correct token', async () => {
+  describe('DELETE_DUTY', () => {
+    it('should delete a signing duty with correct token', async () => {
       await db.query(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
@@ -330,109 +329,11 @@ describe('PostgreSQL Queries', () => {
         LOCK_TOKEN,
       ]);
 
-      const errorMessage = 'Connection timeout';
-      await db.query(UPDATE_DUTY_FAILED, [
-        errorMessage,
+      const deleteResult = await db.query(DELETE_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
         LOCK_TOKEN,
-      ]);
-
-      const selectResult = await db.query<DutyRow>(
-        `SELECT status, error_message, completed_at FROM validator_duties
-         WHERE validator_address = $1 AND slot = $2`,
-        [VALIDATOR_ADDRESS.toString(), SLOT.toString()],
-      );
-
-      const row = selectResult.rows[0];
-      expect(row.status).toBe(DutyStatus.FAILED);
-      expect(row.error_message).toBe(errorMessage);
-      expect(row.completed_at).toBeTruthy();
-    });
-
-    it('should not update with wrong token', async () => {
-      await db.query(INSERT_OR_GET_DUTY, [
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        BLOCK_NUMBER.toString(),
-        DUTY_TYPE,
-        MESSAGE_HASH,
-        NODE_ID,
-        LOCK_TOKEN,
-      ]);
-
-      const result = await db.query(UPDATE_DUTY_FAILED, [
-        'Some error',
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        DUTY_TYPE,
-        'wrong-token',
-      ]);
-
-      expect(result.affectedRows).toBe(0);
-
-      // Verify still in signing state
-      const selectResult = await db.query<DutyRow>(
-        `SELECT status FROM validator_duties WHERE validator_address = $1 AND slot = $2`,
-        [VALIDATOR_ADDRESS.toString(), SLOT.toString()],
-      );
-      expect(selectResult.rows[0].status).toBe(DutyStatus.SIGNING);
-    });
-
-    it('should not update if status is not signing', async () => {
-      await db.query(INSERT_OR_GET_DUTY, [
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        BLOCK_NUMBER.toString(),
-        DUTY_TYPE,
-        MESSAGE_HASH,
-        NODE_ID,
-        LOCK_TOKEN,
-      ]);
-      await db.query(UPDATE_DUTY_SIGNED, [
-        SIGNATURE,
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        DUTY_TYPE,
-        LOCK_TOKEN,
-      ]);
-
-      const result = await db.query(UPDATE_DUTY_FAILED, [
-        'Some error',
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        DUTY_TYPE,
-        LOCK_TOKEN,
-      ]);
-
-      expect(result.affectedRows).toBe(0);
-    });
-  });
-
-  describe('DELETE_FAILED_DUTY', () => {
-    it('should delete a failed duty', async () => {
-      await db.query(INSERT_OR_GET_DUTY, [
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        BLOCK_NUMBER.toString(),
-        DUTY_TYPE,
-        MESSAGE_HASH,
-        NODE_ID,
-        LOCK_TOKEN,
-      ]);
-      await db.query(UPDATE_DUTY_FAILED, [
-        'Error',
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        DUTY_TYPE,
-        LOCK_TOKEN,
-      ]);
-
-      const deleteResult = await db.query(DELETE_FAILED_DUTY, [
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        DUTY_TYPE,
       ]);
 
       expect(deleteResult.affectedRows).toBe(1);
@@ -443,6 +344,34 @@ describe('PostgreSQL Queries', () => {
         SLOT.toString(),
       ]);
       expect(selectResult.rows.length).toBe(0);
+    });
+
+    it('should not delete with wrong token', async () => {
+      await db.query(INSERT_OR_GET_DUTY, [
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        BLOCK_NUMBER.toString(),
+        DUTY_TYPE,
+        MESSAGE_HASH,
+        NODE_ID,
+        LOCK_TOKEN,
+      ]);
+
+      const deleteResult = await db.query(DELETE_DUTY, [
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+        DUTY_TYPE,
+        'wrong-token',
+      ]);
+
+      expect(deleteResult.affectedRows).toBe(0);
+
+      // Verify still exists
+      const selectResult = await db.query(`SELECT * FROM validator_duties WHERE validator_address = $1 AND slot = $2`, [
+        VALIDATOR_ADDRESS.toString(),
+        SLOT.toString(),
+      ]);
+      expect(selectResult.rows.length).toBe(1);
     });
 
     it('should not delete a signed duty', async () => {
@@ -463,10 +392,12 @@ describe('PostgreSQL Queries', () => {
         LOCK_TOKEN,
       ]);
 
-      const deleteResult = await db.query(DELETE_FAILED_DUTY, [
+      // Even with correct token, can't delete a signed duty
+      const deleteResult = await db.query(DELETE_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        LOCK_TOKEN,
       ]);
 
       expect(deleteResult.affectedRows).toBe(0);
@@ -477,26 +408,6 @@ describe('PostgreSQL Queries', () => {
         SLOT.toString(),
       ]);
       expect(selectResult.rows.length).toBe(1);
-    });
-
-    it('should not delete a signing duty', async () => {
-      await db.query(INSERT_OR_GET_DUTY, [
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        BLOCK_NUMBER.toString(),
-        DUTY_TYPE,
-        MESSAGE_HASH,
-        NODE_ID,
-        LOCK_TOKEN,
-      ]);
-
-      const deleteResult = await db.query(DELETE_FAILED_DUTY, [
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        DUTY_TYPE,
-      ]);
-
-      expect(deleteResult.affectedRows).toBe(0);
     });
   });
 

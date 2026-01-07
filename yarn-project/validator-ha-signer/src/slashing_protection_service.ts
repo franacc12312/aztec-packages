@@ -8,12 +8,7 @@ import { type Logger, createLogger } from '@aztec/foundation/log';
 import { RunningPromise } from '@aztec/foundation/promise';
 import { sleep } from '@aztec/foundation/sleep';
 
-import {
-  type CheckAndRecordParams,
-  DutyStatus,
-  type RecordFailureParams,
-  type RecordSuccessParams,
-} from './db/types.js';
+import { type CheckAndRecordParams, type DeleteDutyParams, DutyStatus, type RecordSuccessParams } from './db/types.js';
 import { DutyAlreadySignedError, SlashingProtectionError } from './errors.js';
 import type { SlashingProtectionConfig, SlashingProtectionDatabase } from './types.js';
 
@@ -30,7 +25,7 @@ import type { SlashingProtectionConfig, SlashingProtectionDatabase } from './typ
  * 1. checkAndRecord() - Atomically try to acquire lock via tryInsertOrGetExisting
  * 2. Caller performs the signing operation
  * 3. recordSuccess() - Update to 'signed' status with signature
- *    OR recordFailure() - Update to 'failed' status with error
+ *    OR deleteDuty() - Delete the record to allow retry
  */
 export class SlashingProtectionService {
   private readonly log: Logger;
@@ -66,7 +61,7 @@ export class SlashingProtectionService {
    *    - FAILED: Delete the failed record
    *    - SIGNING: Wait and poll until status changes, then handle result
    *
-   * @returns The lockToken that must be used for recordSuccess/recordFailure
+   * @returns The lockToken that must be used for recordSuccess/deleteDuty
    * @throws DutyAlreadySignedError if the duty was already completed
    * @throws SlashingProtectionError if attempting to sign different data for same slot/duty
    */
@@ -106,16 +101,6 @@ export class SlashingProtectionService {
           throw new SlashingProtectionError(slot, dutyType, record.messageHash, messageHash);
         }
         throw new DutyAlreadySignedError(slot, dutyType, record.nodeId);
-      } else if (record.status === DutyStatus.FAILED) {
-        // Previous attempt failed - delete and retry
-        this.log.info(`Previous attempt for duty ${dutyType} at slot ${slot} failed, retrying`, {
-          validatorAddress: validatorAddress.toString(),
-          previousNodeId: record.nodeId,
-          previousError: record.errorMessage,
-          newNodeId: nodeId,
-        });
-        await this.db.deleteFailedDuty(validatorAddress, slot, dutyType);
-        // Loop continues - next iteration will try to insert again
       } else if (record.status === DutyStatus.SIGNING) {
         // Another node is currently signing - check for timeout
         if (Date.now() - startTime > this.signingTimeoutMs) {
@@ -166,27 +151,24 @@ export class SlashingProtectionService {
   }
 
   /**
-   * Record a failed signing operation.
-   * Updates the duty status to 'failed' with the error message.
+   * Delete a duty record after a failed signing operation.
+   * Removes the record to allow another node/attempt to retry.
    * Only succeeds if the lockToken matches (caller must be the one who created the duty).
-   * A future attempt can retry after this.
    *
-   * @returns true if the update succeeded, false if token didn't match
+   * @returns true if the delete succeeded, false if token didn't match
    */
-  async recordFailure(params: RecordFailureParams): Promise<boolean> {
-    const { validatorAddress, slot, dutyType, error, lockToken } = params;
+  async deleteDuty(params: DeleteDutyParams): Promise<boolean> {
+    const { validatorAddress, slot, dutyType, lockToken } = params;
 
-    const success = await this.db.updateDutyFailed(validatorAddress, slot, dutyType, error, lockToken);
+    const success = await this.db.deleteDuty(validatorAddress, slot, dutyType, lockToken);
 
     if (success) {
-      this.log.warn(`Recorded failed signing for duty ${dutyType} at slot ${slot}`, {
+      this.log.info(`Deleted duty ${dutyType} at slot ${slot} to allow retry`, {
         validatorAddress: validatorAddress.toString(),
-        error,
       });
     } else {
-      this.log.warn(`Failed to record failure for duty ${dutyType} at slot ${slot}: invalid token`, {
+      this.log.warn(`Failed to delete duty ${dutyType} at slot ${slot}: invalid token`, {
         validatorAddress: validatorAddress.toString(),
-        error,
       });
     }
 

@@ -161,29 +161,16 @@ WHERE validator_address = $2
 `;
 
 /**
- * Query to update a duty to 'failed' status
+ * Query to delete a duty
+ * Only deletes if the lockToken matches
  */
-export const UPDATE_DUTY_FAILED = `
-UPDATE validator_duties
-SET status = 'failed',
-    error_message = $1,
-    completed_at = CURRENT_TIMESTAMP
-WHERE validator_address = $2
-  AND slot = $3
-  AND duty_type = $4
-  AND status = 'signing'
-  AND lock_token = $5;
-`;
-
-/**
- * Query to delete a failed duty (to allow retry)
- */
-export const DELETE_FAILED_DUTY = `
+export const DELETE_DUTY = `
 DELETE FROM validator_duties
 WHERE validator_address = $1
   AND slot = $2
   AND duty_type = $3
-  AND status = 'failed';
+  AND status = 'signing'
+  AND lock_token = $4;
 `;
 
 /**

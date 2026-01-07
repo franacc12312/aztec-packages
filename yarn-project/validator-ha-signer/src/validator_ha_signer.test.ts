@@ -149,7 +149,7 @@ describe('ValidatorHASigner', () => {
       expect(dutyResult.record.signature).toBe(SIGNATURE_STRING);
     });
 
-    it('should record failure when signing function throws', async () => {
+    it('should delete duty when signing function throws', async () => {
       const error = new Error('Signing failed');
       signFn.mockRejectedValue(error);
 
@@ -166,7 +166,7 @@ describe('ValidatorHASigner', () => {
         ),
       ).rejects.toThrow('Signing failed');
 
-      // Verify duty was recorded as failed
+      // Verify duty was deleted
       const dutyResult = await db.tryInsertOrGetExisting({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: 100n,
@@ -175,9 +175,7 @@ describe('ValidatorHASigner', () => {
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
       });
-      expect(dutyResult.isNew).toBe(false);
-      expect(dutyResult.record.status).toBe(DutyStatus.FAILED);
-      expect(dutyResult.record.errorMessage).toBe('Signing failed');
+      expect(dutyResult.isNew).toBe(true);
     });
 
     it('should throw DutyAlreadySignedError when duty already signed', async () => {

@@ -109,12 +109,11 @@ export class ValidatorHASigner {
     try {
       signature = await signFn(messageHash);
     } catch (error: any) {
-      // Record failure (only succeeds if we own the lock)
-      await this.slashingProtection.recordFailure({
+      // Delete duty to allow retry (only succeeds if we own the lock)
+      await this.slashingProtection.deleteDuty({
         validatorAddress,
         slot,
         dutyType,
-        error: error.message ?? String(error),
         lockToken,
       });
       throw error;

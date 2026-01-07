@@ -6,13 +6,10 @@ This package uses [node-pg-migrate](https://github.com/salsita/node-pg-migrate) 
 
 ```bash
 # Run pending migrations
-yarn migrate:up
+aztec migrate-ha-db up --database-url postgresql://...
 
 # Rollback last migration
-yarn migrate:down
-
-# Check migration status
-DATABASE_URL=postgresql://... npx node-pg-migrate status
+aztec migrate-ha-db down --database-url postgresql://...
 ```
 
 ## Migration Files
@@ -67,8 +64,8 @@ spec:
     spec:
       initContainers:
         - name: db-migrate
-          image: validator-image:latest
-          command: ['yarn', 'migrate:up']
+          image: aztecprotocol/aztec:<image_tag>
+          command: ['node', '--no-warnings', '/usr/src/yarn-project/aztec/dest/bin/index.js', 'migrate-ha-db', 'up']
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -77,7 +74,7 @@ spec:
                   key: connection-string
       containers:
         - name: validator
-          image: validator-image:latest
+          image: aztecprotocol/aztec:<image_tag>
           # ... validator config
 ```
 
@@ -93,8 +90,8 @@ spec:
     spec:
       containers:
         - name: migrate
-          image: validator-image:latest
-          command: ['yarn', 'migrate:up']
+          image: aztecprotocol/aztec:<image_tag>
+          command: ['node', '--no-warnings', '/usr/src/yarn-project/aztec/dest/bin/index.js', 'migrate-ha-db', 'up']
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -110,9 +107,10 @@ spec:
 # GitHub Actions example
 - name: Run Database Migrations
   run: |
-    export DATABASE_URL=${{ secrets.DATABASE_URL }}
-    cd yarn-project/validator-ha-signer
-    yarn migrate:up
+    docker run --rm \
+      -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
+      aztecprotocol/aztec:<image_tag> \
+      migrate-ha-db up
 ```
 
 ## High Availability Considerations
@@ -133,14 +131,13 @@ npx node-pg-migrate create my-feature
 # 2. Edit migrations/[timestamp]_my-feature.ts
 
 # 3. Test migration locally
-export DATABASE_URL=postgresql://localhost:5432/validator_dev
-yarn migrate:up
+aztec migrate-ha-db up --database-url postgresql://localhost:5432/validator_dev
 
 # 4. Test rollback
-yarn migrate:down
+aztec migrate-ha-db down --database-url postgresql://localhost:5432/validator_dev
 
 # 5. Re-apply
-yarn migrate:up
+aztec migrate-ha-db up --database-url postgresql://localhost:5432/validator_dev
 
 # 6. Run tests
 yarn test
@@ -153,26 +150,23 @@ yarn test
 If a migration fails partway through:
 
 ```bash
-# Check the current state
-DATABASE_URL=postgresql://... npx node-pg-migrate status
-
 # The failed migration will be marked as running
 # Fix the issue and re-run
-yarn migrate:up
+aztec migrate-ha-db up --database-url postgresql://...
 ```
 
 ### Reset Development Database
 
 ```bash
 # Drop all migrations
-while yarn migrate:down; do :; done
+while aztec migrate-ha-db down --database-url postgresql://localhost:5432/validator_dev; do :; done
 
 # Or drop the database entirely
 psql -c "DROP DATABASE validator_dev;"
 psql -c "CREATE DATABASE validator_dev;"
 
 # Re-run migrations
-yarn migrate:up
+aztec migrate-ha-db up --database-url postgresql://localhost:5432/validator_dev
 ```
 
 ### Check Applied Migrations
