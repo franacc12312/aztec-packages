@@ -11,11 +11,7 @@ use crate::{
         event_message::EventMessage,
     },
 };
-use protocol_types::{
-    address::AztecAddress,
-    constants::NULL_MSG_SENDER_CONTRACT_ADDRESS,
-    traits::{Deserialize, Serialize},
-};
+use protocol_types::{address::AztecAddress, traits::{Deserialize, Serialize}};
 
 /// `ContractSelf` is the core interface for interacting with an Aztec contract's own state and context.
 ///
