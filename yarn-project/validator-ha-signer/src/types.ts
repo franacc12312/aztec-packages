@@ -6,17 +6,17 @@ import type { Pool } from 'pg';
 import type { ValidatorHASignerConfig } from './config.js';
 import type {
   CheckAndRecordParams,
+  DeleteDutyParams,
   DutyIdentifier,
   DutyType,
-  RecordFailureParams,
   RecordSuccessParams,
   ValidatorDutyRecord,
 } from './db/types.js';
 
 export type {
   CheckAndRecordParams,
+  DeleteDutyParams,
   DutyIdentifier,
-  RecordFailureParams,
   RecordSuccessParams,
   ValidatorDutyRecord,
   ValidatorHASignerConfig,
@@ -67,8 +67,7 @@ export interface SigningContext {
  * The interface is designed around 3 core operations:
  * 1. tryInsertOrGetExisting - Atomically insert or get existing record (eliminates race conditions)
  * 2. updateDutySigned - Update to signed status on success
- * 3. deleteFailedDuty - Delete failed record to allow retry
- * 4. updateDutyFailed - Update to failed status with error message (allows other nodes to see and clean up).
+ * 3. deleteDuty - Delete a duty record on failure
  */
 export interface SlashingProtectionDatabase {
   /**
@@ -94,23 +93,13 @@ export interface SlashingProtectionDatabase {
   ): Promise<boolean>;
 
   /**
-   * Update a duty to 'failed' status with error message.
+   * Delete a duty record.
    * Only succeeds if the lockToken matches (caller must be the one who created the duty).
+   * Used when signing fails to allow another node/attempt to retry.
    *
-   * @returns true if the update succeeded, false if token didn't match or duty not found
+   * @returns true if the delete succeeded, false if token didn't match or duty not found
    */
-  updateDutyFailed(
-    validatorAddress: EthAddress,
-    slot: SlotNumber,
-    dutyType: DutyType,
-    errorMessage: string,
-    lockToken: string,
-  ): Promise<boolean>;
-
-  /**
-   * Delete a failed duty to allow retry
-   */
-  deleteFailedDuty(validatorAddress: EthAddress, slot: SlotNumber, dutyType: DutyType): Promise<boolean>;
+  deleteDuty(validatorAddress: EthAddress, slot: SlotNumber, dutyType: DutyType, lockToken: string): Promise<boolean>;
 
   /**
    * Cleanup own stuck duties

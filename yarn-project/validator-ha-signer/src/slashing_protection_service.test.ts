@@ -126,7 +126,7 @@ describe('SlashingProtectionService', () => {
       await expect(service.checkAndRecord(params2)).rejects.toThrow(SlashingProtectionError);
     });
 
-    it('should allow retry after failed duty', async () => {
+    it('should allow retry after deleted duty', async () => {
       const params: CheckAndRecordParams = {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
@@ -136,13 +136,12 @@ describe('SlashingProtectionService', () => {
         nodeId: NODE_ID,
       };
 
-      // First node fails
+      // First node acquires lock then deletes (simulating failure)
       const lockToken = await service.checkAndRecord(params);
-      await service.recordFailure({
+      await service.deleteDuty({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
-        error: 'Test error',
         lockToken,
       });
 
@@ -220,7 +219,7 @@ describe('SlashingProtectionService', () => {
       await expect(promise).rejects.toThrow(SlashingProtectionError);
     });
 
-    it('should acquire lock after other node completes with failure', async () => {
+    it('should acquire lock after other node deletes duty on failure', async () => {
       const params: CheckAndRecordParams = {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
@@ -233,24 +232,20 @@ describe('SlashingProtectionService', () => {
       // First node acquires lock
       const lockToken = await service.checkAndRecord(params);
 
-      // First node fails
-      await service.recordFailure({
+      // First node deletes on failure
+      await service.deleteDuty({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
-        error: 'Test error',
         lockToken,
       });
-
-      // Verify duty is in failed state
-      let result = await db.tryInsertOrGetExisting(params);
-      expect(result.record.status).toBe(DutyStatus.FAILED);
 
       // Second node should be able to acquire the lock (retry)
       const params2 = { ...params, nodeId: NODE_ID_2 };
       await service.checkAndRecord(params2);
 
-      result = await db.tryInsertOrGetExisting(params2);
+      // Verify second node acquired the lock
+      const result = await db.tryInsertOrGetExisting(params2);
       expect(result.isNew).toBe(false);
       expect(result.record.status).toBe(DutyStatus.SIGNING);
       expect(result.record.nodeId).toBe(NODE_ID_2);
@@ -338,8 +333,8 @@ describe('SlashingProtectionService', () => {
     });
   });
 
-  describe('recordFailure', () => {
-    it('should update duty to failed status', async () => {
+  describe('deleteDuty', () => {
+    it('should delete duty with correct lockToken', async () => {
       const params: CheckAndRecordParams = {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
@@ -350,23 +345,20 @@ describe('SlashingProtectionService', () => {
       };
 
       const lockToken = await service.checkAndRecord(params);
-      const success = await service.recordFailure({
+      const success = await service.deleteDuty({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
-        error: 'Test error',
         lockToken,
       });
 
       expect(success).toBe(true);
+      // Duty should be gone - new insert should succeed
       const result = await db.tryInsertOrGetExisting(params);
-      expect(result.isNew).toBe(false);
-      expect(result.record.status).toBe(DutyStatus.FAILED);
-      expect(result.record.errorMessage).toBe('Test error');
-      expect(result.record.completedAt).toBeDefined();
+      expect(result.isNew).toBe(true);
     });
 
-    it('should fail to update with wrong lockToken', async () => {
+    it('should fail to delete with wrong lockToken', async () => {
       const params: CheckAndRecordParams = {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
@@ -377,11 +369,10 @@ describe('SlashingProtectionService', () => {
       };
 
       await service.checkAndRecord(params);
-      const success = await service.recordFailure({
+      const success = await service.deleteDuty({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
-        error: 'Test error',
         lockToken: 'wrong-token',
       });
 

@@ -11,10 +11,9 @@ import type { Pool, QueryResult } from 'pg';
 import type { SlashingProtectionDatabase, TryInsertOrGetResult } from '../types.js';
 import {
   CLEANUP_OWN_STUCK_DUTIES,
-  DELETE_FAILED_DUTY,
+  DELETE_DUTY,
   INSERT_OR_GET_DUTY,
   SCHEMA_VERSION,
-  UPDATE_DUTY_FAILED,
   UPDATE_DUTY_SIGNED,
 } from './schema.js';
 import type { CheckAndRecordParams, DutyRow, DutyType, InsertOrGetRow, ValidatorDutyRecord } from './types.js';
@@ -134,20 +133,19 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
   }
 
   /**
-   * Update a duty to 'failed' status with error message.
+   * Delete a duty record.
    * Only succeeds if the lockToken matches (caller must be the one who created the duty).
+   * Used when signing fails to allow another node/attempt to retry.
    *
-   * @returns true if the update succeeded, false if token didn't match or duty not found
+   * @returns true if the delete succeeded, false if token didn't match or duty not found
    */
-  async updateDutyFailed(
+  async deleteDuty(
     validatorAddress: EthAddress,
     slot: SlotNumber,
     dutyType: DutyType,
-    errorMessage: string,
     lockToken: string,
   ): Promise<boolean> {
-    const result = await this.pool.query(UPDATE_DUTY_FAILED, [
-      errorMessage,
+    const result = await this.pool.query(DELETE_DUTY, [
       validatorAddress.toString(),
       slot.toString(),
       dutyType,
@@ -155,7 +153,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
     ]);
 
     if (result.rowCount === 0) {
-      this.log.warn('Failed to update duty to failed status: invalid token or duty not found', {
+      this.log.warn('Failed to delete duty: invalid token or duty not found', {
         validatorAddress: validatorAddress.toString(),
         slot: slot.toString(),
         dutyType,
@@ -163,16 +161,6 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
       return false;
     }
     return true;
-  }
-
-  /**
-   * Delete a failed duty to allow retry
-   * @returns true if a record was deleted, false otherwise
-   */
-  async deleteFailedDuty(validatorAddress: EthAddress, slot: SlotNumber, dutyType: DutyType): Promise<boolean> {
-    const result = await this.pool.query(DELETE_FAILED_DUTY, [validatorAddress.toString(), slot.toString(), dutyType]);
-
-    return (result.rowCount ?? 0) > 0;
   }
 
   /**

@@ -26,6 +26,9 @@ const { signer, db } = await createHASigner({
   runMigrations: true, // Auto-run migrations
 });
 
+// Start background cleanup tasks
+signer.start();
+
 // Sign with protection
 const signature = await signer.signWithProtection(
   validatorAddress,
@@ -35,6 +38,7 @@ const signature = await signer.signWithProtection(
 );
 
 // Cleanup on shutdown
+await signer.stop();
 await db.close();
 ```
 
@@ -42,8 +46,7 @@ await db.close();
 
 ```bash
 # 1. Run migrations separately (once per deployment)
-export DATABASE_URL=postgresql://user:pass@host:port/db
-yarn migrate:up
+aztec migrate-ha-db up --database-url postgresql://user:pass@host:port/db
 ```
 
 ```typescript
@@ -58,34 +61,63 @@ const { signer, db } = await createHASigner({
   signingTimeoutMs: 3000,
   // runMigrations defaults to false
 });
+
+// Start background cleanup tasks
+signer.start();
+
+// On shutdown
+await signer.stop();
+await db.close();
 ```
 
-### Advanced: Manual Database Setup
+### Advanced: Custom Connection Pool
 
-If you need more control over the database connection:
+If you need custom pool configuration (e.g., max connections, idle timeout) or want to share a connection pool across multiple components:
+
+> **Note**: You still need to run migrations separately before using this approach.
+> See [Option 2](#option-2-manual-migrations-recommended-for-production) above.
 
 ```typescript
-import { PostgresSlashingProtectionDatabase, ValidatorHASigner } from '@aztec/validator-ha-signer';
+import { PostgresSlashingProtectionDatabase } from '@aztec/validator-ha-signer/db';
+import { ValidatorHASigner } from '@aztec/validator-ha-signer/validator-ha-signer';
 
 import { Pool } from 'pg';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Custom pool configuration
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20, // Maximum connections
+  idleTimeoutMillis: 30000,
+});
 const db = new PostgresSlashingProtectionDatabase(pool);
+await db.initialize();
 
 const signer = new ValidatorHASigner(db, {
   enabled: true,
   nodeId: 'validator-node-1',
+  pollingIntervalMs: 100,
+  signingTimeoutMs: 3000,
+  maxStuckDutiesAgeMs: 72000,
 });
+
+// Start background cleanup tasks
+signer.start();
+
+// On shutdown
+await signer.stop();
+await pool.end(); // You manage the pool lifecycle
 ```
 
 ## Configuration
 
 Set via environment variables or config object:
 
-- `DATABASE_URL`: PostgreSQL connection string (e.g., `postgresql://user:pass@host:port/db`)
+- `VALIDATOR_HA_DATABASE_URL`: PostgreSQL connection string (e.g., `postgresql://user:pass@host:port/db`)
+- `SLASHING_PROTECTION_ENABLED`: Whether slashing protection is enabled (default: true)
 - `SLASHING_PROTECTION_NODE_ID`: Unique identifier for this validator node
 - `SLASHING_PROTECTION_POLLING_INTERVAL_MS`: How often to check duty status (default: 100)
 - `SLASHING_PROTECTION_SIGNING_TIMEOUT_MS`: Max wait for in-progress signing (default: 3000)
+- `SLASHING_PROTECTION_MAX_STUCK_DUTIES_AGE_MS`: Max age of stuck duties before cleanup (default: 72000)
 
 ## Database Migrations
 
@@ -95,13 +127,10 @@ This package uses `node-pg-migrate` for database schema management.
 
 ```bash
 # Run pending migrations
-yarn migrate:up
+aztec migrate-ha-db up --database-url postgresql://...
 
 # Rollback last migration
-yarn migrate:down
-
-# Check migration status
-DATABASE_URL=postgresql://... npx node-pg-migrate status
+aztec migrate-ha-db down --database-url postgresql://...
 ```
 
 ### Creating New Migrations
@@ -126,8 +155,8 @@ spec:
     spec:
       containers:
         - name: migrate
-          image: your-validator-image
-          command: ['yarn', 'migrate:up']
+          image: aztecprotocol/aztec:<image_tag>
+          command: ['node', '--no-warnings', '/usr/src/yarn-project/aztec/dest/bin/index.js', 'migrate-ha-db', 'up']
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -143,7 +172,7 @@ When multiple validator nodes attempt to sign:
 
 1. First node acquires lock and signs
 2. Other nodes receive `DutyAlreadySignedError` (expected)
-3. If different data detected: `SlashingProtectionError` (critical)
+3. If different data detected: `SlashingProtectionError` (likely for block builder signing)
 4. Failed attempts are auto-cleaned, allowing retry
 
 ## Development
