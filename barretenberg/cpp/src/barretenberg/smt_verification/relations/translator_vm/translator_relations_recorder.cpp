@@ -32,6 +32,9 @@ static std::vector<std::string> build_all_entity_member_names()
     std::vector<std::string> names;
     names.reserve(bb::TranslatorFlavor::NUM_ALL_ENTITIES);
 
+    // GeminiMaskingEntity (must be first)
+    names.push_back("gemini_masking_poly");
+
     // PrecomputedEntities (use exact member names)
     names.push_back("ordered_extra_range_constraints_numerator");
     names.push_back("lagrange_first");
@@ -256,11 +259,9 @@ OperationTrace record_translator_opcode_constraint_relation()
 
     AllEntities symbolic_all_entities;
     std::vector<std::reference_wrapper<RecordingFF>> refs;
-    std::vector<std::string> names;
+    auto names = build_all_entity_member_names();
 
-    // Collect all entity names and references
-    for (auto [name, entity] : zip_view(symbolic_all_entities.get_labels(), symbolic_all_entities.get_all())) {
-        names.push_back(name);
+    for (auto& entity : symbolic_all_entities.get_all()) {
         refs.push_back(std::ref(entity));
     }
 
@@ -318,10 +319,9 @@ OperationTrace record_translator_accumulator_transfer_relation()
 
     AllEntities symbolic_all_entities;
     std::vector<std::reference_wrapper<RecordingFF>> refs;
-    std::vector<std::string> names;
+    auto names = build_all_entity_member_names();
 
-    for (auto [name, entity] : zip_view(symbolic_all_entities.get_labels(), symbolic_all_entities.get_all())) {
-        names.push_back(name);
+    for (auto& entity : symbolic_all_entities.get_all()) {
         refs.push_back(std::ref(entity));
     }
 
@@ -376,10 +376,9 @@ OperationTrace record_translator_non_native_field_relation()
 
     AllEntities symbolic_all_entities;
     std::vector<std::reference_wrapper<RecordingFF>> refs;
-    std::vector<std::string> names;
+    auto names = build_all_entity_member_names();
 
-    for (auto [name, entity] : zip_view(symbolic_all_entities.get_labels(), symbolic_all_entities.get_all())) {
-        names.push_back(name);
+    for (auto& entity : symbolic_all_entities.get_all()) {
         refs.push_back(std::ref(entity));
     }
 
