@@ -72,7 +72,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
    * Atomically try to insert a new duty record, or get the existing one if present.
    *
    * @returns { isNew: true, record } if we successfully inserted and acquired the lock
-   * @returns { isNew: false, record } if a record already exists
+   * @returns { isNew: false, record } if a record already exists. lock_token is empty if the record already exists.
    */
   async tryInsertOrGetExisting(params: CheckAndRecordParams): Promise<TryInsertOrGetResult> {
     // create a token for ownership verification

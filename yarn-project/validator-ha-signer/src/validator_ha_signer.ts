@@ -38,23 +38,23 @@ export class ValidatorHASigner {
   private readonly slashingProtection: SlashingProtectionService | undefined;
 
   constructor(
-    db: SlashingProtectionDatabase | undefined,
+    db: SlashingProtectionDatabase,
     private readonly config: ValidatorHASignerConfig,
   ) {
     this.log = createLogger('validator-ha-signer');
 
-    if (config.haSigningEnabled && db) {
-      if (!config.nodeId || config.nodeId === '') {
-        throw new Error('NODE_ID is required for high-availability setups');
-      }
-      this.slashingProtection = new SlashingProtectionService(db, config);
-      this.log.info('Validator HA Signer initialized with slashing protection', {
-        nodeId: config.nodeId,
-      });
-    } else {
-      this.slashingProtection = undefined;
-      this.log.info('Validator HA Signer initialized WITHOUT slashing protection');
+    if (!config.haSigningEnabled) {
+      // this shouldn't happen, the validator should use different signer for non-HA setups
+      throw new Error('Validator HA Signer is not enabled in config');
     }
+
+    if (!config.nodeId || config.nodeId === '') {
+      throw new Error('NODE_ID is required for high-availability setups');
+    }
+    this.slashingProtection = new SlashingProtectionService(db, config);
+    this.log.info('Validator HA Signer initialized with slashing protection', {
+      nodeId: config.nodeId,
+    });
   }
 
   /**

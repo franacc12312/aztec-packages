@@ -5,7 +5,6 @@ import { Pool } from 'pg';
 
 import type { ValidatorHASignerConfig } from './config.js';
 import { PostgresSlashingProtectionDatabase } from './db/postgres.js';
-import { runMigrations } from './migrations.js';
 import type { CreateHASignerDeps, SlashingProtectionDatabase } from './types.js';
 import { ValidatorHASigner } from './validator_ha_signer.js';
 
@@ -58,25 +57,12 @@ export async function createHASigner(
   signer: ValidatorHASigner;
   db: SlashingProtectionDatabase;
 }> {
-  const {
-    databaseUrl,
-    runMigrations: shouldRunMigrations = false,
-    poolMaxCount,
-    poolMinCount,
-    poolIdleTimeoutMs,
-    poolConnectionTimeoutMs,
-    ...signerConfig
-  } = config;
+  const { databaseUrl, poolMaxCount, poolMinCount, poolIdleTimeoutMs, poolConnectionTimeoutMs, ...signerConfig } =
+    config;
 
   if (!databaseUrl) {
     throw new Error('databaseUrl is required for createHASigner');
   }
-
-  // Run migrations if requested
-  if (shouldRunMigrations) {
-    await runMigrations(databaseUrl, { direction: 'up', verbose: true });
-  }
-
   // Create connection pool (or use provided pool)
   let pool: Pool;
   if (!deps?.pool) {

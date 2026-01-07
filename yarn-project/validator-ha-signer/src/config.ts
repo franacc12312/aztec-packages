@@ -32,14 +32,8 @@ export interface ValidatorHASignerConfig {
    */
   databaseUrl?: string;
   /**
-   * Whether to run database migrations on startup
-   * @default false
-   *
-   * Set to true for simple deployments where you want automatic schema setup.
-   * Set to false (recommended for production High-Availability setups) and run migrations separately
-   * using: `aztec migrate-ha-db up --database-url <url>`
+   * PostgreSQL connection pool configuration
    */
-  runMigrations?: boolean;
   /** Maximum number of clients in the pool (default: 10) */
   poolMaxCount?: number;
   /** Minimum number of clients in the pool (default: 0) */
@@ -81,11 +75,6 @@ export const validatorHASignerConfigMappings: ConfigMappingsType<ValidatorHASign
     env: 'VALIDATOR_HA_DATABASE_URL',
     description:
       'PostgreSQL connection string for validator HA signer (format: postgresql://user:password@host:port/database)',
-  },
-  runMigrations: {
-    env: 'VALIDATOR_HA_RUN_MIGRATIONS',
-    description: 'Whether to run database migrations on startup (default: false, recommended for production)',
-    ...booleanConfigHelper(false),
   },
   poolMaxCount: {
     env: 'VALIDATOR_HA_POOL_MAX',

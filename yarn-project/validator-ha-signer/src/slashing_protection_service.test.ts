@@ -397,24 +397,19 @@ describe('SlashingProtectionService', () => {
       const params3 = { ...params1, nodeId: 'node-3' };
 
       // All three nodes try to acquire lock simultaneously
-      const promises = [
-        service.checkAndRecord(params1),
-        service.checkAndRecord(params2),
-        service.checkAndRecord(params3),
-      ];
+      const promises = [params1, params2, params3].map(params =>
+        service.checkAndRecord(params).then(lockToken => ({ nodeId: params.nodeId, lockToken })),
+      );
 
-      // First one should succeed, let it complete signing
-      await sleep(50);
-      const result = await db.tryInsertOrGetExisting(params1);
-      const winnerNodeId = result.record.nodeId;
-      const lockToken = result.record.lockToken;
+      // Whichever resolves first is the actual winner
+      const winner = await Promise.race(promises);
       await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
-        nodeId: winnerNodeId,
-        lockToken,
+        nodeId: winner.nodeId,
+        lockToken: winner.lockToken,
       });
 
       // Wait for all promises to complete

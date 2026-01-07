@@ -70,17 +70,9 @@ describe('ValidatorHASigner', () => {
       ).toThrow('NODE_ID is required for high-availability setups');
     });
 
-    it('should initialize without slashing protection when disabled', () => {
-      const disabledConfig = { ...config, haSigningEnabled: false };
-      const signer = new ValidatorHASigner(db, disabledConfig);
-      expect(signer.isEnabled).toBe(false);
-      expect(signer.nodeId).toBe(NODE_ID);
-    });
-
-    it('should initialize without slashing protection when db is null', () => {
-      const signer = new ValidatorHASigner(undefined, config);
-      expect(signer.isEnabled).toBe(false);
-      expect(signer.nodeId).toBe(NODE_ID);
+    it('should not initialize when enabled is false', () => {
+      const disabledConfig = { ...config, enabled: false };
+      expect(() => new ValidatorHASigner(db, disabledConfig)).toThrow('Validator HA Signer is not enabled in config');
     });
   });
 
@@ -89,19 +81,6 @@ describe('ValidatorHASigner', () => {
       const signer = new ValidatorHASigner(db, config);
       signer.start();
       await signer.stop();
-    });
-
-    it('should start and stop without error when disabled', async () => {
-      const disabledConfig = { ...config, haSigningEnabled: false };
-      const signer = new ValidatorHASigner(db, disabledConfig);
-      signer.start(); // No-op
-      await signer.stop(); // No-op
-    });
-
-    it('should start and stop without error when db is undefined', async () => {
-      const signer = new ValidatorHASigner(undefined, config);
-      signer.start(); // No-op
-      await signer.stop(); // No-op
     });
   });
 
@@ -467,95 +446,6 @@ describe('ValidatorHASigner', () => {
       });
       expect(dutyResult.isNew).toBe(false);
       expect(dutyResult.record.status).toBe(DutyStatus.SIGNED);
-    });
-  });
-
-  describe('signWithProtection - disabled', () => {
-    let signer: ValidatorHASigner;
-    let signFn: jest.Mock<(messageHash: Buffer32) => Promise<Signature>>;
-
-    beforeEach(() => {
-      const disabledConfig = { ...config, haSigningEnabled: false };
-      signer = new ValidatorHASigner(db, disabledConfig);
-      signer.start(); // No-op when disabled
-      signFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
-      signFn.mockResolvedValue(mockSignature);
-    });
-
-    afterEach(async () => {
-      await signer.stop(); // No-op when disabled
-    });
-
-    it('should sign directly without slashing protection', async () => {
-      const result = await signer.signWithProtection(
-        VALIDATOR_ADDRESS,
-        MESSAGE_HASH,
-        {
-          slot: SlotNumber(100),
-          blockNumber: BlockNumber(50),
-          dutyType: DutyType.BLOCK_PROPOSAL,
-        },
-        signFn,
-      );
-
-      expect(result).toBe(mockSignature);
-      expect(signFn).toHaveBeenCalledWith(MESSAGE_HASH);
-
-      // Verify no duty was recorded
-      const dutyResult = await db.tryInsertOrGetExisting({
-        validatorAddress: VALIDATOR_ADDRESS,
-        slot: SlotNumber(100),
-        blockNumber: BlockNumber(50),
-        dutyType: DutyType.BLOCK_PROPOSAL,
-        messageHash: MESSAGE_HASH.toString(),
-        nodeId: NODE_ID,
-      });
-      expect(dutyResult.isNew).toBe(true);
-    });
-
-    it('should allow signing same data multiple times', async () => {
-      // Sign twice with same data
-      await signer.signWithProtection(
-        VALIDATOR_ADDRESS,
-        MESSAGE_HASH,
-        {
-          slot: SlotNumber(100),
-          blockNumber: BlockNumber(50),
-          dutyType: DutyType.BLOCK_PROPOSAL,
-        },
-        signFn,
-      );
-
-      await signer.signWithProtection(
-        VALIDATOR_ADDRESS,
-        MESSAGE_HASH,
-        {
-          slot: SlotNumber(100),
-          blockNumber: BlockNumber(50),
-          dutyType: DutyType.BLOCK_PROPOSAL,
-        },
-        signFn,
-      );
-
-      expect(signFn).toHaveBeenCalledTimes(2);
-    });
-
-    it('should propagate signing function errors', async () => {
-      const error = new Error('Signing failed');
-      signFn.mockRejectedValue(error);
-
-      await expect(
-        signer.signWithProtection(
-          VALIDATOR_ADDRESS,
-          MESSAGE_HASH,
-          {
-            slot: SlotNumber(100),
-            blockNumber: BlockNumber(50),
-            dutyType: DutyType.BLOCK_PROPOSAL,
-          },
-          signFn,
-        ),
-      ).rejects.toThrow('Signing failed');
     });
   });
 });

@@ -2,7 +2,7 @@ import { Buffer32 } from '@aztec/foundation/buffer';
 import { EthAddress } from '@aztec/foundation/eth-address';
 
 import { PGlite } from '@electric-sql/pglite';
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Pool } from '@middle-management/pglite-pg-adapter';
 
 import { PostgresSlashingProtectionDatabase } from './postgres.js';
@@ -14,6 +14,7 @@ import {
   SCHEMA_VERSION,
   UPDATE_DUTY_SIGNED,
 } from './schema.js';
+import { setupTestSchema } from './test_helper.js';
 import { type DutyRow, DutyStatus, DutyType, type InsertOrGetRow } from './types.js';
 
 /**
@@ -34,49 +35,11 @@ describe('PostgreSQL Queries', () => {
   beforeEach(async () => {
     db = new PGlite();
 
-    // Initialize schema
-    for (const statement of SCHEMA_SETUP) {
-      await db.query(statement);
-    }
-    await db.query(INSERT_SCHEMA_VERSION, [SCHEMA_VERSION]);
+    await setupTestSchema(db);
   });
 
   afterEach(async () => {
     await db.close();
-  });
-
-  describe('schema setup', () => {
-    it('should create validator_duties table with correct columns', async () => {
-      const result = await db.query<{ column_name: string; data_type: string; is_nullable: boolean }>(`
-        SELECT column_name, data_type, is_nullable
-        FROM information_schema.columns
-        WHERE table_name = 'validator_duties'
-        ORDER BY ordinal_position
-      `);
-
-      const columns = result.rows.map(r => r.column_name);
-      expect(columns).toContain('validator_address');
-      expect(columns).toContain('slot');
-      expect(columns).toContain('block_number');
-      expect(columns).toContain('duty_type');
-      expect(columns).toContain('status');
-      expect(columns).toContain('message_hash');
-      expect(columns).toContain('signature');
-      expect(columns).toContain('node_id');
-      expect(columns).toContain('lock_token');
-      expect(columns).toContain('started_at');
-      expect(columns).toContain('completed_at');
-      expect(columns).toContain('error_message');
-    });
-
-    it('should create schema_version table', async () => {
-      const result = await db.query<{ version: number }>(`
-        SELECT version FROM schema_version ORDER BY version DESC LIMIT 1
-      `);
-
-      expect(result.rows.length).toBe(1);
-      expect(result.rows[0].version).toBe(SCHEMA_VERSION);
-    });
   });
 
   describe('INSERT_OR_GET_DUTY', () => {
@@ -469,42 +432,6 @@ describe('PostgreSQL Queries', () => {
       ).rejects.toThrow();
     });
   });
-
-  describe('bigint handling', () => {
-    it('should handle large slot numbers correctly', async () => {
-      const largeSlot = 9007199254740991n; // Max safe integer
-
-      const result = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
-        VALIDATOR_ADDRESS.toString(),
-        largeSlot.toString(),
-        BLOCK_NUMBER.toString(),
-        DUTY_TYPE,
-        MESSAGE_HASH,
-        NODE_ID,
-        LOCK_TOKEN,
-      ]);
-
-      const row = result.rows[0];
-      expect(BigInt(row.slot)).toBe(largeSlot);
-    });
-
-    it('should handle large block numbers correctly', async () => {
-      const largeBlockNumber = 9007199254740991n;
-
-      const result = await db.query<InsertOrGetRow>(INSERT_OR_GET_DUTY, [
-        VALIDATOR_ADDRESS.toString(),
-        SLOT.toString(),
-        largeBlockNumber.toString(),
-        DUTY_TYPE,
-        MESSAGE_HASH,
-        NODE_ID,
-        LOCK_TOKEN,
-      ]);
-
-      const row = result.rows[0];
-      expect(BigInt(row.block_number)).toBe(largeBlockNumber);
-    });
-  });
 });
 
 describe('PostgresSlashingProtectionDatabase', () => {
@@ -585,6 +512,63 @@ describe('PostgresSlashingProtectionDatabase', () => {
       await expect(db.initialize()).rejects.toThrow(
         `Database schema version ${SCHEMA_VERSION + 1} is newer than expected (${SCHEMA_VERSION}). Please update your application.`,
       );
+    });
+
+    it('should allow closing the database connection', async () => {
+      const db = new PostgresSlashingProtectionDatabase(pool);
+
+      const endSpy = jest.spyOn(pool, 'end');
+      await db.close();
+      expect(endSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('bigint handling', () => {
+    const VALIDATOR_ADDRESS = EthAddress.random();
+    const SLOT = 100n;
+    const BLOCK_NUMBER = 50n;
+    const MESSAGE_HASH = Buffer32.random().toString();
+    const NODE_ID = 'node-1';
+
+    beforeEach(async () => {
+      for (const statement of SCHEMA_SETUP) {
+        await pglite.query(statement);
+      }
+      await pglite.query(INSERT_SCHEMA_VERSION, [SCHEMA_VERSION]);
+    });
+
+    it('should handle large slot numbers correctly', async () => {
+      const largeSlot = 9007199254740991n; // Max safe integer
+
+      const db = new PostgresSlashingProtectionDatabase(pool);
+      const result = await db.tryInsertOrGetExisting({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: largeSlot,
+        blockNumber: BLOCK_NUMBER,
+        dutyType: DutyType.BLOCK_PROPOSAL,
+        messageHash: MESSAGE_HASH,
+        nodeId: NODE_ID,
+      });
+
+      expect(result.isNew).toBe(true);
+      expect(result.record.slot).toBe(largeSlot);
+    });
+
+    it('should handle large block numbers correctly', async () => {
+      const largeBlockNumber = 9007199254740991n;
+
+      const db = new PostgresSlashingProtectionDatabase(pool);
+      const result = await db.tryInsertOrGetExisting({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: SLOT,
+        blockNumber: largeBlockNumber,
+        dutyType: DutyType.BLOCK_PROPOSAL,
+        messageHash: MESSAGE_HASH,
+        nodeId: NODE_ID,
+      });
+
+      expect(result.isNew).toBe(true);
+      expect(result.record.blockNumber).toBe(largeBlockNumber);
     });
   });
 });

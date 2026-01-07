@@ -119,6 +119,8 @@ export class SlashingProtectionService {
         });
         await sleep(this.pollingIntervalMs);
         // Loop continues - next iteration will check status again
+      } else {
+        throw new Error(`Unknown duty status: ${record.status}`);
       }
     }
   }

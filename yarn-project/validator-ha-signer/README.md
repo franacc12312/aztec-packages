@@ -23,7 +23,6 @@ const { signer, db } = await createHASigner({
   nodeId: 'validator-node-1',
   pollingIntervalMs: 100,
   signingTimeoutMs: 3000,
-  runMigrations: true, // Auto-run migrations
 });
 
 // Start background cleanup tasks
@@ -59,7 +58,6 @@ const { signer, db } = await createHASigner({
   nodeId: 'validator-node-1',
   pollingIntervalMs: 100,
   signingTimeoutMs: 3000,
-  // runMigrations defaults to false
 });
 
 // Start background cleanup tasks

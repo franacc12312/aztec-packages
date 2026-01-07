@@ -1,4 +1,4 @@
-import type { FileStoreBlobClient } from '@aztec/blob-client/filestore';
+import type { BlobClientInterface } from '@aztec/blob-client/client';
 import { GENESIS_ARCHIVE_ROOT } from '@aztec/constants';
 import type { EpochCache } from '@aztec/epoch-cache';
 import { BlockNumber, SlotNumber } from '@aztec/foundation/branded-types';
@@ -53,6 +53,7 @@ describe('ValidatorClient', () => {
   let dateProvider: TestDateProvider;
   let txProvider: MockProxy<TxProvider>;
   let keyStoreManager: KeystoreManager;
+  let blobClient: MockProxy<BlobClientInterface>;
 
   beforeEach(async () => {
     p2pClient = mock<P2P>();
@@ -68,6 +69,9 @@ describe('ValidatorClient', () => {
     txProvider = mock<TxProvider>();
     l1ToL2MessageSource.getL1ToL2Messages.mockResolvedValue([]);
     dateProvider = new TestDateProvider();
+    blobClient = mock<BlobClientInterface>();
+    blobClient.canUpload.mockReturnValue(false);
+    blobClient.sendBlobsToFilestore.mockResolvedValue(true);
 
     const validatorPrivateKeys = [generatePrivateKey(), generatePrivateKey()];
     validatorAccounts = validatorPrivateKeys.map(privateKey => privateKeyToAccount(privateKey));
@@ -114,7 +118,7 @@ describe('ValidatorClient', () => {
       l1ToL2MessageSource,
       txProvider,
       keyStoreManager,
-      undefined, // fileStoreBlobUploadClient
+      blobClient,
       dateProvider,
     );
   });
@@ -474,11 +478,12 @@ describe('ValidatorClient', () => {
     });
 
     describe('filestore blob upload', () => {
-      let mockFileStoreBlobClient: MockProxy<FileStoreBlobClient>;
+      let mockBlobClient: MockProxy<BlobClientInterface>;
 
       beforeEach(() => {
-        mockFileStoreBlobClient = mock<FileStoreBlobClient>();
-        mockFileStoreBlobClient.saveBlobs.mockResolvedValue();
+        mockBlobClient = mock<BlobClientInterface>();
+        mockBlobClient.canUpload.mockReturnValue(true);
+        mockBlobClient.sendBlobsToFilestore.mockResolvedValue(true);
       });
 
       const createValidatorWithFileStore = () => {
@@ -491,7 +496,7 @@ describe('ValidatorClient', () => {
           l1ToL2MessageSource,
           txProvider,
           keyStoreManager,
-          mockFileStoreBlobClient,
+          mockBlobClient,
           dateProvider,
         );
       };
@@ -513,7 +518,7 @@ describe('ValidatorClient', () => {
         // Wait for fire-and-forget upload (1ms is enough since mock resolves immediately)
         await sleep(1);
 
-        expect(mockFileStoreBlobClient.saveBlobs).toHaveBeenCalledWith(expect.any(Array), true);
+        expect(mockBlobClient.sendBlobsToFilestore).toHaveBeenCalledWith(expect.any(Array));
       });
 
       it('should not attempt upload when fileStoreBlobUploadClient is undefined', async () => {
@@ -525,11 +530,11 @@ describe('ValidatorClient', () => {
 
         expect(attestations).toBeDefined();
         // No upload should happen since there's no filestore client
-        expect(mockFileStoreBlobClient.saveBlobs).not.toHaveBeenCalled();
+        expect(mockBlobClient.sendBlobsToFilestore).not.toHaveBeenCalled();
       });
 
       it('should not fail attestation when blob upload fails', async () => {
-        mockFileStoreBlobClient.saveBlobs.mockRejectedValue(new Error('Upload failed'));
+        mockBlobClient.sendBlobsToFilestore.mockRejectedValue(new Error('Upload failed'));
         const validatorWithFileStore = createValidatorWithFileStore();
         validatorWithFileStore.updateConfig({ validatorReexecute: true });
         blockBuilder.buildBlock.mockImplementation(() => Promise.resolve(blockBuildResult));
@@ -565,7 +570,7 @@ describe('ValidatorClient', () => {
         await sleep(1);
 
         // Upload should still happen because filestore presence triggers re-execution
-        expect(mockFileStoreBlobClient.saveBlobs).toHaveBeenCalled();
+        expect(mockBlobClient.sendBlobsToFilestore).toHaveBeenCalled();
       });
 
       it('should not upload blobs when validation fails', async () => {
@@ -581,7 +586,7 @@ describe('ValidatorClient', () => {
 
         expect(attestations).toBeUndefined();
         // No upload because validation failed
-        expect(mockFileStoreBlobClient.saveBlobs).not.toHaveBeenCalled();
+        expect(mockBlobClient.sendBlobsToFilestore).not.toHaveBeenCalled();
       });
     });
 
