@@ -198,4 +198,3 @@ TEST(ECCVMLookupRelation, LookupReadCountsVariablesPresent)
     ASSERT_TRUE(found_read_counts_0) << "lookup_read_counts_0 should be a symbolic variable";
     ASSERT_TRUE(found_read_counts_1) << "lookup_read_counts_1 should be a symbolic variable";
 }
-

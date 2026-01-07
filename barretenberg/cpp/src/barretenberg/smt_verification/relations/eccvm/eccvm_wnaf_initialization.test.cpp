@@ -69,8 +69,8 @@ TEST(ECCVMWnafInitialization, ScalarSumShiftConstrainedWhenInactive)
 
     // Assert all relation formulas are satisfied
     for (size_t i = 0; i < formulas.size(); ++i) {
-        s.assertFormula(
-            s.term_manager.mkTerm(cvc5::Kind::EQUAL, { static_cast<cvc5::Term>(formulas[i]), static_cast<cvc5::Term>(zero) }));
+        s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                              { static_cast<cvc5::Term>(formulas[i]), static_cast<cvc5::Term>(zero) }));
     }
 
     // We are at row 0: precompute_select = 0
@@ -130,8 +130,8 @@ TEST(ECCVMWnafInitialization, FirstActiveRowScalarSumMustBeZero)
 
     // Assert all relation formulas
     for (size_t i = 0; i < formulas.size(); ++i) {
-        s.assertFormula(
-            s.term_manager.mkTerm(cvc5::Kind::EQUAL, { static_cast<cvc5::Term>(formulas[i]), static_cast<cvc5::Term>(zero) }));
+        s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                              { static_cast<cvc5::Term>(formulas[i]), static_cast<cvc5::Term>(zero) }));
     }
 
     // Row 0 is inactive
@@ -192,8 +192,8 @@ TEST(ECCVMWnafInitialization, ZeroingConstraintsCoverage)
 
     // Assert zeroing constraints (subrelations 14-19)
     for (size_t i = 14; i <= 19; ++i) {
-        s.assertFormula(
-            s.term_manager.mkTerm(cvc5::Kind::EQUAL, { static_cast<cvc5::Term>(formulas[i]), static_cast<cvc5::Term>(zero) }));
+        s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                              { static_cast<cvc5::Term>(formulas[i]), static_cast<cvc5::Term>(zero) }));
     }
 
     // Inactive row
@@ -259,6 +259,3 @@ TEST(ECCVMWnafInitialization, CheckForLagrangeFirstConstraints)
         GTEST_SKIP() << "lagrange_first not found in WNAF relation - initialization may rely on other relations";
     }
 }
-
-
-

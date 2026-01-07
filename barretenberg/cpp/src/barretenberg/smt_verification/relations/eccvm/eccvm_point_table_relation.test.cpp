@@ -620,12 +620,12 @@ TEST(ECCVMPointTableRelation, AdditionFormulaIsCorrect)
     std::vector<std::string> names;
     smt_eccvm_relations::replay_eccvm_point_table_relation(trace, &s, "", false, formulas, vars, names);
 
-    STerm Tx = find_var(vars, names, "precompute_tx");         // x3
-    STerm Ty = find_var(vars, names, "precompute_ty");         // y3
+    STerm Tx = find_var(vars, names, "precompute_tx");             // x3
+    STerm Ty = find_var(vars, names, "precompute_ty");             // y3
     STerm Tx_shift = find_var(vars, names, "precompute_tx_shift"); // x1
     STerm Ty_shift = find_var(vars, names, "precompute_ty_shift"); // y1
-    STerm Dx = find_var(vars, names, "precompute_dx");         // x2
-    STerm Dy = find_var(vars, names, "precompute_dy");         // y2
+    STerm Dx = find_var(vars, names, "precompute_dx");             // x2
+    STerm Dy = find_var(vars, names, "precompute_dy");             // y2
     STerm transition = find_var(vars, names, "precompute_point_transition");
     STerm lagrange_first = find_var(vars, names, "lagrange_first");
 
@@ -643,4 +643,3 @@ TEST(ECCVMPointTableRelation, AdditionFormulaIsCorrect)
     // The test is that the formulas are satisfiable for valid inputs
     ASSERT_TRUE(s.check()) << "Addition formula should be satisfiable";
 }
-

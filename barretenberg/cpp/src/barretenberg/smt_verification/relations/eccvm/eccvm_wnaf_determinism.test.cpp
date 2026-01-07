@@ -173,10 +173,10 @@ TEST(ECCVMWnafDeterminism, ScalarSumAccumulationIsDeterministic)
     }
 
     // Assert the accumulation formula (subrelation 8) for both
-    s.assertFormula(
-        s.term_manager.mkTerm(cvc5::Kind::EQUAL, { static_cast<cvc5::Term>(formulas_A[8]), static_cast<cvc5::Term>(zero) }));
-    s.assertFormula(
-        s.term_manager.mkTerm(cvc5::Kind::EQUAL, { static_cast<cvc5::Term>(formulas_B[8]), static_cast<cvc5::Term>(zero) }));
+    s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                          { static_cast<cvc5::Term>(formulas_A[8]), static_cast<cvc5::Term>(zero) }));
+    s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                          { static_cast<cvc5::Term>(formulas_B[8]), static_cast<cvc5::Term>(zero) }));
 
     // Both are active rows (precompute_select = 1, not at transition)
     precompute_select_A == one;
@@ -504,10 +504,12 @@ TEST(ECCVMWnafDeterminism, InactiveRowsAreZeroed)
     auto trace = smt_eccvm_relations::record_eccvm_wnaf_relation();
 
     // Test each zeroing constraint
-    std::vector<std::pair<size_t, std::string>> zero_constraints = {
-        { 14, "w0 (first WNAF digit)" },  { 15, "w1 (second WNAF digit)" }, { 16, "w2 (third WNAF digit)" },
-        { 17, "w3 (fourth WNAF digit)" }, { 18, "round" },                  { 19, "pc" }
-    };
+    std::vector<std::pair<size_t, std::string>> zero_constraints = { { 14, "w0 (first WNAF digit)" },
+                                                                     { 15, "w1 (second WNAF digit)" },
+                                                                     { 16, "w2 (third WNAF digit)" },
+                                                                     { 17, "w3 (fourth WNAF digit)" },
+                                                                     { 18, "round" },
+                                                                     { 19, "pc" } };
 
     for (const auto& [idx, desc] : zero_constraints) {
         Solver s(modulus, default_solver_config);
@@ -625,7 +627,8 @@ TEST(ECCVMWnafDeterminism, FullScalarDecompositionIsUnique)
         s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::OR, diff_terms));
 
         // Should be UNSAT
-        ASSERT_FALSE(s.check()) << "Round " << round << ": Same scalar_sum and scalar_sum_shift must produce same slices";
+        ASSERT_FALSE(s.check()) << "Round " << round
+                                << ": Same scalar_sum and scalar_sum_shift must produce same slices";
     }
 }
 
@@ -680,10 +683,10 @@ TEST(ECCVMWnafDeterminism, SanityCheck_DifferentSlicesProduceDifferentOutputs)
     STerm q_transition_B = find_var(vars_B, names_B, "B__precompute_point_transition");
 
     // Assert accumulation constraints
-    s.assertFormula(
-        s.term_manager.mkTerm(cvc5::Kind::EQUAL, { static_cast<cvc5::Term>(formulas_A[8]), static_cast<cvc5::Term>(zero) }));
-    s.assertFormula(
-        s.term_manager.mkTerm(cvc5::Kind::EQUAL, { static_cast<cvc5::Term>(formulas_B[8]), static_cast<cvc5::Term>(zero) }));
+    s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                          { static_cast<cvc5::Term>(formulas_A[8]), static_cast<cvc5::Term>(zero) }));
+    s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                          { static_cast<cvc5::Term>(formulas_B[8]), static_cast<cvc5::Term>(zero) }));
 
     precompute_select_A == one;
     precompute_select_B == one;
@@ -696,12 +699,9 @@ TEST(ECCVMWnafDeterminism, SanityCheck_DifferentSlicesProduceDifferentOutputs)
 
     // Assert outputs are DIFFERENT
     s.assertFormula(s.term_manager.mkTerm(
-        cvc5::Kind::DISTINCT, { static_cast<cvc5::Term>(scalar_sum_shift_A), static_cast<cvc5::Term>(scalar_sum_shift_B) }));
+        cvc5::Kind::DISTINCT,
+        { static_cast<cvc5::Term>(scalar_sum_shift_A), static_cast<cvc5::Term>(scalar_sum_shift_B) }));
 
     // Should be SAT: different slices CAN produce different outputs
     ASSERT_TRUE(s.check()) << "Sanity check: Different slices should be able to produce different outputs";
 }
-
-
-
-
