@@ -265,14 +265,6 @@ impl PrivateContext {
         }
     }
 
-    /// "Unsafe" versus calling `context.msg_sender()`, because it doesn't
-    /// translate `NULL_MSG_SENDER_CONTRACT_ADDRESS` as
-    /// `Option<AztecAddress>::none`.
-    /// Used by some internal aztecnr functions.
-    pub fn msg_sender_unsafe(self) -> AztecAddress {
-        self.inputs.call_context.msg_sender
-    }
-
     /// Returns the contract address of the current function being executed.
     ///
     /// This is equivalent to `address(this)` in Solidity (hence the name).

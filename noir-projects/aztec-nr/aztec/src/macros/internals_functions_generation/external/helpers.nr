@@ -104,7 +104,7 @@ pub(crate) comptime fn create_authorize_once_check(
         .as_ctstring()
         .as_quoted_str();
     quote {         
-        if (!$from_arg_name_quoted.eq(self.msg_sender().unwrap())) {
+        if (!$from_arg_name_quoted.eq(self.msg_sender())) {
             $fn_call(self.context, $from_arg_name_quoted);
         } else {
             assert($nonce_check_quote, $invalid_nonce_message);

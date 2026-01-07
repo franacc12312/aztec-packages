@@ -458,17 +458,6 @@ impl PublicContext {
         }
     }
 
-    /// "Unsafe" versus calling `context.msg_sender()`, because it doesn't
-    /// translate `NULL_MSG_SENDER_CONTRACT_ADDRESS` as
-    /// `Option<AztecAddress>::none`.
-    /// Used by some internal aztecnr functions.
-    pub fn msg_sender_unsafe(_self: Self) -> AztecAddress {
-        // Safety: AVM opcodes are constrained by the AVM itself
-        unsafe {
-            sender()
-        }
-    }
-
     /// Returns the function selector of the currently-executing function.
     ///
     /// This is similar to `msg.sig` in Solidity, returning the first 4
