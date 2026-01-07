@@ -8,6 +8,7 @@ import { Signature } from '@aztec/foundation/eth-signature';
 import { BufferReader, serializeToBuffer } from '@aztec/foundation/serialize';
 
 import type { L2BlockInfo } from '../block/l2_block_info.js';
+import { MAX_TXS_PER_BLOCK } from '../deserialization/index.js';
 import { TxHash } from '../tx/index.js';
 import { Tx } from '../tx/tx.js';
 import { ConsensusPayload } from './consensus_payload.js';
@@ -126,10 +127,19 @@ export class BlockProposal extends Gossipable {
 
     const payload = reader.readObject(ConsensusPayload);
     const sig = reader.readObject(Signature);
-    const txHashes = reader.readArray(reader.readNumber(), TxHash);
+
+    const txHashCount = reader.readNumber();
+    if (txHashCount > MAX_TXS_PER_BLOCK) {
+      throw new Error(`txHashes count ${txHashCount} exceeds maximum ${MAX_TXS_PER_BLOCK}`);
+    }
+    const txHashes = reader.readArray(txHashCount, TxHash);
 
     if (!reader.isEmpty()) {
-      const txs = reader.readArray(reader.readNumber(), Tx);
+      const txCount = reader.readNumber();
+      if (txCount > MAX_TXS_PER_BLOCK) {
+        throw new Error(`txs count ${txCount} exceeds maximum ${MAX_TXS_PER_BLOCK}`);
+      }
+      const txs = reader.readArray(txCount, Tx);
       return new BlockProposal(payload, sig, txHashes, txs);
     }
 
