@@ -58,20 +58,8 @@ export async function createHASigner(
   signer: ValidatorHASigner;
   db: SlashingProtectionDatabase;
 }> {
-  const {
-    databaseUrl,
-    runMigrations: shouldRunMigrations = false,
-    poolMaxCount,
-    poolMinCount,
-    poolIdleTimeoutMs,
-    poolConnectionTimeoutMs,
-    ...signerConfig
-  } = config;
-
-  // Run migrations if requested
-  if (shouldRunMigrations) {
-    await runMigrations(databaseUrl, { direction: 'up', verbose: true });
-  }
+  const { databaseUrl, poolMaxCount, poolMinCount, poolIdleTimeoutMs, poolConnectionTimeoutMs, ...signerConfig } =
+    config;
 
   // Create connection pool (or use provided pool)
   let pool: Pool;
