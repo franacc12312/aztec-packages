@@ -23,13 +23,10 @@ std::vector<smt_terms::STerm> OperationReplayer::replay(
         STerm result;
 
         switch (op.kind) {
+            // A wire or a challenge
         case OpKind::VAR: {
             const auto& var_name = std::get<std::string>(op.value);
-            if (is_ffi) {
-                result = initial_variables.at(var_name);
-            } else {
-                result = initial_variables.at(var_name);
-            }
+            result = initial_variables.at(var_name);
             break;
         }
 
@@ -70,6 +67,7 @@ std::vector<smt_terms::STerm> OperationReplayer::replay(
             break;
         }
 
+        // This shouldn't really happen, since inversion for non-constants is not supported in the relations
         case OpKind::INV: {
             const auto& operand = results.at(op.lhs_id);
             // Inversion is represented as 1 / x

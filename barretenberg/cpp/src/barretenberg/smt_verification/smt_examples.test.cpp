@@ -8,7 +8,6 @@
 #include "barretenberg/stdlib/primitives/field/field.hpp"
 
 #include "barretenberg/smt_verification/circuit/ultra_circuit.hpp"
-#include "barretenberg/smt_verification/relations/translator_vm/translator_relations.hpp"
 
 using namespace bb;
 
@@ -47,8 +46,6 @@ TEST(smtExample, multiplication_true)
     bool res = s.check();
     ASSERT_FALSE(res);
 }
-
-// translator relation tests moved to translator_relation_verification.test.cpp
 
 TEST(smtExample, multiplication_true_kind)
 {

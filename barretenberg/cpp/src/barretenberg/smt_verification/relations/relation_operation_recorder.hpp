@@ -1,4 +1,10 @@
 #pragma once
+/// @file relation_operation_recorder.hpp
+/// @brief Records the operations performed by the relations and replays them on a specific solver to produce SMT terms
+/// @details We would like to run the relations on a specific solver to produce SMT terms several times and maybe for
+/// different solver instances and even different types. This becomes an issue because then we have to provide context
+/// somehow for each type and also parametrize each relation for each term. Instead, we record the operations performed
+/// by the relations and replay them on a specific solver to produce SMT terms.
 #include "barretenberg/common/assert.hpp"
 #include "barretenberg/ecc/curves/bn254/fr.hpp"
 #include "barretenberg/ecc/curves/grumpkin/grumpkin.hpp"
@@ -153,8 +159,7 @@ class RecordingFF {
     static constexpr uint256_t modulus = bb::grumpkin::fq::modulus;
 
     RecordingFF()
-        : trace()
-        , operation_id(std::nullopt)
+        : operation_id(std::nullopt)
         , is_constant(true)
         , constant_value(bb::fr::zero())
     {}

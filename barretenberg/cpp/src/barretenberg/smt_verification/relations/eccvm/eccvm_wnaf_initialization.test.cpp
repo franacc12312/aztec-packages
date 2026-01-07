@@ -5,14 +5,15 @@
  * This file tests whether the WNAF relation properly constrains initialization
  * at the start of the trace (row 0 -> row 1 transition).
  *
- * SECURITY CONCERN:
- * At row 0, precompute_select = 0, which disables most constraints.
- * At row 1, the first active row, scalar_sum should be 0 (start of first scalar).
- * But scalar_sum at row 1 comes from scalar_sum_shift at row 0.
+ * KEY INSIGHT:
+ * At row 0: lagrange_first = 1, precompute_select = 0
+ * The relation uses `precompute_select * scaled_transition + scaled_lagrange_first`
+ * as a selector for subrelations 10 and 11, which constrains:
+ * - round_shift = 0
+ * - scalar_sum_shift = 0
  *
- * If scalar_sum_shift at row 0 is not constrained to 0, a malicious prover
- * could start with an arbitrary scalar_sum, potentially causing incorrect
- * scalar decomposition.
+ * So even though precompute_select = 0 at row 0, the lagrange_first = 1 activates
+ * these constraints, ensuring proper initialization.
  */
 
 #include <gtest/gtest.h>
@@ -40,17 +41,15 @@ STerm find_var(const std::vector<STerm>& vars, const std::vector<std::string>& n
 } // namespace
 
 /**
- * @brief Test if scalar_sum is constrained when precompute_select = 0
+ * @brief Test that scalar_sum_shift is constrained at row 0 via lagrange_first
  *
- * This tests the initialization row (row 0) where precompute_select = 0.
- * The question: Is scalar_sum_shift constrained to be 0?
+ * At row 0: lagrange_first = 1, precompute_select = 0
+ * Subrelation 11 uses selector: precompute_select * scaled_transition + scaled_lagrange_first
+ * When lagrange_first = 1, this selector is active and forces scalar_sum_shift = 0.
  *
- * If this test PASSES (SAT), it means scalar_sum_shift can be non-zero
- * when precompute_select = 0, which is a potential vulnerability.
- *
- * Expected: UNSAT if properly constrained, SAT if vulnerable
+ * Expected: UNSAT (scalar_sum_shift must be 0)
  */
-TEST(ECCVMWnafInitialization, ScalarSumShiftConstrainedWhenInactive)
+TEST(ECCVMWnafInitialization, ScalarSumShiftConstrainedAtRowZero)
 {
     const char* modulus = "30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001";
 
@@ -65,6 +64,7 @@ TEST(ECCVMWnafInitialization, ScalarSumShiftConstrainedWhenInactive)
     STerm one = FFIConst("1", &s, 10);
 
     STerm precompute_select = find_var(vars, names, "precompute_select");
+    STerm lagrange_first = find_var(vars, names, "lagrange_first");
     STerm scalar_sum_shift = find_var(vars, names, "precompute_scalar_sum_shift");
 
     // Assert all relation formulas are satisfied
@@ -73,44 +73,31 @@ TEST(ECCVMWnafInitialization, ScalarSumShiftConstrainedWhenInactive)
                                               { static_cast<cvc5::Term>(formulas[i]), static_cast<cvc5::Term>(zero) }));
     }
 
-    // We are at row 0: precompute_select = 0
+    // Row 0 conditions: lagrange_first = 1, precompute_select = 0
+    lagrange_first == one;
     precompute_select == zero;
 
     // Try to set scalar_sum_shift to non-zero
     scalar_sum_shift != zero;
 
-    bool is_sat = s.check();
-
-    if (is_sat) {
-        // VULNERABILITY DETECTED!
-        // scalar_sum_shift can be non-zero when precompute_select = 0
-        // This means at row 1, scalar_sum can start with an arbitrary value
-        GTEST_SKIP() << "POTENTIAL VULNERABILITY: scalar_sum_shift is NOT constrained when precompute_select = 0. "
-                     << "A malicious prover could inject arbitrary scalar_sum at trace start.";
-    } else {
-        // Properly constrained
-        SUCCEED() << "scalar_sum_shift is properly constrained to 0 when precompute_select = 0";
-    }
+    // Should be UNSAT: lagrange_first activates subrelation 11 which forces scalar_sum_shift = 0
+    ASSERT_FALSE(s.check()) << "scalar_sum_shift must be 0 at row 0 (via lagrange_first in subrelation 11)";
 }
 
 /**
  * @brief Test the transition from row 0 (inactive) to row 1 (first active)
  *
  * This simulates the exact scenario at trace start:
- * - Row 0: precompute_select = 0 (inactive)
- * - Row 1: precompute_select = 1, round = 0 (first row of first scalar)
+ * - Row 0: lagrange_first = 1, precompute_select = 0 (inactive)
+ * - Row 1 (shift values): precompute_select_shift = 1, round_shift = 0
  *
- * We verify that scalar_sum at row 1 must be 0.
+ * We verify that scalar_sum_shift (which becomes scalar_sum at row 1) must be 0.
  */
 TEST(ECCVMWnafInitialization, FirstActiveRowScalarSumMustBeZero)
 {
     const char* modulus = "30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001";
 
     auto trace = smt_eccvm_relations::record_eccvm_wnaf_relation();
-
-    // We model this as two consecutive rows:
-    // Row 0 (current): precompute_select = 0
-    // Row 1 (shift): precompute_select_shift = 1, scalar_sum_shift should start accumulation
 
     Solver s(modulus, default_solver_config);
 
@@ -121,11 +108,10 @@ TEST(ECCVMWnafInitialization, FirstActiveRowScalarSumMustBeZero)
     STerm zero = FFIConst("0", &s, 10);
     STerm one = FFIConst("1", &s, 10);
 
+    STerm lagrange_first = find_var(vars, names, "lagrange_first");
     STerm precompute_select = find_var(vars, names, "precompute_select");
     STerm precompute_select_shift = find_var(vars, names, "precompute_select_shift");
-    STerm scalar_sum = find_var(vars, names, "precompute_scalar_sum");
     STerm scalar_sum_shift = find_var(vars, names, "precompute_scalar_sum_shift");
-    STerm round = find_var(vars, names, "precompute_round");
     STerm round_shift = find_var(vars, names, "precompute_round_shift");
 
     // Assert all relation formulas
@@ -134,40 +120,31 @@ TEST(ECCVMWnafInitialization, FirstActiveRowScalarSumMustBeZero)
                                               { static_cast<cvc5::Term>(formulas[i]), static_cast<cvc5::Term>(zero) }));
     }
 
-    // Row 0 is inactive
+    // Row 0 conditions
+    lagrange_first == one;
     precompute_select == zero;
 
     // Row 1 (shift) is the first active row
     precompute_select_shift == one;
-
-    // Row 1 should be round 0 of a scalar
     round_shift == zero;
-
-    // The question: Can scalar_sum_shift (which will be scalar_sum at row 1's perspective) be non-zero?
-    // Note: scalar_sum at current row is what becomes scalar_sum from the PREVIOUS row's shift
-    // But we're at row 0, so there's no "previous" constraint
 
     // Try to have non-zero scalar_sum_shift
     scalar_sum_shift != zero;
 
-    bool is_sat = s.check();
-
-    if (is_sat) {
-        GTEST_SKIP() << "POTENTIAL VULNERABILITY: At the transition from inactive row 0 to active row 1, "
-                     << "scalar_sum can be non-zero. First scalar decomposition may be incorrect.";
-    } else {
-        SUCCEED() << "First active row correctly constrains scalar_sum to 0";
-    }
+    // Should be UNSAT: lagrange_first via subrelation 11 forces scalar_sum_shift = 0
+    ASSERT_FALSE(s.check()) << "At row 0->1 transition, scalar_sum_shift must be 0 (via lagrange_first)";
 }
 
 /**
- * @brief Verify that the zeroing constraints (subrelations 14-19) don't cover scalar_sum
+ * @brief Verify that zeroing constraints (14-19) cover specific variables but not scalar_sum
  *
- * This confirms that when precompute_select = 0:
+ * Documents that when precompute_select = 0:
  * - w0, w1, w2, w3 are constrained to 0 (via subrelations 14-17)
  * - round is constrained to 0 (via subrelation 18)
  * - pc is constrained to 0 (via subrelation 19)
- * - scalar_sum and scalar_sum_shift are NOT constrained
+ * - scalar_sum is NOT constrained by zeroing constraints (but IS by lagrange_first via subrelation 11)
+ *
+ * This is NOT a vulnerability since scalar_sum_shift is constrained by subrelation 11 at row 0.
  */
 TEST(ECCVMWnafInitialization, ZeroingConstraintsCoverage)
 {
@@ -175,7 +152,61 @@ TEST(ECCVMWnafInitialization, ZeroingConstraintsCoverage)
 
     auto trace = smt_eccvm_relations::record_eccvm_wnaf_relation();
 
-    // Test what IS constrained when precompute_select = 0
+    Solver s(modulus, default_solver_config);
+
+    std::vector<STerm> formulas, vars;
+    std::vector<std::string> names;
+    smt_eccvm_relations::replay_eccvm_wnaf_relation(trace, &s, "", true, formulas, vars, names);
+
+    STerm zero = FFIConst("0", &s, 10);
+
+    STerm precompute_select = find_var(vars, names, "precompute_select");
+    STerm round = find_var(vars, names, "precompute_round");
+    STerm pc = find_var(vars, names, "precompute_pc");
+    STerm scalar_sum = find_var(vars, names, "precompute_scalar_sum");
+
+    // Assert zeroing constraints (subrelations 14-19) only
+    for (size_t i = 14; i <= 19; ++i) {
+        s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                              { static_cast<cvc5::Term>(formulas[i]), static_cast<cvc5::Term>(zero) }));
+    }
+
+    // Inactive row (not specifying lagrange_first - testing zeroing constraints in isolation)
+    precompute_select == zero;
+
+    // Verify round and pc are forced to 0 by zeroing constraints
+    s.push();
+    round != zero;
+    ASSERT_FALSE(s.check()) << "When precompute_select = 0, round should be constrained to 0 by subrelation 18";
+    s.pop();
+
+    s.push();
+    pc != zero;
+    ASSERT_FALSE(s.check()) << "When precompute_select = 0, pc should be constrained to 0 by subrelation 19";
+    s.pop();
+
+    // Verify scalar_sum is NOT constrained by zeroing constraints alone
+    // (This is expected - scalar_sum is constrained by subrelation 11 via lagrange_first instead)
+    s.push();
+    scalar_sum != zero;
+    ASSERT_TRUE(s.check()) << "scalar_sum should NOT be constrained by zeroing constraints 14-19 "
+                           << "(it is constrained by subrelation 11 via lagrange_first)";
+    s.pop();
+}
+
+/**
+ * @brief Verify round_shift is also constrained at row 0 via lagrange_first
+ *
+ * Subrelation 10 uses the same selector as subrelation 11:
+ * precompute_select * scaled_transition + scaled_lagrange_first
+ *
+ * When lagrange_first = 1, round_shift must be 0.
+ */
+TEST(ECCVMWnafInitialization, RoundShiftConstrainedAtRowZero)
+{
+    const char* modulus = "30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001";
+
+    auto trace = smt_eccvm_relations::record_eccvm_wnaf_relation();
     Solver s(modulus, default_solver_config);
 
     std::vector<STerm> formulas, vars;
@@ -185,53 +216,35 @@ TEST(ECCVMWnafInitialization, ZeroingConstraintsCoverage)
     STerm zero = FFIConst("0", &s, 10);
     STerm one = FFIConst("1", &s, 10);
 
+    STerm lagrange_first = find_var(vars, names, "lagrange_first");
     STerm precompute_select = find_var(vars, names, "precompute_select");
-    STerm round = find_var(vars, names, "precompute_round");
-    STerm pc = find_var(vars, names, "precompute_pc");
-    STerm scalar_sum = find_var(vars, names, "precompute_scalar_sum");
+    STerm round_shift = find_var(vars, names, "precompute_round_shift");
 
-    // Assert zeroing constraints (subrelations 14-19)
-    for (size_t i = 14; i <= 19; ++i) {
+    // Assert all relation formulas
+    for (size_t i = 0; i < formulas.size(); ++i) {
         s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
                                               { static_cast<cvc5::Term>(formulas[i]), static_cast<cvc5::Term>(zero) }));
     }
 
-    // Inactive row
+    // Row 0 conditions
+    lagrange_first == one;
     precompute_select == zero;
 
-    // Verify round and pc are forced to 0
-    s.push();
-    round != zero;
-    ASSERT_FALSE(s.check()) << "When precompute_select = 0, round should be constrained to 0";
-    s.pop();
+    // Try to violate: round_shift != 0
+    round_shift != zero;
 
-    s.push();
-    pc != zero;
-    ASSERT_FALSE(s.check()) << "When precompute_select = 0, pc should be constrained to 0";
-    s.pop();
-
-    // Now check if scalar_sum is constrained
-    s.push();
-    scalar_sum != zero;
-    bool scalar_sum_unconstrained = s.check();
-    s.pop();
-
-    if (scalar_sum_unconstrained) {
-        // This confirms scalar_sum is NOT covered by the zeroing constraints
-        GTEST_SKIP() << "CONFIRMED: scalar_sum is NOT constrained when precompute_select = 0. "
-                     << "The zeroing constraints (subrelations 14-19) do not include scalar_sum.";
-    } else {
-        SUCCEED() << "scalar_sum is unexpectedly constrained - this may be from other subrelations";
-    }
+    // Should be UNSAT: lagrange_first activates subrelation 10 which forces round_shift = 0
+    ASSERT_FALSE(s.check()) << "round_shift must be 0 at row 0 (via lagrange_first in subrelation 10)";
 }
 
 /**
- * @brief Test if lagrange_first or other mechanism constrains initialization
+ * @brief Verify initialization constraints don't apply when lagrange_first = 0
  *
- * Check if there might be lagrange_first polynomial constraints that
- * specifically handle the first row initialization.
+ * When lagrange_first = 0 and precompute_select = 0 (inactive row not at start),
+ * the initialization constraints from subrelations 10 and 11 should NOT be active.
+ * Only the zeroing constraints (14-19) apply.
  */
-TEST(ECCVMWnafInitialization, CheckForLagrangeFirstConstraints)
+TEST(ECCVMWnafInitialization, InitConstraintsInactiveAwayFromRowZero)
 {
     const char* modulus = "30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001";
 
@@ -240,22 +253,30 @@ TEST(ECCVMWnafInitialization, CheckForLagrangeFirstConstraints)
 
     std::vector<STerm> formulas, vars;
     std::vector<std::string> names;
-    smt_eccvm_relations::replay_eccvm_wnaf_relation(trace, &s, "", false, formulas, vars, names);
+    smt_eccvm_relations::replay_eccvm_wnaf_relation(trace, &s, "", true, formulas, vars, names);
 
-    // Check if lagrange_first is one of the variables
-    bool has_lagrange_first = false;
-    for (const auto& name : names) {
-        if (name.find("lagrange_first") != std::string::npos) {
-            has_lagrange_first = true;
-            break;
-        }
-    }
+    STerm zero = FFIConst("0", &s, 10);
 
-    if (has_lagrange_first) {
-        SUCCEED() << "lagrange_first polynomial exists - may provide initialization constraints";
-    } else {
-        // The WNAF relation doesn't use lagrange_first
-        // Initialization constraints may need to come from ecc_point_table_relation or elsewhere
-        GTEST_SKIP() << "lagrange_first not found in WNAF relation - initialization may rely on other relations";
-    }
+    STerm lagrange_first = find_var(vars, names, "lagrange_first");
+    STerm precompute_select = find_var(vars, names, "precompute_select");
+    STerm q_transition = find_var(vars, names, "precompute_point_transition");
+    STerm scalar_sum_shift = find_var(vars, names, "precompute_scalar_sum_shift");
+
+    // Assert only subrelation 11 (scalar_sum_shift constraint)
+    s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                          { static_cast<cvc5::Term>(formulas[11]), static_cast<cvc5::Term>(zero) }));
+
+    // Away from row 0: lagrange_first = 0
+    lagrange_first == zero;
+    // Inactive row: precompute_select = 0
+    precompute_select == zero;
+    // Not at transition: q_transition = 0
+    q_transition == zero;
+
+    // Try non-zero scalar_sum_shift
+    scalar_sum_shift != zero;
+
+    // Should be SAT: selector (precompute_select * transition + lagrange_first) is 0
+    // so subrelation 11 doesn't constrain scalar_sum_shift
+    ASSERT_TRUE(s.check()) << "Away from row 0, inactive rows should not constrain scalar_sum_shift via subrelation 11";
 }

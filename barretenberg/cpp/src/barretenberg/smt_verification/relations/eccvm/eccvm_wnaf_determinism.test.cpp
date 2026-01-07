@@ -267,13 +267,19 @@ TEST(ECCVMWnafDeterminism, FirstSliceIsPositiveAtTransitions)
 
     STerm s1hi_shift = find_var(vars, names, "precompute_s1hi_shift");
     STerm q_transition = find_var(vars, names, "precompute_point_transition");
+    STerm precompute_select = find_var(vars, names, "precompute_select");
     STerm precompute_select_shift = find_var(vars, names, "precompute_select_shift");
+    STerm lagrange_first = find_var(vars, names, "lagrange_first");
 
     // 2-bit range on s1hi_shift
     assert_2bit_range(s, s1hi_shift);
 
     // Assert the positivity constraint (subrelation 20)
     formulas[20] == zero;
+
+    // Not at row 0 (lagrange_first = 0), current row active
+    lagrange_first == zero;
+    precompute_select == one;
 
     // We are at a transition and the next row is active
     q_transition == one;
@@ -345,10 +351,13 @@ TEST(ECCVMWnafDeterminism, RoundTransitionLogicIsSound)
         STerm round_shift = find_var(vars, names, "precompute_round_shift");
         STerm q_transition = find_var(vars, names, "precompute_point_transition");
         STerm precompute_select = find_var(vars, names, "precompute_select");
+        STerm lagrange_first = find_var(vars, names, "lagrange_first");
 
         // Assert round constraints (subrelations 9 and 10)
         formulas[9] == zero;
         formulas[10] == zero;
+        // Not at row 0
+        lagrange_first == zero;
         precompute_select == one;
         q_transition == one;
 
@@ -371,9 +380,12 @@ TEST(ECCVMWnafDeterminism, RoundTransitionLogicIsSound)
         STerm round_shift = find_var(vars, names, "precompute_round_shift");
         STerm q_transition = find_var(vars, names, "precompute_point_transition");
         STerm precompute_select = find_var(vars, names, "precompute_select");
+        STerm lagrange_first = find_var(vars, names, "lagrange_first");
 
         // Assert round_shift constraint (subrelation 10)
         formulas[10] == zero;
+        // Not at row 0
+        lagrange_first == zero;
         precompute_select == one;
         q_transition == one;
 
@@ -477,9 +489,12 @@ TEST(ECCVMWnafDeterminism, ScalarSumResetsAtTransitions)
     STerm scalar_sum_shift = find_var(vars, names, "precompute_scalar_sum_shift");
     STerm q_transition = find_var(vars, names, "precompute_point_transition");
     STerm precompute_select = find_var(vars, names, "precompute_select");
+    STerm lagrange_first = find_var(vars, names, "lagrange_first");
 
     // Assert the scalar_sum reset constraint (subrelation 11)
     formulas[11] == zero;
+    // Not at row 0
+    lagrange_first == zero;
     precompute_select == one;
     q_transition == one;
 
