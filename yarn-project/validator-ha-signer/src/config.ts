@@ -118,7 +118,6 @@ export const ValidatorHASignerConfigSchema = z.object({
   signingTimeoutMs: z.number().min(0),
   maxStuckDutiesAgeMs: z.number().min(0),
   databaseUrl: z.string().optional(),
-  runMigrations: z.boolean().optional(),
   poolMaxCount: z.number().min(0).optional(),
   poolMinCount: z.number().min(0).optional(),
   poolIdleTimeoutMs: z.number().min(0).optional(),

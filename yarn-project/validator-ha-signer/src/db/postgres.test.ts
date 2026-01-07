@@ -1,3 +1,4 @@
+import { BlockNumber, SlotNumber } from '@aztec/foundation/branded-types';
 import { Buffer32 } from '@aztec/foundation/buffer';
 import { EthAddress } from '@aztec/foundation/eth-address';
 
@@ -525,8 +526,8 @@ describe('PostgresSlashingProtectionDatabase', () => {
 
   describe('bigint handling', () => {
     const VALIDATOR_ADDRESS = EthAddress.random();
-    const SLOT = 100n;
-    const BLOCK_NUMBER = 50n;
+    const SLOT = SlotNumber(100);
+    const BLOCK_NUMBER = BlockNumber(50);
     const MESSAGE_HASH = Buffer32.random().toString();
     const NODE_ID = 'node-1';
 
@@ -538,7 +539,7 @@ describe('PostgresSlashingProtectionDatabase', () => {
     });
 
     it('should handle large slot numbers correctly', async () => {
-      const largeSlot = 9007199254740991n; // Max safe integer
+      const largeSlot = SlotNumber.fromBigInt(9007199254740991n); // Max safe integer
 
       const db = new PostgresSlashingProtectionDatabase(pool);
       const result = await db.tryInsertOrGetExisting({
@@ -555,7 +556,7 @@ describe('PostgresSlashingProtectionDatabase', () => {
     });
 
     it('should handle large block numbers correctly', async () => {
-      const largeBlockNumber = 9007199254740991n;
+      const largeBlockNumber = BlockNumber.fromBigInt(9007199254740991n);
 
       const db = new PostgresSlashingProtectionDatabase(pool);
       const result = await db.tryInsertOrGetExisting({
