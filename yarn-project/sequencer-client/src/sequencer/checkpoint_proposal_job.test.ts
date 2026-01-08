@@ -196,18 +196,20 @@ describe('CheckpointProposalJob', () => {
 
     validatorClient = mock<ValidatorClient>();
     validatorClient.collectAttestations.mockImplementation(() => Promise.resolve([]));
-    validatorClient.createBlockProposal.mockImplementation((_blockNumber, checkpointHeader, archiveRoot, txs) => {
-      // Create a block proposal directly with the checkpoint header instead of using fromBlock
-      // which would require a full L2Block with toCheckpointHeader method
-      const consensusPayload = new ConsensusPayload(checkpointHeader, archiveRoot);
-      return Promise.resolve(
-        new BlockProposal(
-          consensusPayload,
-          mockedSig,
-          (txs ?? []).map((tx: any) => tx.txHash),
-        ),
-      );
-    });
+    validatorClient.createBlockProposal.mockImplementation(
+      (_blockNumber, _blockIndexWithinCheckpoint, checkpointHeader, archiveRoot, txs) => {
+        // Create a block proposal directly with the checkpoint header instead of using fromBlock
+        // which would require a full L2Block with toCheckpointHeader method
+        const consensusPayload = new ConsensusPayload(checkpointHeader, archiveRoot);
+        return Promise.resolve(
+          new BlockProposal(
+            consensusPayload,
+            mockedSig,
+            (txs ?? []).map((tx: any) => tx.txHash),
+          ),
+        );
+      },
+    );
     validatorClient.createCheckpointProposal.mockImplementation((checkpointHeader, archiveRoot, txs) => {
       // Create a minimal BlockProposal for the checkpoint
       const consensusPayload = new ConsensusPayload(checkpointHeader, archiveRoot);

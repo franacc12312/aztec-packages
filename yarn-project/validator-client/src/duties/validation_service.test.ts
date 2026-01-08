@@ -38,6 +38,7 @@ describe('ValidationService', () => {
         publishFullTxs: true,
       },
       blockNumber,
+      0,
     );
     expect(proposal!.getSender()).toEqual(store.getAddress(0));
     expect(proposal!.txs).toBeDefined();
@@ -59,6 +60,7 @@ describe('ValidationService', () => {
         publishFullTxs: false,
       },
       blockNumber,
+      0,
     );
     expect(proposal!.getSender()).toEqual(addresses[0]);
     expect(proposal!.txs).toBeUndefined();

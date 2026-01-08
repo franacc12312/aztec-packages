@@ -362,6 +362,7 @@ describe('e2e_multi_validator_node', () => {
     const originalCreateProposal = validatorClient.createBlockProposal.bind(validatorClient);
     const createBlockProposal = (
       blockNumber: BlockNumber,
+      blockIndexWithinCheckpoint: number,
       header: CheckpointHeader,
       archive: Fr,
       txs: Tx[],
@@ -379,7 +380,15 @@ describe('e2e_multi_validator_node', () => {
         );
       }
 
-      return originalCreateProposal(blockNumber, header, archive, txs, proposerAddress, options);
+      return originalCreateProposal(
+        blockNumber,
+        blockIndexWithinCheckpoint,
+        header,
+        archive,
+        txs,
+        proposerAddress,
+        options,
+      );
     };
     validatorClient.createBlockProposal = jest.fn(createBlockProposal);
 

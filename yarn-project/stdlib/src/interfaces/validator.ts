@@ -85,12 +85,12 @@ export interface Validator {
   // Block validation responsibilities
   createBlockProposal(
     blockNumber: number,
+    blockIndexWithinCheckpoint: number,
     header: CheckpointHeader,
     archive: Fr,
     txs: Tx[],
     proposerAddress: EthAddress | undefined,
     options: BlockProposalOptions,
-    blockIndexWithinCheckpoint: number,
   ): Promise<BlockProposal | undefined>;
   attestToProposal(proposal: BlockProposal, sender: PeerId): Promise<BlockAttestation[] | undefined>;
 

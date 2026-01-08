@@ -401,12 +401,12 @@ export class CheckpointProposalJob {
         // TODO(palla/mbps): Wire this to the new p2p API once available
         const proposal = await this.validatorClient.createBlockProposal(
           block.header.globalVariables.blockNumber,
+          indexWithinCheckpoint,
           (await checkpointBuilder.getCheckpoint()).header,
           block.archive.root,
           usedTxs,
           this.proposer,
           blockProposalOptions,
-          indexWithinCheckpoint,
         );
         await this.p2pClient.broadcastProposal(proposal);
       }

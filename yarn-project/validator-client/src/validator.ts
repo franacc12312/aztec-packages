@@ -22,12 +22,15 @@ import type { CheckpointHeader } from '@aztec/stdlib/rollup';
 import type { Tx } from '@aztec/stdlib/tx';
 import { AttestationTimeoutError } from '@aztec/stdlib/validators';
 import { Attributes, type TelemetryClient, type Tracer, getTelemetryClient, trackSpan } from '@aztec/telemetry-client';
+import { createHASigner } from '@aztec/validator-ha-signer/factory';
 
 import { EventEmitter } from 'events';
 import type { TypedDataDefinition } from 'viem';
 
 import { BlockProposalHandler, type BlockProposalValidationFailureReason } from './block_proposal_handler.js';
 import { ValidationService } from './duties/validation_service.js';
+import { HAKeyStore } from './key_store/ha_key_store.js';
+import type { ExtendedValidatorKeyStore } from './key_store/interface.js';
 import { NodeKeystoreAdapter } from './key_store/node_keystore_adapter.js';
 import { ValidatorMetrics } from './metrics.js';
 
@@ -62,7 +65,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
   private proposersOfInvalidBlocks: Set<string> = new Set();
 
   protected constructor(
-    private keyStore: NodeKeystoreAdapter,
+    private keyStore: ExtendedValidatorKeyStore,
     private epochCache: EpochCache,
     private p2pClient: P2P,
     private blockProposalHandler: BlockProposalHandler,
@@ -141,7 +144,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     }
   }
 
-  static new(
+  static async new(
     config: ValidatorClientFullConfig,
     blockBuilder: IFullNodeBlockBuilder,
     epochCache: EpochCache,
@@ -170,8 +173,14 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
       telemetry,
     );
 
+    let validatorKeyStore: ExtendedValidatorKeyStore = NodeKeystoreAdapter.fromKeyStoreManager(keyStoreManager);
+    if (config.haSigningEnabled) {
+      const { signer } = await createHASigner(config);
+      validatorKeyStore = new HAKeyStore(validatorKeyStore, signer);
+    }
+
     const validator = new ValidatorClient(
-      NodeKeystoreAdapter.fromKeyStoreManager(keyStoreManager),
+      validatorKeyStore,
       epochCache,
       p2pClient,
       blockProposalHandler,
@@ -427,12 +436,12 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
   // TODO(palla/mbps): Block proposal should not require a checkpoint proposal
   async createBlockProposal(
     blockNumber: BlockNumber,
+    blockIndexWithinCheckpoint: number,
     header: CheckpointHeader,
     archive: Fr,
     txs: Tx[],
     proposerAddress: EthAddress | undefined,
     options: BlockProposalOptions,
-    blockIndexWithinCheckpoint: number,
   ): Promise<BlockProposal> {
     // TODO(palla/mbps): Prevent double proposals properly
     // if (this.previousProposal?.slotNumber === header.slotNumber) {
