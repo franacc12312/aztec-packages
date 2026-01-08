@@ -418,14 +418,15 @@ void test_limb_uniqueness_and_maximum(const smt_relation_recorder::OperationTrac
     std::vector<smt_terms::STerm> fm, vm;
     std::vector<std::string> nm;
 
-    smt_translator_relations::replay_translator_decomposition_relation(recording_trace_main, &s2, "M", true, fm, vm, nm);
+    smt_translator_relations::replay_translator_decomposition_relation(
+        recording_trace_main, &s2, "M", true, fm, vm, nm);
     smt_translator_relations::create_range_constraint_formulas(&s2, vm, nm, "constraint", 16384);
 
     smt_terms::STerm one_m = smt_terms::FFIConst("1", &s2, 10);
     for (size_t i = 0; i < vm.size(); ++i) {
         if (nm[i] == "M_op" || nm[i].find("M_lagrange_even_in_minicircuit") != std::string::npos) {
-            s2.assertFormula(s2.term_manager.mkTerm(cvc5::Kind::EQUAL,
-                                                    { static_cast<cvc5::Term>(vm[i]), static_cast<cvc5::Term>(one_m) }));
+            s2.assertFormula(s2.term_manager.mkTerm(
+                cvc5::Kind::EQUAL, { static_cast<cvc5::Term>(vm[i]), static_cast<cvc5::Term>(one_m) }));
         }
     }
 

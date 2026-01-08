@@ -48,8 +48,8 @@ TEST(TranslatorOpcodeConstraintRelation, opcode_must_be_in_valid_set)
     s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
                                           { static_cast<cvc5::Term>(lagr_mini), static_cast<cvc5::Term>(zero) }));
     // Set lagrange_even_in_minicircuit = 1 (we're at an even index in minicircuit)
-    s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
-                                          { static_cast<cvc5::Term>(lagr_even), static_cast<cvc5::Term>(one) }));
+    s.assertFormula(
+        s.term_manager.mkTerm(cvc5::Kind::EQUAL, { static_cast<cvc5::Term>(lagr_even), static_cast<cvc5::Term>(one) }));
 
     for (const auto& formula : formulas) {
         s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
