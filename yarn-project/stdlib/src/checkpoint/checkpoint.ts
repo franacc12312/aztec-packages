@@ -8,6 +8,7 @@ import type { FieldsOf } from '@aztec/foundation/types';
 import { z } from 'zod';
 
 import { L2BlockNew } from '../block/l2_block_new.js';
+import { computeCheckpointOutHash } from '../messaging/out_hash.js';
 import { CheckpointHeader } from '../rollup/checkpoint_header.js';
 import { AppendOnlyTreeSnapshot } from '../trees/append_only_tree_snapshot.js';
 import type { CheckpointInfo } from './checkpoint_info.js';
@@ -64,6 +65,14 @@ export class Checkpoint {
 
   public hash(): Fr {
     return this.header.hash();
+  }
+
+  // Returns the out hash computed from all l2-to-l1 messages in this checkpoint.
+  // Note: This value is different from the out hash in the header, which is the **accumulated** out hash over all
+  // checkpoints up to and including this one in the epoch.
+  public getCheckpointOutHash(): Fr {
+    const msgs = this.blocks.map(block => block.body.txEffects.map(txEffect => txEffect.l2ToL1Msgs));
+    return computeCheckpointOutHash(msgs);
   }
 
   public getState() {

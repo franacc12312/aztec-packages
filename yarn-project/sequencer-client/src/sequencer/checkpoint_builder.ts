@@ -185,6 +185,7 @@ export class FullNodeCheckpointsBuilder {
     checkpointNumber: CheckpointNumber,
     constants: CheckpointGlobalVariables,
     l1ToL2Messages: Fr[],
+    previousCheckpointOutHashes: Fr[],
     fork: MerkleTreeWriteOperations,
   ): Promise<CheckpointBuilder> {
     const stateReference = await fork.getStateReference();
@@ -202,6 +203,7 @@ export class FullNodeCheckpointsBuilder {
       checkpointNumber,
       constants,
       l1ToL2Messages,
+      previousCheckpointOutHashes,
       fork,
     );
 

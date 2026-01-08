@@ -164,6 +164,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
       l1ToL2MessageSource,
       txProvider,
       blockProposalValidator,
+      epochCache,
       config,
       metrics,
       dateProvider,
@@ -200,8 +201,15 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     blockNumber: BlockNumber,
     txs: any[],
     l1ToL2Messages: Fr[],
+    previousCheckpointOutHashes: Fr[],
   ): Promise<any> {
-    return this.blockProposalHandler.reexecuteTransactions(proposal, blockNumber, txs, l1ToL2Messages);
+    return this.blockProposalHandler.reexecuteTransactions(
+      proposal,
+      blockNumber,
+      txs,
+      l1ToL2Messages,
+      previousCheckpointOutHashes,
+    );
   }
 
   public signWithAddress(addr: EthAddress, msg: TypedDataDefinition) {
@@ -317,6 +325,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
         'state_mismatch',
         'failed_txs',
         'in_hash_mismatch',
+        'out_hash_mismatch',
         'parent_block_wrong_slot',
       ];
 

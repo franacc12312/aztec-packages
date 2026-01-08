@@ -30,6 +30,11 @@ export class CheckpointHeader {
     public blobsHash: Fr,
     /** Root of the l1 to l2 messages subtree. */
     public inHash: Fr,
+    /**
+     * The accumulated checkpoint out hash (the root of the epoch out hash balanced tree): The out hash of the first
+     * checkpoint in the epoch is inserted at index 0, the second at index 1, and so on.
+     */
+    public outHash: Fr,
     /** Slot number of the L2 block */
     public slotNumber: SlotNumber,
     /** Timestamp of the L2 block. */
@@ -51,6 +56,7 @@ export class CheckpointHeader {
         blockHeadersHash: schemas.Fr,
         blobsHash: schemas.Fr,
         inHash: schemas.Fr,
+        outHash: schemas.Fr,
         slotNumber: schemas.SlotNumber,
         timestamp: schemas.BigInt,
         coinbase: schemas.EthAddress,
@@ -67,6 +73,7 @@ export class CheckpointHeader {
       fields.blockHeadersHash,
       fields.blobsHash,
       fields.inHash,
+      fields.outHash,
       fields.slotNumber,
       fields.timestamp,
       fields.coinbase,
@@ -88,6 +95,7 @@ export class CheckpointHeader {
       reader.readObject(Fr),
       reader.readObject(Fr),
       reader.readObject(Fr),
+      reader.readObject(Fr),
       SlotNumber(Fr.fromBuffer(reader).toNumber()),
       reader.readUInt64(),
       reader.readObject(EthAddress),
@@ -103,6 +111,7 @@ export class CheckpointHeader {
       this.blockHeadersHash.equals(other.blockHeadersHash) &&
       this.blobsHash.equals(other.blobsHash) &&
       this.inHash.equals(other.inHash) &&
+      this.outHash.equals(other.outHash) &&
       this.slotNumber === other.slotNumber &&
       this.timestamp === other.timestamp &&
       this.coinbase.equals(other.coinbase) &&
@@ -119,6 +128,7 @@ export class CheckpointHeader {
       this.blockHeadersHash,
       this.blobsHash,
       this.inHash,
+      this.outHash,
       new Fr(this.slotNumber),
       bigintToUInt64BE(this.timestamp),
       this.coinbase,
@@ -138,6 +148,7 @@ export class CheckpointHeader {
       blockHeadersHash: Fr.ZERO,
       blobsHash: Fr.ZERO,
       inHash: Fr.ZERO,
+      outHash: Fr.ZERO,
       slotNumber: SlotNumber.ZERO,
       timestamp: 0n,
       coinbase: EthAddress.ZERO,
@@ -154,6 +165,7 @@ export class CheckpointHeader {
       blockHeadersHash: Fr.random(),
       blobsHash: Fr.random(),
       inHash: Fr.random(),
+      outHash: Fr.random(),
       slotNumber: SlotNumber(Math.floor(Math.random() * 1000) + 1),
       timestamp: BigInt(Math.floor(Date.now() / 1000)),
       coinbase: EthAddress.random(),
@@ -170,6 +182,7 @@ export class CheckpointHeader {
       this.blockHeadersHash.isZero() &&
       this.blobsHash.isZero() &&
       this.inHash.isZero() &&
+      this.outHash.isZero() &&
       this.slotNumber === 0 &&
       this.timestamp === 0n &&
       this.coinbase.isZero() &&
@@ -197,6 +210,7 @@ export class CheckpointHeader {
       Fr.fromString(header.blockHeadersHash),
       Fr.fromString(header.blobsHash),
       Fr.fromString(header.inHash),
+      Fr.fromString(header.outHash),
       SlotNumber.fromBigInt(header.slotNumber),
       header.timestamp,
       new EthAddress(hexToBuffer(header.coinbase)),
@@ -220,6 +234,7 @@ export class CheckpointHeader {
       blockHeadersHash: this.blockHeadersHash.toString(),
       blobsHash: this.blobsHash.toString(),
       inHash: this.inHash.toString(),
+      outHash: this.outHash.toString(),
       slotNumber: BigInt(this.slotNumber),
       timestamp: this.timestamp,
       coinbase: this.coinbase.toString(),
@@ -238,6 +253,7 @@ export class CheckpointHeader {
       blockHeadersHash: this.blockHeadersHash.toString(),
       blobsHash: this.blobsHash.toString(),
       inHash: this.inHash.toString(),
+      outHash: this.outHash.toString(),
       slotNumber: this.slotNumber,
       timestamp: this.timestamp,
       coinbase: this.coinbase.toString(),
@@ -253,6 +269,7 @@ export class CheckpointHeader {
   blockHeadersHash: ${this.blockHeadersHash.toString()},
   blobsHash: ${inspect(this.blobsHash)},
   inHash: ${inspect(this.inHash)},
+  outHash: ${inspect(this.outHash)},
   slotNumber: ${this.slotNumber},
   timestamp: ${this.timestamp},
   coinbase: ${this.coinbase.toString()},

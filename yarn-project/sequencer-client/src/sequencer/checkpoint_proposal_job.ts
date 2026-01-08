@@ -15,6 +15,7 @@ import {
   CommitteeAttestation,
   CommitteeAttestationsAndSigners,
   L2BlockNew,
+  type L2BlockSource,
   MaliciousCommitteeAttestationsAndSigners,
 } from '@aztec/stdlib/block';
 import type { Checkpoint } from '@aztec/stdlib/checkpoint';
@@ -57,6 +58,7 @@ const TXS_POLLING_MS = 500;
  */
 export class CheckpointProposalJob implements Traceable {
   constructor(
+    private readonly epoch: EpochNumber,
     private readonly slot: SlotNumber,
     private readonly checkpointNumber: CheckpointNumber,
     private readonly syncedToBlockNumber: BlockNumber,
@@ -70,6 +72,7 @@ export class CheckpointProposalJob implements Traceable {
     private readonly p2pClient: P2P,
     private readonly worldState: WorldStateSynchronizer,
     private readonly l1ToL2MessageSource: L1ToL2MessageSource,
+    private readonly l2BlockSource: L2BlockSource,
     private readonly checkpointsBuilder: FullNodeCheckpointsBuilder,
     private readonly l1Constants: SequencerRollupConstants,
     protected config: ResolvedSequencerConfig,
@@ -167,6 +170,12 @@ export class CheckpointProposalJob implements Traceable {
       // Collect L1 to L2 messages for the checkpoint
       const l1ToL2Messages = await this.l1ToL2MessageSource.getL1ToL2Messages(this.checkpointNumber);
 
+      // Collect the out hashes of all the checkpoints before this one in the same epoch
+      const previousCheckpoints = (await this.l2BlockSource.getCheckpointsForEpoch(this.epoch)).filter(
+        c => c.number < this.checkpointNumber,
+      );
+      const previousCheckpointOutHashes = previousCheckpoints.map(c => c.getCheckpointOutHash());
+
       // Create a long-lived forked world state for the checkpoint builder
       using fork = await this.worldState.fork(this.syncedToBlockNumber, { closeDelayMs: 12_000 });
 
@@ -175,6 +184,7 @@ export class CheckpointProposalJob implements Traceable {
         this.checkpointNumber,
         checkpointGlobalVariables,
         l1ToL2Messages,
+        previousCheckpointOutHashes,
         fork,
       );
 
