@@ -1,0 +1,54 @@
+# Creates a RegisterNewRollupVersionPayload for governance.
+
+name: Create Rollup Upgrade Payload
+
+on:
+  workflow_dispatch:
+    inputs:
+      rpc_url:
+        description: "RPC URL for the target network"
+        required: true
+        type: string
+      registry_address:
+        description: "Address of the Registry contract"
+        required: true
+        type: string
+      rollup_address:
+        description: "Address of the new Rollup to register"
+        required: true
+        type: string
+      private_key:
+        description: "Private key for the deployer account (must be funded)"
+        required: true
+        type: string
+      ref:
+        description: "Git ref to checkout (branch, tag, or commit)"
+        required: false
+        type: string
+        default: "next"
+
+jobs:
+  create-payload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Create upgrade payload
+        working-directory: l1-contracts
+        env:
+          REGISTRY_ADDRESS: ${{ inputs.registry_address }}
+          ROLLUP_ADDRESS: ${{ inputs.rollup_address }}
+        run: |
+          forge script script/deploy/CreateRollupUpgradePayload.s.sol:CreateRollupUpgradePayload \
+            --private-key "${{ inputs.private_key }}" \
+            --rpc-url "${{ inputs.rpc_url }}" \
+            --broadcast \
+            -vvv
