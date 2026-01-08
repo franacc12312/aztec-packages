@@ -249,7 +249,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.ATTESTATION,
-          blockIndexWithinCheckpoint: 0,
+          blockIndexWithinCheckpoint: -1,
         },
         signFn,
       );

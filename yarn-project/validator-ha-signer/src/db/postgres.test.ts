@@ -146,7 +146,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
-        0,
+        -1,
         DutyType.ATTESTATION,
         MESSAGE_HASH,
         NODE_ID,
