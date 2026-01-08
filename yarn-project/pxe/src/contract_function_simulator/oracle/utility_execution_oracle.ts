@@ -376,7 +376,7 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
     noteValidationRequestsArrayBaseSlot: Fr,
     eventValidationRequestsArrayBaseSlot: Fr,
   ) {
-    // TODO(#10727): allow other contracts to deliver notes
+    // TODO(#10727): allow other contracts to store notes
     if (!this.contractAddress.equals(contractAddress)) {
       throw new Error(`Got a note validation request from ${contractAddress}, expected ${this.contractAddress}`);
     }
@@ -392,8 +392,8 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
     ).map(EventValidationRequest.fromFields);
 
     const noteService = new NoteService(this.noteStore, this.aztecNode, this.anchorBlockStore);
-    const noteDeliveries = noteValidationRequests.map(request =>
-      noteService.deliverNote(
+    const noteStorePromises = noteValidationRequests.map(request =>
+      noteService.storeNote(
         request.contractAddress,
         request.owner,
         request.storageSlot,
@@ -408,8 +408,8 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
     );
 
     const eventService = new EventService(this.anchorBlockStore, this.aztecNode, this.privateEventStore);
-    const eventDeliveries = eventValidationRequests.map(request =>
-      eventService.deliverEvent(
+    const eventStorePromises = eventValidationRequests.map(request =>
+      eventService.storeEvent(
         request.contractAddress,
         request.eventTypeId,
         request.randomness,
@@ -420,7 +420,7 @@ export class UtilityExecutionOracle implements IMiscOracle, IUtilityExecutionOra
       ),
     );
 
-    await Promise.all([...noteDeliveries, ...eventDeliveries]);
+    await Promise.all([...noteStorePromises, ...eventStorePromises]);
 
     // Requests are cleared once we're done.
     await this.capsuleStore.setCapsuleArray(contractAddress, noteValidationRequestsArrayBaseSlot, []);
