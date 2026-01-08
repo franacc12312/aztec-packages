@@ -1,7 +1,7 @@
 // === AUDIT STATUS ===
-// internal:    { status: not started, auditors: [], date: YYYY-MM-DD }
-// external_1:  { status: not started, auditors: [], date: YYYY-MM-DD }
-// external_2:  { status: not started, auditors: [], date: YYYY-MM-DD }
+// internal:    { status: Planned, auditors: [], commit: }
+// external_1:  { status: not started, auditors: [], commit: }
+// external_2:  { status: not started, auditors: [], commit: }
 // =====================
 
 #pragma once
@@ -78,6 +78,10 @@ template <typename BuilderType> class MegaRecursiveFlavor_ {
     // length = 3
     static constexpr size_t BATCHED_RELATION_PARTIAL_LENGTH = MAX_PARTIAL_RELATION_LENGTH + 1;
 
+    static constexpr size_t FINAL_PCS_MSM_SIZE(size_t log_n = VIRTUAL_LOG_N)
+    {
+        return MegaFlavor::FINAL_PCS_MSM_SIZE(log_n);
+    };
     static constexpr RepeatedCommitmentsData REPEATED_COMMITMENTS = MegaFlavor::REPEATED_COMMITMENTS;
 
     static constexpr size_t NUM_RELATIONS = std::tuple_size_v<Relations>;

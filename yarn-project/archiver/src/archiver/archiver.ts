@@ -1,4 +1,4 @@
-import type { BlobSinkClientInterface } from '@aztec/blob-sink/client';
+import type { BlobClientInterface } from '@aztec/blob-client/client';
 import { GENESIS_BLOCK_HEADER_HASH } from '@aztec/constants';
 import { EpochCache } from '@aztec/epoch-cache';
 import { createEthereumChain } from '@aztec/ethereum/chain';
@@ -64,7 +64,15 @@ import {
 } from '@aztec/stdlib/epoch-helpers';
 import type { GetContractClassLogsResponse, GetPublicLogsResponse } from '@aztec/stdlib/interfaces/client';
 import type { L2LogsSource } from '@aztec/stdlib/interfaces/server';
-import { ContractClassLog, type LogFilter, type PrivateLog, type PublicLog, TxScopedL2Log } from '@aztec/stdlib/logs';
+import {
+  ContractClassLog,
+  type LogFilter,
+  type PrivateLog,
+  type PublicLog,
+  type SiloedTag,
+  Tag,
+  TxScopedL2Log,
+} from '@aztec/stdlib/logs';
 import { type L1ToL2MessageSource, computeInHashFromL1ToL2Messages } from '@aztec/stdlib/messaging';
 import type { CheckpointHeader } from '@aztec/stdlib/rollup';
 import { type BlockHeader, type IndexedTxEffect, TxHash, TxReceipt } from '@aztec/stdlib/tx';
@@ -73,6 +81,7 @@ import {
   type TelemetryClient,
   type Traceable,
   type Tracer,
+  execInSpan,
   getTelemetryClient,
   trackSpan,
 } from '@aztec/telemetry-client';
@@ -110,7 +119,7 @@ type AddBlockRequest = {
 
 export type ArchiverDeps = {
   telemetry?: TelemetryClient;
-  blobSinkClient: BlobSinkClientInterface;
+  blobClient: BlobClientInterface;
   epochCache?: EpochCache;
   dateProvider?: DateProvider;
 };
@@ -188,7 +197,7 @@ export class Archiver
       maxAllowedEthClientDriftSeconds: number;
       ethereumAllowNoDebugHosts?: boolean;
     },
-    private readonly blobSinkClient: BlobSinkClientInterface,
+    private readonly blobClient: BlobClientInterface,
     private readonly epochCache: EpochCache,
     private readonly dateProvider: DateProvider,
     private readonly instrumentation: ArchiverInstrumentation,
@@ -230,7 +239,7 @@ export class Archiver
     const chain = createEthereumChain(config.l1RpcUrls, config.l1ChainId);
     const publicClient = createPublicClient({
       chain: chain.chainInfo,
-      transport: fallback(config.l1RpcUrls.map(url => http(url))),
+      transport: fallback(config.l1RpcUrls.map(url => http(url, { batch: false }))),
       pollingInterval: config.viemPollingIntervalMS,
     });
 
@@ -238,7 +247,7 @@ export class Archiver
     const debugRpcUrls = config.l1DebugRpcUrls.length > 0 ? config.l1DebugRpcUrls : config.l1RpcUrls;
     const debugClient = createPublicClient({
       chain: chain.chainInfo,
-      transport: fallback(debugRpcUrls.map(url => http(url))),
+      transport: fallback(debugRpcUrls.map(url => http(url, { batch: false }))),
       pollingInterval: config.viemPollingIntervalMS,
     }) as ViemPublicDebugClient;
 
@@ -267,7 +276,7 @@ export class Archiver
       slotDuration,
       ethereumSlotDuration,
       proofSubmissionEpochs: Number(proofSubmissionEpochs),
-      genesisArchiveRoot: Fr.fromHexString(genesisArchiveRoot),
+      genesisArchiveRoot: Fr.fromString(genesisArchiveRoot.toString()),
     };
 
     const opts = merge(
@@ -289,7 +298,7 @@ export class Archiver
       { ...config.l1Contracts, slashingProposerAddress },
       archiverStore,
       opts,
-      deps.blobSinkClient,
+      deps.blobClient,
       epochCache,
       deps.dateProvider ?? new DateProvider(),
       await ArchiverInstrumentation.new(telemetry, () => archiverStore.estimateSize()),
@@ -313,7 +322,7 @@ export class Archiver
       throw new Error('Archiver is already running');
     }
 
-    await this.blobSinkClient.testSources();
+    await this.blobClient.testSources();
     await this.testEthereumNodeSynced();
     await validateAndLogTraceAvailability(this.debugClient, this.config.ethereumAllowNoDebugHosts ?? false);
 
@@ -401,6 +410,7 @@ export class Archiver
     }
   }
 
+  @trackSpan('Archiver.syncFromL1')
   private async syncFromL1() {
     /**
      * We keep track of three "pointers" to L1 blocks:
@@ -547,6 +557,7 @@ export class Archiver
   }
 
   /** Checks if there'd be a reorg for the next checkpoint submission and start pruning now. */
+  @trackSpan('Archiver.handleEpochPrune')
   private async handleEpochPrune(
     provenCheckpointNumber: CheckpointNumber,
     currentL1BlockNumber: bigint,
@@ -620,6 +631,7 @@ export class Archiver
     return [nextStart, nextEnd];
   }
 
+  @trackSpan('Archiver.handleL1ToL2Messages')
   private async handleL1ToL2Messages(
     messagesSyncPoint: L1BlockId,
     currentL1BlockNumber: bigint,
@@ -778,23 +790,24 @@ export class Archiver
     return Buffer32.fromString(block.hash);
   }
 
+  @trackSpan('Archiver.handleCheckpoints')
   private async handleCheckpoints(blocksSynchedTo: bigint, currentL1BlockNumber: bigint): Promise<RollupStatus> {
     const localPendingCheckpointNumber = await this.getSynchedCheckpointNumber();
     const initialValidationResult: ValidateBlockResult | undefined = await this.store.getPendingChainValidationStatus();
-    const [
-      rollupProvenCheckpointNumber,
-      provenArchive,
-      rollupPendingCheckpointNumber,
-      pendingArchive,
-      archiveForLocalPendingCheckpointNumber,
-    ] = await this.rollup.status(localPendingCheckpointNumber, { blockNumber: currentL1BlockNumber });
-    const provenCheckpointNumber = CheckpointNumber.fromBigInt(rollupProvenCheckpointNumber);
-    const pendingCheckpointNumber = CheckpointNumber.fromBigInt(rollupPendingCheckpointNumber);
-    const rollupStatus = {
+    const {
       provenCheckpointNumber,
       provenArchive,
       pendingCheckpointNumber,
       pendingArchive,
+      archiveOfMyCheckpoint: archiveForLocalPendingCheckpointNumber,
+    } = await execInSpan(this.tracer, 'Archiver.getRollupStatus', () =>
+      this.rollup.status(localPendingCheckpointNumber, { blockNumber: currentL1BlockNumber }),
+    );
+    const rollupStatus: RollupStatus = {
+      provenCheckpointNumber,
+      provenArchive: provenArchive.toString(),
+      pendingCheckpointNumber,
+      pendingArchive: pendingArchive.toString(),
       validationResult: initialValidationResult,
     };
     this.log.trace(`Retrieved rollup status at current L1 block ${currentL1BlockNumber}.`, {
@@ -840,14 +853,12 @@ export class Archiver
 
       if (
         localCheckpointForDestinationProvenCheckpointNumber &&
-        provenArchive === localCheckpointForDestinationProvenCheckpointNumber.archive.root.toString()
+        provenArchive.equals(localCheckpointForDestinationProvenCheckpointNumber.archive.root)
       ) {
         const localProvenCheckpointNumber = await this.getProvenCheckpointNumber();
         if (localProvenCheckpointNumber !== provenCheckpointNumber) {
           await this.setProvenCheckpointNumber(provenCheckpointNumber);
-          this.log.info(`Updated proven chain to checkpoint ${provenCheckpointNumber}`, {
-            provenCheckpointNumber,
-          });
+          this.log.info(`Updated proven chain to checkpoint ${provenCheckpointNumber}`, { provenCheckpointNumber });
           const provenSlotNumber = localCheckpointForDestinationProvenCheckpointNumber.header.slotNumber;
           const provenEpochNumber: EpochNumber = getEpochAtSlot(provenSlotNumber, this.l1constants);
           const lastBlockNumberInCheckpoint =
@@ -890,7 +901,7 @@ export class Archiver
       }
 
       const localPendingArchiveRoot = localPendingCheckpoint.archive.root.toString();
-      const noCheckpointSinceLast = localPendingCheckpoint && pendingArchive === localPendingArchiveRoot;
+      const noCheckpointSinceLast = localPendingCheckpoint && pendingArchive.toString() === localPendingArchiveRoot;
       if (noCheckpointSinceLast) {
         // We believe the following line causes a problem when we encounter L1 re-orgs.
         // Basically, by setting the synched L1 block number here, we are saying that we have
@@ -904,7 +915,9 @@ export class Archiver
         return rollupStatus;
       }
 
-      const localPendingCheckpointInChain = archiveForLocalPendingCheckpointNumber === localPendingArchiveRoot;
+      const localPendingCheckpointInChain = archiveForLocalPendingCheckpointNumber.equals(
+        localPendingCheckpoint.archive.root,
+      );
       if (!localPendingCheckpointInChain) {
         // If our local pending checkpoint tip is not in the chain on L1 a "prune" must have happened
         // or the L1 have reorged.
@@ -930,7 +943,7 @@ export class Archiver
               archiveLocal: candidateCheckpoint.archive.root.toString(),
             },
           );
-          if (archiveAtContract === candidateCheckpoint.archive.root.toString()) {
+          if (archiveAtContract.equals(candidateCheckpoint.archive.root)) {
             break;
           }
           tipAfterUnwind--;
@@ -959,18 +972,20 @@ export class Archiver
 
       this.log.trace(`Retrieving checkpoints from L1 block ${searchStartBlock} to ${searchEndBlock}`);
 
-      // TODO(md): Retrieve from blob sink then from consensus client, then from peers
-      const retrievedCheckpoints = await retrieveCheckpointsFromRollup(
-        this.rollup.getContract() as GetContractReturnType<typeof RollupAbi, ViemPublicClient>,
-        this.publicClient,
-        this.debugClient,
-        this.blobSinkClient,
-        searchStartBlock, // TODO(palla/reorg): If the L2 reorg was due to an L1 reorg, we need to start search earlier
-        searchEndBlock,
-        this.l1Addresses,
-        this.instrumentation,
-        this.log,
-        !this.initialSyncComplete, // isHistoricalSync
+      // TODO(md): Retrieve from blob client then from consensus client, then from peers
+      const retrievedCheckpoints = await execInSpan(this.tracer, 'Archiver.retrieveCheckpointsFromRollup', () =>
+        retrieveCheckpointsFromRollup(
+          this.rollup.getContract() as GetContractReturnType<typeof RollupAbi, ViemPublicClient>,
+          this.publicClient,
+          this.debugClient,
+          this.blobClient,
+          searchStartBlock, // TODO(palla/reorg): If the L2 reorg was due to an L1 reorg, we need to start search earlier
+          searchEndBlock,
+          this.l1Addresses,
+          this.instrumentation,
+          this.log,
+          !this.initialSyncComplete, // isHistoricalSync
+        ),
       );
 
       if (retrievedCheckpoints.length === 0) {
@@ -1035,7 +1050,7 @@ export class Archiver
         // checkpoints we just retrieved.
         const l1ToL2Messages = await this.getL1ToL2Messages(published.checkpoint.number);
         const computedInHash = computeInHashFromL1ToL2Messages(l1ToL2Messages);
-        const publishedInHash = published.checkpoint.header.contentCommitment.inHash;
+        const publishedInHash = published.checkpoint.header.inHash;
         if (!computedInHash.equals(publishedInHash)) {
           this.log.fatal(`Mismatch inHash for checkpoint ${published.checkpoint.number}`, {
             checkpointHash: published.checkpoint.hash(),
@@ -1064,7 +1079,11 @@ export class Archiver
       try {
         const updatedValidationResult =
           rollupStatus.validationResult === initialValidationResult ? undefined : rollupStatus.validationResult;
-        const [processDuration] = await elapsed(() => this.addCheckpoints(validCheckpoints, updatedValidationResult));
+        const [processDuration] = await elapsed(() =>
+          execInSpan(this.tracer, 'Archiver.addCheckpoints', () =>
+            this.addCheckpoints(validCheckpoints, updatedValidationResult),
+          ),
+        );
         this.instrumentation.processNewBlocks(
           processDuration / validCheckpoints.length,
           validCheckpoints.flatMap(c => c.checkpoint.blocks),
@@ -1407,14 +1426,12 @@ export class Archiver
     return this.store.getSettledTxReceipt(txHash);
   }
 
-  /**
-   * Gets all logs that match any of the received tags (i.e. logs with their first field equal to a tag).
-   * @param tags - The tags to filter the logs by.
-   * @returns For each received tag, an array of matching logs is returned. An empty array implies no logs match
-   * that tag.
-   */
-  getLogsByTags(tags: Fr[]): Promise<TxScopedL2Log[][]> {
-    return this.store.getLogsByTags(tags);
+  getPrivateLogsByTags(tags: SiloedTag[]): Promise<TxScopedL2Log[][]> {
+    return this.store.getPrivateLogsByTags(tags);
+  }
+
+  getPublicLogsByTagsFromContract(contractAddress: AztecAddress, tags: Tag[]): Promise<TxScopedL2Log[][]> {
+    return this.store.getPublicLogsByTagsFromContract(contractAddress, tags);
   }
 
   /**
@@ -2072,8 +2089,11 @@ export class ArchiverStoreHelper
   getL1ToL2MessageIndex(l1ToL2Message: Fr): Promise<bigint | undefined> {
     return this.store.getL1ToL2MessageIndex(l1ToL2Message);
   }
-  getLogsByTags(tags: Fr[], logsPerTag?: number): Promise<TxScopedL2Log[][]> {
-    return this.store.getLogsByTags(tags, logsPerTag);
+  getPrivateLogsByTags(tags: SiloedTag[]): Promise<TxScopedL2Log[][]> {
+    return this.store.getPrivateLogsByTags(tags);
+  }
+  getPublicLogsByTagsFromContract(contractAddress: AztecAddress, tags: Tag[]): Promise<TxScopedL2Log[][]> {
+    return this.store.getPublicLogsByTagsFromContract(contractAddress, tags);
   }
   getPublicLogs(filter: LogFilter): Promise<GetPublicLogsResponse> {
     return this.store.getPublicLogs(filter);

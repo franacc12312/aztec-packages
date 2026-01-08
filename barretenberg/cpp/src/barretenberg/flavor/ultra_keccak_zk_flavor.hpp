@@ -1,7 +1,7 @@
 // === AUDIT STATUS ===
-// internal:    { status: not started, auditors: [], date: YYYY-MM-DD }
-// external_1:  { status: not started, auditors: [], date: YYYY-MM-DD }
-// external_2:  { status: not started, auditors: [], date: YYYY-MM-DD }
+// internal:    { status: Planned, auditors: [], commit: }
+// external_1:  { status: not started, auditors: [], commit: }
+// external_2:  { status: not started, auditors: [], commit: }
 // =====================
 
 #pragma once
@@ -220,5 +220,7 @@ class UltraKeccakZKFlavor : public UltraKeccakFlavor {
             BB_ASSERT_EQ(proof_data.size(), old_proof_length);
         }
     };
+
+    using VKAndHash = UltraKeccakFlavor::VKAndHash;
 };
 } // namespace bb

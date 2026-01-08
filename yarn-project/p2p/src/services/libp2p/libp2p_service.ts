@@ -28,7 +28,14 @@ import { MerkleTreeId } from '@aztec/stdlib/trees';
 import { Tx, type TxHash, type TxValidationResult, type TxValidator } from '@aztec/stdlib/tx';
 import type { UInt64 } from '@aztec/stdlib/types';
 import { compressComponentVersions } from '@aztec/stdlib/versioning';
-import { Attributes, OtelMetricsAdapter, type TelemetryClient, WithTracer, trackSpan } from '@aztec/telemetry-client';
+import {
+  Attributes,
+  OtelMetricsAdapter,
+  SpanStatusCode,
+  type TelemetryClient,
+  WithTracer,
+  trackSpan,
+} from '@aztec/telemetry-client';
 
 import {
   type GossipSub,
@@ -144,6 +151,8 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
 
   private instrumentation: P2PInstrumentation;
 
+  private telemetry: TelemetryClient;
+
   protected logger: Logger;
 
   constructor(
@@ -153,7 +162,7 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
     private peerDiscoveryService: PeerDiscoveryService,
     private reqresp: ReqRespInterface,
     private peerManager: PeerManagerInterface,
-    protected mempools: MemPools<T>,
+    protected mempools: MemPools,
     private archiver: L2BlockSource & ContractDataSource,
     private epochCache: EpochCacheInterface,
     private proofVerifier: ClientProtocolCircuitVerifier,
@@ -162,6 +171,7 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
     logger: Logger = createLogger('p2p:libp2p_service'),
   ) {
     super(telemetry, 'LibP2PService');
+    this.telemetry = telemetry;
 
     // Create child logger with fisherman prefix if in fisherman mode
     this.logger = config.fishermanMode ? logger.createChild('[FISHERMAN]') : logger;
@@ -185,7 +195,7 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
 
     // Use FishermanAttestationValidator in fisherman mode to validate attestation payloads against proposals
     this.attestationValidator = config.fishermanMode
-      ? new FishermanAttestationValidator(epochCache, mempools.attestationPool!, telemetry)
+      ? new FishermanAttestationValidator(epochCache, mempools.attestationPool, telemetry)
       : new AttestationValidator(epochCache);
     this.blockProposalValidator = new BlockProposalValidator(epochCache, { txsPermitted: !config.disableTransactions });
 
@@ -215,7 +225,7 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
     config: P2PConfig,
     peerId: PeerId,
     deps: {
-      mempools: MemPools<T>;
+      mempools: MemPools;
       l2BlockSource: L2BlockSource & ContractDataSource;
       epochCache: EpochCacheInterface;
       proofVerifier: ClientProtocolCircuitVerifier;
@@ -486,8 +496,7 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
       [ReqRespSubProtocol.BLOCK]: blockHandler.bind(this),
     };
 
-    // Only handle block transactions request if attestation pool is available to the client
-    if (this.mempools.attestationPool && !this.config.disableTransactions) {
+    if (!this.config.disableTransactions) {
       const blockTxsHandler = reqRespBlockTxsHandler(this.mempools.attestationPool, this.mempools.txPool);
       requestResponseHandlers[ReqRespSubProtocol.BLOCK_TXS] = blockTxsHandler.bind(this);
     }
@@ -623,7 +632,10 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
     if (!this.node.services.pubsub) {
       throw new Error('Pubsub service not available.');
     }
-    const p2pMessage = P2PMessage.fromGossipable(message, this.config.debugP2PInstrumentMessages);
+    const isBlockProposal = topic === this.topicStrings[TopicType.block_proposal];
+    const traceContext =
+      this.config.debugP2PInstrumentMessages && isBlockProposal ? this.telemetry.getTraceContext() : undefined;
+    const p2pMessage = P2PMessage.fromGossipable(message, this.config.debugP2PInstrumentMessages, traceContext);
     const result = await this.node.services.pubsub.publish(topic, p2pMessage.toMessageData());
     return result.recipients.length;
   }
@@ -708,23 +720,70 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
       return;
     }
 
+    // Determine topic type for attributes
     if (msg.topic === this.topicStrings[TopicType.tx]) {
       topicType = TopicType.tx;
-      await this.handleGossipedTx(p2pMessage.payload, msgId, source);
-    }
-    if (msg.topic === this.topicStrings[TopicType.block_attestation]) {
+    } else if (msg.topic === this.topicStrings[TopicType.block_attestation]) {
       topicType = TopicType.block_attestation;
-      if (this.clientType === P2PClientType.Full) {
-        await this.processAttestationFromPeer(p2pMessage.payload, msgId, source);
-      }
-    }
-    if (msg.topic === this.topicStrings[TopicType.block_proposal]) {
+    } else if (msg.topic === this.topicStrings[TopicType.block_proposal]) {
       topicType = TopicType.block_proposal;
-      await this.processBlockFromPeer(p2pMessage.payload, msgId, source);
     }
 
-    if (p2pMessage.timestamp !== undefined && topicType !== undefined) {
-      const latency = msgReceivedTime - p2pMessage.timestamp.getTime();
+    // Process the message, optionally within a linked span for trace propagation
+    const processMessage = async () => {
+      if (msg.topic === this.topicStrings[TopicType.tx]) {
+        await this.handleGossipedTx(p2pMessage.payload, msgId, source);
+      }
+      if (msg.topic === this.topicStrings[TopicType.block_attestation]) {
+        if (this.clientType === P2PClientType.Full) {
+          await this.processAttestationFromPeer(p2pMessage.payload, msgId, source);
+        }
+      }
+      if (msg.topic === this.topicStrings[TopicType.block_proposal]) {
+        await this.processBlockFromPeer(p2pMessage.payload, msgId, source);
+      }
+    };
+
+    const latency = p2pMessage.timestamp !== undefined ? msgReceivedTime - p2pMessage.timestamp.getTime() : undefined;
+    const propagatedContext = p2pMessage.traceContext
+      ? this.telemetry.extractPropagatedContext(p2pMessage.traceContext)
+      : undefined;
+
+    if (propagatedContext) {
+      await this.tracer.startActiveSpan(
+        'LibP2PService.processMessage',
+        {
+          attributes: {
+            [Attributes.TOPIC_NAME]: topicType!,
+            [Attributes.PEER_ID]: source.toString(),
+          },
+        },
+        propagatedContext,
+        async span => {
+          try {
+            await processMessage();
+            span.setStatus({
+              code: SpanStatusCode.OK,
+            });
+          } catch (err) {
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: String(err),
+            });
+            if (typeof err === 'string' || (err && err instanceof Error)) {
+              span.recordException(err);
+            }
+            throw err;
+          } finally {
+            span.end();
+          }
+        },
+      );
+    } else {
+      await processMessage();
+    }
+
+    if (latency !== undefined && topicType !== undefined) {
       this.instrumentation.recordMessageLatency(topicType, latency);
     }
 
@@ -809,7 +868,7 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
   private async processAttestationFromPeer(payloadData: Buffer, msgId: string, source: PeerId): Promise<void> {
     const validationFunc: () => Promise<ReceivedMessageValidationResult<BlockAttestation>> = async () => {
       const attestation = BlockAttestation.fromBuffer(payloadData);
-      const pool = this.mempools.attestationPool!;
+      const pool = this.mempools.attestationPool;
       const isValid = await this.validateAttestation(source, attestation);
       const exists = isValid && (await pool.hasAttestation(attestation));
 
@@ -866,7 +925,7 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
       },
     );
 
-    await this.mempools.attestationPool!.addAttestations([attestation]);
+    await this.mempools.attestationPool.addAttestations([attestation]);
   }
 
   private async processBlockFromPeer(payloadData: Buffer, msgId: string, source: PeerId): Promise<void> {
@@ -875,10 +934,8 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
       const isValid = await this.validateBlockProposal(source, block);
       const pool = this.mempools.attestationPool;
 
-      // Note that we dont have an attestation pool if we're a prover node, but we still
-      // subscribe to block proposal topics in order to prevent their txs from being cleared.
-      const exists = isValid && (await pool?.hasBlockProposal(block));
-      const canAdd = isValid && (await pool?.canAddProposal(block));
+      const exists = isValid && (await pool.hasBlockProposal(block));
+      const canAdd = isValid && (await pool.canAddProposal(block));
 
       this.logger.trace(`Validate propagated block proposal`, {
         isValid,
@@ -934,14 +991,12 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
       archive: block.archive.toString(),
       source: sender.toString(),
     });
-    const attestationsForPreviousSlot = await this.mempools.attestationPool?.getAttestationsForSlot(previousSlot);
-    if (attestationsForPreviousSlot !== undefined) {
-      this.logger.verbose(`Received ${attestationsForPreviousSlot.length} attestations for slot ${previousSlot}`);
-    }
+    const attestationsForPreviousSlot = await this.mempools.attestationPool.getAttestationsForSlot(previousSlot);
+    this.logger.verbose(`Received ${attestationsForPreviousSlot.length} attestations for slot ${previousSlot}`);
 
     // Attempt to add proposal, then mark the txs in this proposal as non-evictable
     try {
-      await this.mempools.attestationPool?.addBlockProposal(block);
+      await this.mempools.attestationPool.addBlockProposal(block);
     } catch (err: unknown) {
       // Drop proposals if we hit per-slot cap in the attestation pool; rethrow unknown errors
       if (err instanceof ProposalSlotCapExceededError) {
@@ -1047,7 +1102,7 @@ export class LibP2PService<T extends P2PClientType = P2PClientType.Full> extends
       }
 
       // Given proposal (should have locally), ensure returned txs are valid subset and match request indices
-      const proposal = await this.mempools.attestationPool?.getBlockProposal(request.blockHash.toString());
+      const proposal = await this.mempools.attestationPool.getBlockProposal(request.blockHash.toString());
       if (proposal) {
         // Build intersected indices
         const intersectIdx = request.txIndices.getTrueIndices().filter(i => response.txIndices.isSet(i));

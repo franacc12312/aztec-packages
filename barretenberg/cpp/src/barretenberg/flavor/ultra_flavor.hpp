@@ -1,7 +1,7 @@
 // === AUDIT STATUS ===
-// internal:    { status: not started, auditors: [], date: YYYY-MM-DD }
-// external_1:  { status: not started, auditors: [], date: YYYY-MM-DD }
-// external_2:  { status: not started, auditors: [], date: YYYY-MM-DD }
+// internal:    { status: Planned, auditors: [], commit: }
+// external_1:  { status: not started, auditors: [], commit: }
+// external_2:  { status: not started, auditors: [], commit: }
 // =====================
 
 #pragma once
@@ -225,8 +225,6 @@ class UltraFlavor {
 
         auto get_wires() { return RefArray{ w_l, w_r, w_o, w_4 }; };
         auto get_to_be_shifted() { return RefArray{ w_l, w_r, w_o, w_4, z_perm }; };
-
-        MSGPACK_FIELDS(w_l, w_r, w_o, w_4, z_perm, lookup_inverses, lookup_read_counts, lookup_read_tags);
     };
 
     /**
@@ -525,6 +523,8 @@ class UltraFlavor {
         }
 #endif
     };
+
+    using VKAndHash = VKAndHash_<FF, VerificationKey>;
 
     /**
      * @brief A container for storing the partially evaluated multivariates produced by sumcheck.

@@ -46,13 +46,16 @@ namespace bb::avm2::simulation {
  * For every opcode execution method (e.g. Execution::add(), Execution::sub(), etc), it is crucial to preserve
  * the following order of operations (temporality groups 3,4,5,6):
  * 1. Temporality group 3 (Register read): Set the inputs and validate them. (RegisterValidationException might be
- * thrown.)
+ * thrown.) The corresponding memory reads must be performed in this group.
  * 2. Temporality group 4 (Gas): Consume gas. (OutOfGasException might be thrown.)
  * 3. Temporality group 5 (Opcode execution): Execute the opcode. (OpcodeExecutionException might be thrown.)
- * 4. Temporality group 6 (Register write): Set the output.
+ * 4. Temporality group 6 (Register write): Set the output. The corresponding memory writes must be performed in this
+ *    group. This order is crucial for the completeness of the circuit.
  *
- * This order is crucial for the completeness of the circuit. In tracegen, we rely on this order to correctly
- * populate the execution trace. In particular, we stop processing if any of the above exceptions are thrown.
+ * In tracegen, we rely on this order to correctly populate the execution trace. In particular, we stop processing if
+ * any of the above exceptions are thrown.
+ * For the memory permutations to be valid, the corresponding memory reads and writes must be performed in the same
+ * group.
  */
 
 /**
@@ -471,10 +474,10 @@ void Execution::get_env_var(ContextInterface& context, MemoryAddress dst_addr, u
     case EnvironmentVariable::TIMESTAMP:
         result = MemoryValue::from<uint64_t>(context.get_globals().timestamp);
         break;
-    case EnvironmentVariable::BASEFEEPERL2GAS:
+    case EnvironmentVariable::MINFEEPERL2GAS:
         result = MemoryValue::from<uint128_t>(context.get_globals().gas_fees.fee_per_l2_gas);
         break;
-    case EnvironmentVariable::BASEFEEPERDAGAS:
+    case EnvironmentVariable::MINFEEPERDAGAS:
         result = MemoryValue::from<uint128_t>(context.get_globals().gas_fees.fee_per_da_gas);
         break;
     case EnvironmentVariable::ISSTATICCALL:
@@ -583,7 +586,7 @@ void Execution::call(ContextInterface& context,
 
     get_gas_tracker().consume_gas(); // Base gas.
     Gas gas_limit = get_gas_tracker().compute_gas_limit_for_call(
-        Gas{ allocated_l2_gas_read.as<uint32_t>(), allocated_da_gas_read.as<uint32_t>() });
+        Gas{ .l2_gas = allocated_l2_gas_read.as<uint32_t>(), .da_gas = allocated_da_gas_read.as<uint32_t>() });
 
     // Tag check contract address + cd_size
     auto nested_context = context_provider.make_nested_context(contract_address,
@@ -643,7 +646,7 @@ void Execution::static_call(ContextInterface& context,
 
     get_gas_tracker().consume_gas(); // Base gas.
     Gas gas_limit = get_gas_tracker().compute_gas_limit_for_call(
-        Gas{ allocated_l2_gas_read.as<uint32_t>(), allocated_da_gas_read.as<uint32_t>() });
+        Gas{ .l2_gas = allocated_l2_gas_read.as<uint32_t>(), .da_gas = allocated_da_gas_read.as<uint32_t>() });
 
     // Tag check contract address + cd_size
     auto nested_context = context_provider.make_nested_context(contract_address,
@@ -1325,8 +1328,9 @@ void Execution::get_contract_instance(ContextInterface& context,
 
     // Execution can still handle address memory read and tag checking
     const auto& address_value = memory.get(address_offset);
-    AztecAddress contract_address = address_value.as<AztecAddress>();
     set_and_validate_inputs(opcode, { address_value });
+
+    AztecAddress contract_address = address_value.as<AztecAddress>();
 
     get_gas_tracker().consume_gas();
 
@@ -1721,6 +1725,11 @@ EnqueuedCallResult Execution::execute(std::unique_ptr<ContextInterface> enqueued
     external_call_stack.push(std::move(enqueued_call_context));
 
     while (!external_call_stack.empty()) {
+        // Throws CancelledException if cancelled. No-op when cancellation_token_ is nullptr (non-NAPI paths).
+        if (cancellation_token_) {
+            cancellation_token_->check_and_throw();
+        }
+
         // We fix the context at this point. Even if the opcode changes the stack
         // we'll always use this in the loop.
         auto& context = *external_call_stack.top();
@@ -1728,7 +1737,7 @@ EnqueuedCallResult Execution::execute(std::unique_ptr<ContextInterface> enqueued
         // Default inputs and output initialization. This properly resets the values between two
         // opcode executions as well.
         inputs = {};
-        output = MemoryValue::from<FF>(0);
+        output = MemoryValue::from_tag(static_cast<MemoryTag>(0), 0);
 
         // Members of the execution event which are set in the try block.
         Instruction instruction;
@@ -1801,8 +1810,8 @@ EnqueuedCallResult Execution::execute(std::unique_ptr<ContextInterface> enqueued
         } catch (const std::exception& e) {
             // This is a coding error, we should not get here.
             // All exceptions should fall in the above catch blocks.
-            info("An unhandled exception occurred: ", e.what());
-            throw e;
+            important("An unhandled exception occurred: ", e.what());
+            throw;
         }
 
         // We always do what follows. "Finally".
@@ -2131,7 +2140,8 @@ inline void Execution::call_with_operands(void (Execution::*f)(ContextInterface&
                                           ContextInterface& context,
                                           const std::vector<Operand>& resolved_operands)
 {
-    assert(resolved_operands.size() == sizeof...(Ts));
+    // NOTE: Only asserting in debug builds because these convertions are in the hot path.
+    BB_ASSERT_DEBUG(resolved_operands.size() == sizeof...(Ts), "Resolved operands size mismatch");
     auto operand_indices = std::make_index_sequence<sizeof...(Ts)>{};
     [f, this, &context, &resolved_operands]<std::size_t... Is>(std::index_sequence<Is...>) {
         (this->*f)(context, resolved_operands.at(Is).to<std::decay_t<Ts>>()...);
@@ -2148,7 +2158,8 @@ inline void Execution::call_with_operands(void (Execution::*f)(ContextInterface&
 void Execution::set_and_validate_inputs(ExecutionOpCode opcode, const std::vector<MemoryValue>& inputs)
 {
     const auto& register_info = instruction_info_db.get(opcode).register_info;
-    assert(inputs.size() == register_info.num_inputs());
+    // NOTE: Only asserting in debug builds because these convertions are in the hot path.
+    BB_ASSERT_DEBUG(inputs.size() == register_info.num_inputs(), "Inputs size mismatch");
     this->inputs = inputs;
     for (size_t i = 0; i < register_info.num_inputs(); i++) {
         if (register_info.expected_tag(i) && register_info.expected_tag(i) != this->inputs.at(i).get_tag()) {
@@ -2171,8 +2182,8 @@ void Execution::set_and_validate_inputs(ExecutionOpCode opcode, const std::vecto
 void Execution::set_output(ExecutionOpCode opcode, const MemoryValue& output)
 {
     const auto& register_info = instruction_info_db.get(opcode).register_info;
-    (void)register_info; // To please GCC.
-    assert(register_info.num_outputs() == 1);
+    // NOTE: Only asserting in debug builds because these convertions are in the hot path.
+    BB_ASSERT_DEBUG(register_info.num_outputs() == 1, "Outputs size mismatch");
     this->output = output;
 }
 

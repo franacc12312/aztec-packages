@@ -233,7 +233,7 @@ function test_engine_start {
   # parallel will only process the result of job N when it receives a new job *after* job N has completed.
   # This can prevent a "fail fast" situation, or prevent the results from the first batch of commands from showing up.
   # Empty commands fed to run_test_cmd are no-ops, so we keep parallel processing results in timely fashion with this.
-  while ! grep -E '^STOP$' $test_cmds_file; do sleep 5; echo | atomic_append $test_cmds_file; done &
+  while ! grep -Eq '^STOP$' $test_cmds_file; do sleep 5; echo | atomic_append $test_cmds_file; done &
   # Continuously stream the test cmds into parallelize.
   DENOISE=0 parallelize < <(tail -n+0 -f $test_cmds_file)
 }
@@ -256,10 +256,10 @@ function build_and_test {
   echo_header "build and test"
 
   # Start the test engine.
-  # setsid will put it in it's own process group we can terminate on cleanup.
   rm -f $test_cmds_file
   touch $test_cmds_file
-  setsid color_prefix "test-engine" "denoise test_engine_start" &
+  # put it in it's own process group via background subshell, we can terminate on cleanup.
+  (color_prefix "test-engine" "denoise test_engine_start") &
   test_engine_pid=$!
   test_engine_pgid=$(ps -o pgid= -p $test_engine_pid)
 
@@ -430,13 +430,25 @@ function release_github {
   if gh release view "aztec-packages-v$CURRENT_VERSION" &>/dev/null; then
     compare_link=$(echo -e "See changes: https://github.com/AztecProtocol/aztec-packages/compare/aztec-packages-v${CURRENT_VERSION}...${COMMIT_HASH}")
   fi
+  # Determine if this is a prerelease (has a prerelease tag like -rc.1, -alpha, etc.)
+  local is_prerelease=false
+  if [ -n "$(semver prerelease $REF_NAME)" ]; then
+    is_prerelease=true
+  fi
   # Ensure we have a commit release.
   if ! gh release view "$REF_NAME" &>/dev/null; then
+    local prerelease_flag=""
+    if $is_prerelease; then
+      prerelease_flag="--prerelease"
+    fi
     do_or_dryrun gh release create "$REF_NAME" \
-      --prerelease \
+      $prerelease_flag \
       --target $COMMIT_HASH \
       --title "$REF_NAME" \
       --notes "$compare_link"
+  elif ! $is_prerelease; then
+    # Release exists but this is not a prerelease version - ensure it's marked as a full release
+    do_or_dryrun gh release edit "$REF_NAME" --prerelease=false
   fi
 }
 
@@ -488,6 +500,10 @@ function release_dryrun {
   DRY_RUN=1 release
 }
 
+# Handle our command line arguments.
+# All the commands that start with ci-* are intended to be callable from
+# a fresh repo. They are ideal for calling into from github actions on a new runner
+# Current flow: ci3.yml -> .github/ci3.sh -> ci.sh -> this script on a fresh EC2 runner.
 case "$cmd" in
   "clean")
     echo "WARNING: This will erase *all* untracked files, including hooks and submodules."
@@ -516,6 +532,9 @@ case "$cmd" in
     install_hooks
     build
   ;;
+  ######################################
+  # VARIANTS ON NORMAL PULL-REQUEST CI #
+  ######################################
   "ci-fast")
     export CI=1
     export USE_TEST_CACHE=1
@@ -546,11 +565,26 @@ case "$cmd" in
     build_and_test
     bench
     ;;
+  ##########################################
+  # NETWORK DEPLOYMENTS WITH BENCHES/TESTS #
+  ##########################################
   "ci-network-deploy")
+    # Args: <env_file> <namespace> [docker_image]
     export CI=1
+    env_file="${1:?env_file is required}"
+    namespace="${2:?namespace is required}"
+    docker_image="${3:-}"
     build
+    # If no docker image provided, build and push to aztecdev
+    if [ -z "$docker_image" ]; then
+      release-image/bootstrap.sh push_pr
+      docker_image="aztecprotocol/aztecdev:$(git rev-parse HEAD)"
+    fi
+    # Set up environment and deploy using spartan
+    export NAMESPACE="$namespace"
+    export AZTEC_DOCKER_IMAGE="$docker_image"
     deploy_exit_code=0
-    spartan/bootstrap.sh network_deploy $NETWORK_ENV_FILE || deploy_exit_code=$?
+    spartan/bootstrap.sh network_deploy "${env_file}" || deploy_exit_code=$?
     # Merge and upload deploy benchmarks (deploy_network.sh writes to spartan/bench-out/)
     rm -rf bench-out
     mkdir -p bench-out
@@ -559,17 +593,52 @@ case "$cmd" in
     exit $deploy_exit_code
     ;;
   "ci-network-tests")
+    # Args: <env_file> <namespace>
     export CI=1
+    env_file="${1:?env_file is required}"
+    namespace="${2:?namespace is required}"
     build
-    spartan/bootstrap.sh network_tests $NETWORK_ENV_FILE
+    # Set up environment for tests
+    export NAMESPACE="$namespace"
+    spartan/bootstrap.sh network_tests "${env_file}"
     ;;
   "ci-network-bench")
+    # Args: <env_file> <namespace> [docker_image]
+    # Deploys network and runs benchmarks. Cleanup should be done separately.
     export CI=1
+    env_file="${1:?env_file is required}"
+    namespace="${2:?namespace is required}"
+    docker_image="${3:-}"
     build
-    spartan/bootstrap.sh network_bench $NETWORK_ENV_FILE
+    # If no docker image provided, build and push to aztecdev
+    if [ -z "$docker_image" ]; then
+      release-image/bootstrap.sh push_pr
+      docker_image="aztecprotocol/aztecdev:$(git rev-parse HEAD)"
+    fi
+    # Set up environment and deploy using spartan
+    export NAMESPACE="$namespace"
+    export AZTEC_DOCKER_IMAGE="$docker_image"
+    spartan/bootstrap.sh network_deploy "${env_file}"
+    # Run benchmarks
+    spartan/bootstrap.sh network_bench "${env_file}"
+    rm -rf bench-out
+    mkdir -p bench-out
     bench_merge
     cache_upload spartan-bench-$(git rev-parse HEAD^{tree}).tar.gz bench-out/bench.json
     ;;
+  "ci-network-teardown")
+    # Args: <env_file> <namespace>
+    # Tears down a deployed network.
+    export CI=1
+    env_file="${1:?env_file is required}"
+    namespace="${2:?namespace is required}"
+    # Set up environment for teardown
+    export NAMESPACE="$namespace"
+    denoise "spartan/bootstrap.sh network_teardown ${env_file}"
+    ;;
+  ############
+  # RELEASES #
+  ############
   "ci-release")
     export CI=1
     export USE_TEST_CACHE=1
@@ -579,6 +648,10 @@ case "$cmd" in
     build
     release
     ;;
+
+  ##########################
+  # MERGE TRAIN CI SUBSETS #
+  ##########################
   "ci-docs")
     export CI=1
     export USE_TEST_CACHE=1
@@ -592,6 +665,17 @@ case "$cmd" in
     export AVM_TRANSPILER=0
     barretenberg/cpp/bootstrap.sh ci
     ;;
+"ci-barretenberg-full")
+    export CI=1
+    export USE_TEST_CACHE=1
+    export AVM=0
+    export AVM_TRANSPILER=0
+    barretenberg/bootstrap.sh ci
+    ;;
+
+  #######################
+  # AVM QA ONE OFF JOBS #
+  #######################
   "ci-avm-inputs-collection")
     # Nightly job: Run e2e tests with AVM circuit inputs dumping, upload to cache
     export CI=1
@@ -608,6 +692,9 @@ case "$cmd" in
     build
     yarn-project/end-to-end/bootstrap.sh avm_check_circuit
     ;;
+  ##############################################
+  # Default handler, calls our above functions #
+  ##############################################
   *)
     default_cmd_handler "$@"
     ;;

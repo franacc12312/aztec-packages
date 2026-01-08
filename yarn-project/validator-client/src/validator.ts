@@ -1,5 +1,5 @@
+import type { BlobClientInterface } from '@aztec/blob-client/client';
 import { getBlobsPerL1Block } from '@aztec/blob-lib';
-import type { FileStoreBlobClient } from '@aztec/blob-sink/filestore';
 import type { EpochCache } from '@aztec/epoch-cache';
 import { BlockNumber, EpochNumber } from '@aztec/foundation/branded-types';
 import { Fr } from '@aztec/foundation/curves/bn254';
@@ -21,7 +21,7 @@ import type { BlockAttestation, BlockProposal, BlockProposalOptions } from '@azt
 import type { CheckpointHeader } from '@aztec/stdlib/rollup';
 import type { Tx } from '@aztec/stdlib/tx';
 import { AttestationTimeoutError } from '@aztec/stdlib/validators';
-import { type TelemetryClient, type Tracer, getTelemetryClient } from '@aztec/telemetry-client';
+import { Attributes, type TelemetryClient, type Tracer, getTelemetryClient, trackSpan } from '@aztec/telemetry-client';
 
 import { EventEmitter } from 'events';
 import type { TypedDataDefinition } from 'viem';
@@ -67,7 +67,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     private p2pClient: P2P,
     private blockProposalHandler: BlockProposalHandler,
     private config: ValidatorClientFullConfig,
-    private fileStoreBlobUploadClient: FileStoreBlobClient | undefined,
+    private blobClient: BlobClientInterface,
     private dateProvider: DateProvider = new DateProvider(),
     telemetry: TelemetryClient = getTelemetryClient(),
     log = createLogger('validator'),
@@ -150,7 +150,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     l1ToL2MessageSource: L1ToL2MessageSource,
     txProvider: TxProvider,
     keyStoreManager: KeystoreManager,
-    fileStoreBlobUploadClient?: FileStoreBlobClient,
+    blobClient: BlobClientInterface,
     dateProvider: DateProvider = new DateProvider(),
     telemetry: TelemetryClient = getTelemetryClient(),
   ) {
@@ -176,7 +176,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
       p2pClient,
       blockProposalHandler,
       config,
-      fileStoreBlobUploadClient,
+      blobClient,
       dateProvider,
       telemetry,
     );
@@ -264,6 +264,10 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     }
   }
 
+  @trackSpan('validator.attestToProposal', (proposal, proposalSender) => ({
+    [Attributes.BLOCK_HASH]: proposal.payload.header.hash.toString(),
+    [Attributes.PEER_ID]: proposalSender.toString(),
+  }))
   async attestToProposal(proposal: BlockProposal, proposalSender: PeerId): Promise<BlockAttestation[] | undefined> {
     const slotNumber = proposal.slotNumber;
     const proposer = proposal.getSender();
@@ -295,7 +299,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
       (slashBroadcastedInvalidBlockPenalty > 0n && validatorReexecute) ||
       (partOfCommittee && validatorReexecute) ||
       alwaysReexecuteBlockProposals ||
-      this.fileStoreBlobUploadClient;
+      this.blobClient.canUpload();
 
     const validationResult = await this.blockProposalHandler.handleBlockProposal(
       proposal,
@@ -352,12 +356,12 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     this.metrics.incSuccessfulAttestations(inCommittee.length);
 
     // Upload blobs to filestore after successful re-execution (fire-and-forget)
-    if (validationResult.reexecutionResult?.block && this.fileStoreBlobUploadClient) {
+    if (validationResult.reexecutionResult?.block && this.blobClient.canUpload()) {
       void Promise.resolve().then(async () => {
         try {
           const blobFields = validationResult.reexecutionResult!.block.getCheckpointBlobFields();
           const blobs = getBlobsPerL1Block(blobFields);
-          await this.fileStoreBlobUploadClient!.saveBlobs(blobs, true);
+          await this.blobClient.sendBlobsToFilestore(blobs);
           this.log.debug(`Uploaded ${blobs.length} blobs to filestore from re-execution`, proposalInfo);
         } catch (err) {
           this.log.warn(`Failed to upload blobs from re-execution`, err);
@@ -420,6 +424,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     ]);
   }
 
+  // TODO(palla/mbps): Block proposal should not require a checkpoint proposal
   async createBlockProposal(
     blockNumber: BlockNumber,
     header: CheckpointHeader,
@@ -427,18 +432,32 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     txs: Tx[],
     proposerAddress: EthAddress | undefined,
     options: BlockProposalOptions,
-  ): Promise<BlockProposal | undefined> {
-    if (this.previousProposal?.slotNumber === header.slotNumber) {
-      this.log.verbose(`Already made a proposal for the same slot, skipping proposal`);
-      return Promise.resolve(undefined);
-    }
+  ): Promise<BlockProposal> {
+    // TODO(palla/mbps): Prevent double proposals properly
+    // if (this.previousProposal?.slotNumber === header.slotNumber) {
+    //   this.log.verbose(`Already made a proposal for the same slot, skipping proposal`);
+    //   return Promise.resolve(undefined);
+    // }
 
+    this.log.info(`Assembling block proposal for block ${blockNumber} slot ${header.slotNumber}`);
     const newProposal = await this.validationService.createBlockProposal(header, archive, txs, proposerAddress, {
       ...options,
       broadcastInvalidBlockProposal: this.config.broadcastInvalidBlockProposal,
     });
     this.previousProposal = newProposal;
     return newProposal;
+  }
+
+  // TODO(palla/mbps): Effectively create a checkpoint proposal different from a block proposal
+  createCheckpointProposal(
+    header: CheckpointHeader,
+    archive: Fr,
+    txs: Tx[],
+    proposerAddress: EthAddress | undefined,
+    options: BlockProposalOptions,
+  ): Promise<BlockProposal> {
+    this.log.info(`Assembling checkpoint proposal for slot ${header.slotNumber}`);
+    return this.createBlockProposal(0 as BlockNumber, header, archive, txs, proposerAddress, options);
   }
 
   async broadcastBlockProposal(proposal: BlockProposal): Promise<void> {

@@ -1,7 +1,7 @@
 // === AUDIT STATUS ===
-// internal:    { status: not started, auditors: [], date: YYYY-MM-DD }
-// external_1:  { status: not started, auditors: [], date: YYYY-MM-DD }
-// external_2:  { status: not started, auditors: [], date: YYYY-MM-DD }
+// internal:    { status: Planned, auditors: [], commit: }
+// external_1:  { status: not started, auditors: [], commit: }
+// external_2:  { status: not started, auditors: [], commit: }
 // =====================
 
 #pragma once
@@ -63,6 +63,7 @@ class UltraRollupFlavor : public bb::UltraFlavor {
     };
 
     using VerifierCommitments = VerifierCommitments_<Commitment, VerificationKey>;
+    using VKAndHash = VKAndHash_<FF, VerificationKey>;
 };
 
 } // namespace bb

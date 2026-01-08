@@ -6,7 +6,7 @@ import {
   PUBLIC_DATA_TREE_HEIGHT,
 } from '@aztec/constants';
 import { type L1ContractAddresses, L1ContractsNames } from '@aztec/ethereum/l1-contract-addresses';
-import { BlockNumber, SlotNumber } from '@aztec/foundation/branded-types';
+import { BlockNumber, EpochNumber, SlotNumber } from '@aztec/foundation/branded-types';
 import { Buffer32 } from '@aztec/foundation/buffer';
 import { timesAsync } from '@aztec/foundation/collection';
 import { randomInt } from '@aztec/foundation/crypto/random';
@@ -40,7 +40,10 @@ import { PublicKeys } from '../keys/public_keys.js';
 import { ExtendedContractClassLog } from '../logs/extended_contract_class_log.js';
 import { ExtendedPublicLog } from '../logs/extended_public_log.js';
 import type { LogFilter } from '../logs/log_filter.js';
+import { SiloedTag } from '../logs/siloed_tag.js';
+import { Tag } from '../logs/tag.js';
 import { TxScopedL2Log } from '../logs/tx_scoped_l2_log.js';
+import { randomTxScopedPrivateL2Log } from '../tests/factories.js';
 import { getTokenContractArtifact } from '../tests/fixtures.js';
 import { MerkleTreeId } from '../trees/merkle_tree_id.js';
 import { NullifierMembershipWitness } from '../trees/nullifier_membership_witness.js';
@@ -138,8 +141,12 @@ describe('AztecNodeApiSchema', () => {
   });
 
   it('getL2ToL1Messages', async () => {
-    const response = await context.client.getL2ToL1Messages(BlockNumber(1));
-    expect(response?.length).toBe(3);
+    const response = await context.client.getL2ToL1Messages(EpochNumber(1));
+    expect(response.length).toBe(3);
+    expect(response[0].length).toBe(4);
+    expect(response[0][0].length).toBe(2);
+    expect(response[0][0][0].length).toBe(3);
+    expect(response[0][0][0][0]).toBeInstanceOf(Fr);
   });
 
   it('getArchiveSiblingPath', async () => {
@@ -202,8 +209,8 @@ describe('AztecNodeApiSchema', () => {
     expect(response).toBeInstanceOf(BlockHeader);
   });
 
-  it('getCurrentBaseFees', async () => {
-    const response = await context.client.getCurrentBaseFees();
+  it('getCurrentMinFees', async () => {
+    const response = await context.client.getCurrentMinFees();
     expect(response).toEqual(GasFees.empty());
   });
 
@@ -298,8 +305,14 @@ describe('AztecNodeApiSchema', () => {
     expect(response).toEqual({ logs: [expect.any(ExtendedContractClassLog)], maxLogsHit: true });
   });
 
-  it('getLogsByTags', async () => {
-    const response = await context.client.getLogsByTags([Fr.random()]);
+  it('getPrivateLogsByTags', async () => {
+    const response = await context.client.getPrivateLogsByTags([new SiloedTag(Fr.random())]);
+    expect(response).toEqual([[expect.any(TxScopedL2Log)]]);
+  });
+
+  it('getPublicLogsByTagsFromContract', async () => {
+    const contractAddress = await AztecAddress.random();
+    const response = await context.client.getPublicLogsByTagsFromContract(contractAddress, [new Tag(Fr.random())]);
     expect(response).toEqual([[expect.any(TxScopedL2Log)]]);
   });
 
@@ -583,8 +596,16 @@ class MockAztecNode implements AztecNode {
     expect(l1ToL2Message).toBeInstanceOf(Fr);
     return Promise.resolve(true);
   }
-  getL2ToL1Messages(_blockNumber: number | 'latest'): Promise<Fr[][] | undefined> {
-    return Promise.resolve(Array.from({ length: 3 }, (_, i) => [new Fr(i)]));
+  getL2ToL1Messages(_epoch: EpochNumber): Promise<Fr[][][][]> {
+    return Promise.resolve(
+      Array.from({ length: 3 }, (_, i) =>
+        Array.from({ length: 4 }, (_, j) =>
+          Array.from({ length: 2 }, (_, k) =>
+            Array.from({ length: 3 }).map((_, l) => new Fr(i * 11 + j * 22 + k * 33 + l * 44)),
+          ),
+        ),
+      ),
+    );
   }
   getArchiveSiblingPath(
     blockNumber: number | 'latest',
@@ -634,7 +655,7 @@ class MockAztecNode implements AztecNode {
   getBlockHeaderByArchive(_archive: Fr): Promise<BlockHeader | undefined> {
     return Promise.resolve(BlockHeader.empty());
   }
-  getCurrentBaseFees(): Promise<GasFees> {
+  getCurrentMinFees(): Promise<GasFees> {
     return Promise.resolve(GasFees.empty());
   }
   getMaxPriorityFees(): Promise<GasFees> {
@@ -713,10 +734,20 @@ class MockAztecNode implements AztecNode {
     expect(filter.contractAddress).toBeInstanceOf(AztecAddress);
     return Promise.resolve({ logs: [await ExtendedContractClassLog.random()], maxLogsHit: true });
   }
-  async getLogsByTags(tags: Fr[]): Promise<TxScopedL2Log[][]> {
+  getPrivateLogsByTags(tags: SiloedTag[], _logsPerTag?: number): Promise<TxScopedL2Log[][]> {
     expect(tags).toHaveLength(1);
-    expect(tags[0]).toBeInstanceOf(Fr);
-    return [[await TxScopedL2Log.random()]];
+    expect(tags[0]).toBeInstanceOf(SiloedTag);
+    return Promise.resolve([[randomTxScopedPrivateL2Log()]]);
+  }
+  getPublicLogsByTagsFromContract(
+    contractAddress: AztecAddress,
+    tags: Tag[],
+    _logsPerTag?: number,
+  ): Promise<TxScopedL2Log[][]> {
+    expect(contractAddress).toBeInstanceOf(AztecAddress);
+    expect(tags).toHaveLength(1);
+    expect(tags[0]).toBeInstanceOf(Tag);
+    return Promise.resolve([[randomTxScopedPrivateL2Log()]]);
   }
   sendTx(tx: Tx): Promise<void> {
     expect(tx).toBeInstanceOf(Tx);

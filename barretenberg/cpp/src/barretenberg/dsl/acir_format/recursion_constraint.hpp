@@ -1,7 +1,7 @@
 // === AUDIT STATUS ===
-// internal:    { status: not started, auditors: [], date: YYYY-MM-DD }
-// external_1:  { status: not started, auditors: [], date: YYYY-MM-DD }
-// external_2:  { status: not started, auditors: [], date: YYYY-MM-DD }
+// internal:    { status: Planned, auditors: [], commit: }
+// external_1:  { status: not started, auditors: [], commit: }
+// external_2:  { status: not started, auditors: [], commit: }
 // =====================
 
 #pragma once
@@ -12,11 +12,11 @@
 #include "barretenberg/dsl/acir_format/gate_counter.hpp"
 #include "barretenberg/dsl/acir_format/recursion_constraint_output.hpp"
 #include "barretenberg/dsl/acir_format/witness_constant.hpp"
-#include "barretenberg/stdlib/honk_verifier/ultra_recursive_verifier.hpp"
 #include "barretenberg/stdlib/primitives/bigfield/constants.hpp"
 #include "barretenberg/stdlib/primitives/field/field.hpp"
 #include "barretenberg/stdlib/primitives/pairing_points.hpp"
 #include "barretenberg/stdlib/proof/proof.hpp"
+#include "barretenberg/ultra_honk/ultra_verifier.hpp"
 #include "recursion_constraint.hpp"
 #include <cstdint>
 #include <vector>

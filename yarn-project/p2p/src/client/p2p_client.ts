@@ -3,28 +3,21 @@ import { BlockNumber, SlotNumber } from '@aztec/foundation/branded-types';
 import { createLogger } from '@aztec/foundation/log';
 import { DateProvider } from '@aztec/foundation/timer';
 import type { AztecAsyncKVStore, AztecAsyncMap, AztecAsyncSingleton } from '@aztec/kv-store';
-import type {
-  EthAddress,
-  L2BlockId,
-  L2BlockNew,
-  L2BlockSource,
+import {
+  type EthAddress,
+  type L2BlockId,
+  type L2BlockNew,
+  type L2BlockSource,
   L2BlockStream,
-  L2BlockStreamEvent,
-  L2Tips,
+  type L2BlockStreamEvent,
+  type L2Tips,
 } from '@aztec/stdlib/block';
 import type { ContractDataSource } from '@aztec/stdlib/contract';
 import { getTimestampForSlot } from '@aztec/stdlib/epoch-helpers';
 import { type PeerInfo, tryStop } from '@aztec/stdlib/interfaces/server';
 import { BlockAttestation, type BlockProposal, type P2PClientType } from '@aztec/stdlib/p2p';
 import type { Tx, TxHash } from '@aztec/stdlib/tx';
-import {
-  Attributes,
-  type TelemetryClient,
-  TraceableL2BlockStream,
-  WithTracer,
-  getTelemetryClient,
-  trackSpan,
-} from '@aztec/telemetry-client';
+import { Attributes, type TelemetryClient, WithTracer, getTelemetryClient, trackSpan } from '@aztec/telemetry-client';
 
 import type { PeerId } from '@libp2p/interface';
 import type { ENR } from '@nethermindeth/enr';
@@ -69,7 +62,7 @@ export class P2PClient<T extends P2PClientType = P2PClientType.Full>
   private synchedLatestSlot: AztecAsyncSingleton<bigint>;
 
   private txPool: TxPool;
-  private attestationPool: T extends P2PClientType.Full ? AttestationPool : undefined;
+  private attestationPool: AttestationPool;
 
   private config: P2PConfig;
 
@@ -91,7 +84,7 @@ export class P2PClient<T extends P2PClientType = P2PClientType.Full>
     _clientType: T,
     private store: AztecAsyncKVStore,
     private l2BlockSource: L2BlockSource & ContractDataSource,
-    mempools: MemPools<T>,
+    mempools: MemPools,
     private p2pService: P2PService,
     private txCollection: TxCollection,
     config: Partial<P2PConfig> = {},
@@ -103,7 +96,7 @@ export class P2PClient<T extends P2PClientType = P2PClientType.Full>
 
     this.config = { ...getP2PDefaultConfig(), ...config };
     this.txPool = mempools.txPool;
-    this.attestationPool = mempools.attestationPool!;
+    this.attestationPool = mempools.attestationPool;
 
     this.txProvider = new TxProvider(
       this.txCollection,
@@ -282,10 +275,7 @@ export class P2PClient<T extends P2PClientType = P2PClientType.Full>
     const syncedProvenBlock = (await this.getSyncedProvenBlockNum()) + 1;
     const syncedFinalizedBlock = (await this.getSyncedFinalizedBlockNum()) + 1;
 
-    if (
-      (await this.txPool.isEmpty()) &&
-      (this.attestationPool === undefined || (await this.attestationPool?.isEmpty()))
-    ) {
+    if ((await this.txPool.isEmpty()) && (await this.attestationPool.isEmpty())) {
       // if mempools are empty, we don't care about syncing prior blocks
       this.initBlockStream(BlockNumber(this.latestBlockNumberAtStart));
       this.setCurrentState(P2PClientState.RUNNING);
@@ -338,12 +328,10 @@ export class P2PClient<T extends P2PClientType = P2PClientType.Full>
   private initBlockStream(startingBlock?: BlockNumber) {
     if (!this.blockStream) {
       const { blockRequestBatchSize: batchSize, blockCheckIntervalMS: pollIntervalMS } = this.config;
-      this.blockStream = new TraceableL2BlockStream(
+      this.blockStream = new L2BlockStream(
         this.l2BlockSource,
         this,
         this,
-        this.telemetry.getTracer('P2PL2BlockStream'),
-        'P2PL2BlockStream',
         createLogger(`${this.log.module}:l2-block-stream`),
         { batchSize, pollIntervalMS, startingBlock },
       );
@@ -389,19 +377,17 @@ export class P2PClient<T extends P2PClientType = P2PClientType.Full>
   }
 
   public async getAttestationsForSlot(slot: SlotNumber, proposalId?: string): Promise<BlockAttestation[]> {
-    return (
-      (await (proposalId
-        ? this.attestationPool?.getAttestationsForSlotAndProposal(slot, proposalId)
-        : this.attestationPool?.getAttestationsForSlot(slot))) ?? []
-    );
+    return await (proposalId
+      ? this.attestationPool.getAttestationsForSlotAndProposal(slot, proposalId)
+      : this.attestationPool.getAttestationsForSlot(slot));
   }
 
   public addAttestations(attestations: BlockAttestation[]): Promise<void> {
-    return this.attestationPool?.addAttestations(attestations) ?? Promise.resolve();
+    return this.attestationPool.addAttestations(attestations);
   }
 
   public deleteAttestation(attestation: BlockAttestation): Promise<void> {
-    return this.attestationPool?.deleteAttestations([attestation]) ?? Promise.resolve();
+    return this.attestationPool.deleteAttestations([attestation]);
   }
 
   // REVIEW: https://github.com/AztecProtocol/aztec-packages/issues/7963
@@ -715,6 +701,7 @@ export class P2PClient<T extends P2PClientType = P2PClientType.Full>
     }
 
     await this.markTxsAsMinedFromBlocks(blocks);
+    await this.txPool.clearNonEvictableTxs();
     await this.startCollectingMissingTxs(blocks);
 
     const lastBlock = blocks.at(-1)!;
@@ -782,7 +769,7 @@ export class P2PClient<T extends P2PClientType = P2PClientType.Full>
     await this.txPool.deleteTxs(txHashes, { permanently: true });
     await this.txPool.cleanupDeletedMinedTxs(lastBlockNum);
 
-    await this.attestationPool?.deleteAttestationsOlderThan(lastBlockSlot);
+    await this.attestationPool.deleteAttestationsOlderThan(lastBlockSlot);
 
     await this.synchedFinalizedBlockNumber.set(lastBlockNum);
     this.log.debug(`Synched to finalized block ${lastBlockNum} at slot ${lastBlockSlot}`);
@@ -833,8 +820,7 @@ export class P2PClient<T extends P2PClientType = P2PClientType.Full>
       this.log.info(`Deleting ${minedTxsFromReorg.length} mined txs from reorg`);
       await this.txPool.deleteTxs(minedTxsFromReorg);
     } else {
-      this.log.info(`Moving ${minedTxsFromReorg.length} mined txs from reorg back to pending`);
-      await this.txPool.markMinedAsPending(minedTxsFromReorg);
+      await this.txPool.markMinedAsPending(minedTxsFromReorg, latestBlock);
     }
 
     await this.synchedLatestBlockNumber.set(latestBlock);
