@@ -150,6 +150,8 @@ class RecordingFF {
     std::optional<size_t> operation_id; // ID of the operation that produced this value
     bool is_constant;
     bb::fr constant_value;
+    bool is_negative_constant; // If true, replay should negate this constant. It is here, because cvc5 struggles with
+                               // large constants, so it's easier to negate the constant
 
     // Thread-local trace used for default construction
     static inline thread_local std::shared_ptr<OperationTrace> default_trace;
@@ -162,17 +164,33 @@ class RecordingFF {
         : operation_id(std::nullopt)
         , is_constant(true)
         , constant_value(bb::fr::zero())
+        , is_negative_constant(false)
     {}
 
     // Single-argument constructors for integers
-    // Template constructor that accepts any integral type and converts to uint64_t to avoid ambiguity
+    // Template constructor that accepts any integral type
+    // For negative values, we store the absolute value and a flag to negate during replay.
+    // This ensures the SMT solver sees small constants (e.g., 3) rather than large ones (p - 3),
+    // which significantly improves solver performance.
     template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
     RecordingFF(T val)
         : trace(default_trace ? default_trace : std::make_shared<OperationTrace>())
         , operation_id(std::nullopt)
         , is_constant(true)
-        , constant_value(bb::fr(static_cast<uint64_t>(val)))
-    {}
+        , constant_value(bb::fr(0))
+        , is_negative_constant(false)
+    {
+        if constexpr (std::is_signed_v<T>) {
+            if (val < 0) {
+                is_negative_constant = true;
+                constant_value = bb::fr(static_cast<uint64_t>(-static_cast<int64_t>(val)));
+            } else {
+                constant_value = bb::fr(static_cast<uint64_t>(val));
+            }
+        } else {
+            constant_value = bb::fr(static_cast<uint64_t>(val));
+        }
+    }
 
     // Single-argument constructor from uint256_t (for relation constants)
     // Non-explicit to allow implicit conversion from uint256_t constants in relations
@@ -181,6 +199,7 @@ class RecordingFF {
         , operation_id(std::nullopt)
         , is_constant(true)
         , constant_value(bb::fr(val))
+        , is_negative_constant(false)
     {}
 
     // Constructor from bb::fr (for constants like curve_b)
@@ -189,6 +208,7 @@ class RecordingFF {
         , operation_id(std::nullopt)
         , is_constant(true)
         , constant_value(val)
+        , is_negative_constant(false)
     {}
 
     // Constructor from bb::fq (for constants from curves like Grumpkin)
@@ -198,6 +218,7 @@ class RecordingFF {
         , operation_id(std::nullopt)
         , is_constant(true)
         , constant_value(bb::fr(static_cast<uint256_t>(val)))
+        , is_negative_constant(false)
     {}
 
     explicit RecordingFF(std::shared_ptr<OperationTrace> t)
@@ -205,6 +226,7 @@ class RecordingFF {
         , operation_id(std::nullopt)
         , is_constant(true)
         , constant_value(bb::fr::zero())
+        , is_negative_constant(false)
     {}
 
     explicit RecordingFF(std::shared_ptr<OperationTrace> t, uint64_t val)
@@ -212,13 +234,15 @@ class RecordingFF {
         , operation_id(std::nullopt)
         , is_constant(true)
         , constant_value(bb::fr(val))
+        , is_negative_constant(false)
     {}
 
     explicit RecordingFF(std::shared_ptr<OperationTrace> t, int val)
         : trace(t)
         , operation_id(std::nullopt)
         , is_constant(true)
-        , constant_value(bb::fr(val))
+        , constant_value(bb::fr(val >= 0 ? static_cast<uint64_t>(val) : static_cast<uint64_t>(-val)))
+        , is_negative_constant(val < 0)
     {}
 
     explicit RecordingFF(std::shared_ptr<OperationTrace> t, const uint256_t& val)
@@ -226,6 +250,7 @@ class RecordingFF {
         , operation_id(std::nullopt)
         , is_constant(true)
         , constant_value(bb::fr(val))
+        , is_negative_constant(false)
     {}
 
     explicit RecordingFF(std::shared_ptr<OperationTrace> t, const bb::fr& val)
@@ -233,6 +258,7 @@ class RecordingFF {
         , operation_id(std::nullopt)
         , is_constant(true)
         , constant_value(val)
+        , is_negative_constant(false)
     {}
 
     explicit RecordingFF(std::shared_ptr<OperationTrace> t, const std::string& var_name)
@@ -240,6 +266,7 @@ class RecordingFF {
         , operation_id(trace->record_var(var_name))
         , is_constant(false)
         , constant_value(bb::fr::zero())
+        , is_negative_constant(false)
     {}
 
   private:
@@ -252,6 +279,7 @@ class RecordingFF {
         , operation_id(op_id)
         , is_constant(false)
         , constant_value(bb::fr::zero())
+        , is_negative_constant(false)
     {}
 
   public:
@@ -272,6 +300,11 @@ class RecordingFF {
         if (other.is_constant) {
             BB_ASSERT(trace && "Non-constant RecordingFF must have an associated trace");
             size_t constant_id = trace->record_const_fr(other.constant_value);
+            // If the constant is negative, negate it: a + (-c) = a - c
+            if (other.is_negative_constant) {
+                size_t result_id_local = trace->record_binary_op(OpKind::SUB, operation_id.value(), constant_id);
+                return RecordingFF(trace, result_id_local, OperationIdTag{});
+            }
             size_t result_id_local = trace->record_binary_op(OpKind::ADD, operation_id.value(), constant_id);
             return RecordingFF(trace, result_id_local, OperationIdTag{});
         }
@@ -283,16 +316,49 @@ class RecordingFF {
     RecordingFF operator-(const RecordingFF& other) const
     {
         if (is_constant && other.is_constant) {
-            return RecordingFF(trace, constant_value - other.constant_value);
+            // Handle sign combinations properly
+            bb::fr result;
+            if (is_negative_constant && other.is_negative_constant) {
+                // (-a) - (-b) = -a + b = b - a
+                result = other.constant_value - constant_value;
+            } else if (is_negative_constant) {
+                // (-a) - b = -(a + b)
+                result = -(constant_value + other.constant_value);
+            } else if (other.is_negative_constant) {
+                // a - (-b) = a + b
+                result = constant_value + other.constant_value;
+            } else {
+                result = constant_value - other.constant_value;
+            }
+            return RecordingFF(trace, result);
         }
 
         if (is_constant && !other.is_constant) {
-            return other - *this;
+            // (const) - (var) cannot be commuted! This is a bug in the original code.
+            // For now, record as NEG(var - const) = const - var
+            BB_ASSERT(other.trace && "Non-constant RecordingFF must have an associated trace");
+            size_t constant_id = other.trace->record_const_fr(constant_value);
+            size_t sub_id = 0;
+            if (is_negative_constant) {
+                // (-c) - x = -(c + x)
+                size_t add_id = other.trace->record_binary_op(OpKind::ADD, other.operation_id.value(), constant_id);
+                sub_id = other.trace->record_unary_op(OpKind::NEG, add_id);
+            } else {
+                // c - x = -(x - c)
+                size_t temp_id = other.trace->record_binary_op(OpKind::SUB, other.operation_id.value(), constant_id);
+                sub_id = other.trace->record_unary_op(OpKind::NEG, temp_id);
+            }
+            return RecordingFF(other.trace, sub_id, OperationIdTag{});
         }
 
         if (other.is_constant) {
             BB_ASSERT(trace && "Non-constant RecordingFF must have an associated trace");
             size_t constant_id = trace->record_const_fr(other.constant_value);
+            // If the constant is negative: a - (-c) = a + c
+            if (other.is_negative_constant) {
+                size_t result_id_local = trace->record_binary_op(OpKind::ADD, operation_id.value(), constant_id);
+                return RecordingFF(trace, result_id_local, OperationIdTag{});
+            }
             size_t result_id_local = trace->record_binary_op(OpKind::SUB, operation_id.value(), constant_id);
             return RecordingFF(trace, result_id_local, OperationIdTag{});
         }
@@ -305,7 +371,13 @@ class RecordingFF {
     RecordingFF operator*(const RecordingFF& other) const
     {
         if (is_constant && other.is_constant) {
-            return RecordingFF(trace, constant_value * other.constant_value);
+            // Handle sign: (-a) * (-b) = a*b, (-a) * b = -(a*b), etc.
+            bb::fr result = constant_value * other.constant_value;
+            bool result_negative = is_negative_constant != other.is_negative_constant;
+            if (result_negative) {
+                result = -result;
+            }
+            return RecordingFF(trace, result);
         }
 
         if (is_constant && !other.is_constant) {
@@ -316,6 +388,10 @@ class RecordingFF {
             BB_ASSERT(trace && "Non-constant RecordingFF must have an associated trace");
             size_t constant_id = trace->record_const_fr(other.constant_value);
             size_t result_id_local = trace->record_binary_op(OpKind::MUL, operation_id.value(), constant_id);
+            // If the constant is negative, negate the result: a * (-c) = -(a * c)
+            if (other.is_negative_constant) {
+                result_id_local = trace->record_unary_op(OpKind::NEG, result_id_local);
+            }
             return RecordingFF(trace, result_id_local, OperationIdTag{});
         }
 

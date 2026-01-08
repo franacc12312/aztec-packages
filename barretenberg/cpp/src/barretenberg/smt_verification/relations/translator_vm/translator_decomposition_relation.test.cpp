@@ -63,7 +63,8 @@ std::vector<LimbDecomposition> get_translator_decomposition_map()
           { "accumulator_high_limbs_range_constraint_0_shift",
             "accumulator_high_limbs_range_constraint_1_shift",
             "accumulator_high_limbs_range_constraint_2_shift",
-            "accumulator_high_limbs_range_constraint_3_shift" },
+            "accumulator_high_limbs_range_constraint_3_shift",
+            "accumulator_high_limbs_range_constraint_4_shift" },
           4,
           "rc_3_shift * 64 = rc_4_shift (8-bit top limb)",
           37 },
@@ -185,7 +186,8 @@ std::vector<LimbDecomposition> get_translator_decomposition_map()
           { "p_y_high_limbs_range_constraint_0_shift",
             "p_y_high_limbs_range_constraint_1_shift",
             "p_y_high_limbs_range_constraint_2_shift",
-            "p_y_high_limbs_range_constraint_3_shift" },
+            "p_y_high_limbs_range_constraint_3_shift",
+            "p_y_high_limbs_range_constraint_4_shift" },
           4,
           "rc_3_shift * 64 = rc_4_shift (8-bit top limb)",
           29 },
@@ -232,7 +234,8 @@ std::vector<LimbDecomposition> get_translator_decomposition_map()
           { "p_x_high_limbs_range_constraint_0_shift",
             "p_x_high_limbs_range_constraint_1_shift",
             "p_x_high_limbs_range_constraint_2_shift",
-            "p_x_high_limbs_range_constraint_3_shift" },
+            "p_x_high_limbs_range_constraint_3_shift",
+            "p_x_high_limbs_range_constraint_4_shift" },
           4,
           "rc_3_shift * 64 = rc_4_shift (8-bit top limb)",
           25 },
@@ -279,7 +282,8 @@ std::vector<LimbDecomposition> get_translator_decomposition_map()
           { "quotient_high_limbs_range_constraint_0_shift",
             "quotient_high_limbs_range_constraint_1_shift",
             "quotient_high_limbs_range_constraint_2_shift",
-            "quotient_high_limbs_range_constraint_3_shift" },
+            "quotient_high_limbs_range_constraint_3_shift",
+            "quotient_high_limbs_range_constraint_4_shift" },
           4,
           "rc_3_shift * 16 = rc_4_shift (10-bit top limb)",
           41 },
@@ -343,14 +347,13 @@ MappedLimbVariables find_mapped_limb_variables(const std::vector<smt_terms::STer
     return result;
 }
 
-void test_limb_uniqueness_and_maximum(smt_solver::Solver& s,
-                                      const smt_relation_recorder::OperationTrace& recording_trace_main,
+void test_limb_uniqueness_and_maximum(const smt_relation_recorder::OperationTrace& recording_trace_main,
                                       const LimbDecomposition& decomp,
                                       std::string& out_unique,
                                       std::string& out_max)
 {
-    // Test uniqueness
-    s.push();
+    // Create a fresh solver to avoid state accumulation
+    smt_solver::Solver s(BN254_MODULUS, smt_solver::default_solver_config);
 
     std::vector<smt_terms::STerm> f1, v1, f2, v2;
     std::vector<std::string> n1, n2;
@@ -408,57 +411,56 @@ void test_limb_uniqueness_and_maximum(smt_solver::Solver& s,
     s.assertFormula(disj);
 
     out_unique = s.check() ? "NOT_UNIQUE" : "UNIQUE";
-    s.pop();
 
-    s.push();
+    // Create a fresh solver for max test
+    smt_solver::Solver s2(BN254_MODULUS, smt_solver::default_solver_config);
 
     std::vector<smt_terms::STerm> fm, vm;
     std::vector<std::string> nm;
 
-    smt_translator_relations::replay_translator_decomposition_relation(recording_trace_main, &s, "M", true, fm, vm, nm);
-    smt_translator_relations::create_range_constraint_formulas(&s, vm, nm, "constraint", 16384);
+    smt_translator_relations::replay_translator_decomposition_relation(recording_trace_main, &s2, "M", true, fm, vm, nm);
+    smt_translator_relations::create_range_constraint_formulas(&s2, vm, nm, "constraint", 16384);
 
-    smt_terms::STerm one_m = smt_terms::FFIConst("1", &s, 10);
+    smt_terms::STerm one_m = smt_terms::FFIConst("1", &s2, 10);
     for (size_t i = 0; i < vm.size(); ++i) {
         if (nm[i] == "M_op" || nm[i].find("M_lagrange_even_in_minicircuit") != std::string::npos) {
-            s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
-                                                  { static_cast<cvc5::Term>(vm[i]), static_cast<cvc5::Term>(one_m) }));
+            s2.assertFormula(s2.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                                    { static_cast<cvc5::Term>(vm[i]), static_cast<cvc5::Term>(one_m) }));
         }
     }
 
-    smt_translator_relations::assert_formulas_zero(&s, { fm[decomp.relation_index], fm[decomp.tail_relation_index] });
+    smt_translator_relations::assert_formulas_zero(&s2, { fm[decomp.relation_index], fm[decomp.tail_relation_index] });
 
     auto max_limb = find_mapped_limb_variables(vm, nm, decomp, "M");
     uint256_t max_found = 0;
 
     for (int bits = 80; bits >= 1; bits--) {
-        s.push();
+        s2.push();
         uint256_t test_val = (uint256_t(1) << static_cast<uint64_t>(bits)) - 1;
-        smt_terms::STerm test_term = smt_terms::FFIConst(to_dec_string(test_val), &s, 10);
-        s.assertFormula(s.term_manager.mkTerm(
+        smt_terms::STerm test_term = smt_terms::FFIConst(to_dec_string(test_val), &s2, 10);
+        s2.assertFormula(s2.term_manager.mkTerm(
             cvc5::Kind::GEQ, { static_cast<cvc5::Term>(max_limb.limb_var), static_cast<cvc5::Term>(test_term) }));
 
-        if (s.check()) {
+        if (s2.check()) {
             max_found = test_val;
-            s.pop();
+            s2.pop();
             break;
         }
-        s.pop();
+        s2.pop();
     }
 
     bool is_accumulator = (decomp.relation_index <= 3);
     bool is_wide_limb = (decomp.relation_index == 20 || decomp.relation_index == 21);
     if (!is_accumulator && !is_wide_limb) {
-        s.push();
+        s2.push();
         uint256_t test_val = max_found + 1;
-        smt_terms::STerm test_term = smt_terms::FFIConst(to_dec_string(test_val), &s, 10);
-        s.assertFormula(s.term_manager.mkTerm(
+        smt_terms::STerm test_term = smt_terms::FFIConst(to_dec_string(test_val), &s2, 10);
+        s2.assertFormula(s2.term_manager.mkTerm(
             cvc5::Kind::GEQ, { static_cast<cvc5::Term>(max_limb.limb_var), static_cast<cvc5::Term>(test_term) }));
-        ASSERT_FALSE(s.check());
-        s.pop();
+        ASSERT_FALSE(s2.check());
+        s2.pop();
     }
 
-    s.pop();
     out_max = to_dec_string(max_found);
 }
 
@@ -765,7 +767,7 @@ TEST(TranslatorDecompositionRelation, limb_decompositions_are_unique_and_bounded
         for (const auto& decomp : limbs_to_test) {
             std::string unique_result;
             std::string max_value;
-            test_limb_uniqueness_and_maximum(s, recording_trace_main, decomp, unique_result, max_value);
+            test_limb_uniqueness_and_maximum(recording_trace_main, decomp, unique_result, max_value);
 
             std::string bitness_str = "N/A";
             std::string max_hex_str = max_value;

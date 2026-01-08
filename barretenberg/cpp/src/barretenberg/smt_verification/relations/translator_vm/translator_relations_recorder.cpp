@@ -473,8 +473,30 @@ void replay_translator_opcode_constraint_relation(const OperationTrace& trace,
                                                   std::vector<STerm>& out_vars,
                                                   std::vector<std::string>& out_names)
 {
-    // For now, use the same implementation with use_ffi = false
-    replay_translator_decomposition_relation(trace, solver, prefix, false, out_formulas, out_vars, out_names);
+    using namespace smt_terms;
+
+    auto original_names = build_all_entity_member_names();
+    std::unordered_map<std::string, std::string> name_map;
+
+    for (const auto& name : original_names) {
+        if (prefix.empty()) {
+            name_map[name] = name;
+        } else {
+            name_map[name] = prefix + "_" + name;
+        }
+    }
+
+    std::unordered_map<std::string, STerm> initial_variables;
+    out_vars.clear();
+    out_names.clear();
+
+    for (const auto& name : original_names) {
+        initial_variables[name] = FFVar(name_map[name], solver);
+        out_vars.push_back(initial_variables[name]);
+        out_names.push_back(name_map[name]);
+    }
+
+    out_formulas = OperationReplayer::replay(trace, solver, initial_variables, false);
 }
 
 void replay_translator_accumulator_transfer_relation(const OperationTrace& trace,

@@ -20,19 +20,36 @@ TEST(TranslatorOpcodeConstraintRelation, opcode_must_be_in_valid_set)
         recording_trace, &s, "", formulas, vars, names);
 
     // Find selector and opcode variables
-    smt_terms::STerm lagr_mini, op_var;
+    smt_terms::STerm lagr_mini, op_var, lagr_even;
+    bool found_op = false, found_lagr_mini = false, found_lagr_even = false;
     for (size_t i = 0; i < names.size(); ++i) {
         if (names[i] == "lagrange_mini_masking") {
             lagr_mini = vars[i];
+            found_lagr_mini = true;
         }
         if (names[i] == "op") {
             op_var = vars[i];
+            found_op = true;
+        }
+        if (names[i] == "lagrange_even_in_minicircuit") {
+            lagr_even = vars[i];
+            found_lagr_even = true;
         }
     }
 
+    ASSERT_TRUE(found_op) << "Could not find 'op' in variable names";
+    ASSERT_TRUE(found_lagr_mini) << "Could not find 'lagrange_mini_masking' in variable names";
+    ASSERT_TRUE(found_lagr_even) << "Could not find 'lagrange_even_in_minicircuit' in variable names";
+
     smt_terms::STerm zero = smt_terms::FFConst("0", &s, 10);
+    smt_terms::STerm one = smt_terms::FFConst("1", &s, 10);
+
+    // Set lagrange_mini_masking = 0 (constraint is active)
     s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
                                           { static_cast<cvc5::Term>(lagr_mini), static_cast<cvc5::Term>(zero) }));
+    // Set lagrange_even_in_minicircuit = 1 (we're at an even index in minicircuit)
+    s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
+                                          { static_cast<cvc5::Term>(lagr_even), static_cast<cvc5::Term>(one) }));
 
     for (const auto& formula : formulas) {
         s.assertFormula(s.term_manager.mkTerm(cvc5::Kind::EQUAL,
