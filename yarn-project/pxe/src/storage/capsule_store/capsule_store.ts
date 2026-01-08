@@ -3,11 +3,18 @@ import { type Logger, createLogger } from '@aztec/foundation/log';
 import type { AztecAsyncKVStore, AztecAsyncMap } from '@aztec/kv-store';
 import type { AztecAddress } from '@aztec/stdlib/aztec-address';
 
-export class CapsuleStore {
+import type { StagedStore } from '../../job_coordinator/job_coordinator.js';
+
+export class CapsuleStore implements StagedStore {
+  readonly storeName = 'capsule';
+
   #store: AztecAsyncKVStore;
 
   // Arbitrary data stored by contracts. Key is computed as `${contractAddress}:${key}`
   #capsules: AztecAsyncMap<string, Buffer>;
+
+  // jobId => `${contractAddress}:${key}` => memory
+  #stagedCapsules: Map<string, Map<string, Buffer | null>>;
 
   logger: Logger;
 
@@ -16,7 +23,71 @@ export class CapsuleStore {
 
     this.#capsules = this.#store.openMap('capsules');
 
+    this.#stagedCapsules = new Map();
+
     this.logger = createLogger('pxe:capsule-data-provider');
+  }
+
+  #getJobView(jobId: string): Map<string, Buffer | null> {
+    let jobView = this.#stagedCapsules.get(jobId);
+    if (!jobView) {
+      jobView = new Map();
+      this.#stagedCapsules.set(jobId, jobView);
+    }
+    return jobView;
+  }
+
+  async #getFromStage(jobId: string, dbSlotKey: string): Promise<Buffer | null> {
+    const jobView = this.#getJobView(jobId);
+    let staged: Buffer | null | undefined = jobView.get(dbSlotKey);
+    if (staged === undefined) {
+      // If we don't have a staged version of this dbSlotKey, first we check if there's one in DB
+      // If it's not in DB, we'll get a null here, which is useful to signal "I checked, there was nothing"
+      staged = await this.#loadCapsuleFromDb(dbSlotKey);
+      jobView.set(dbSlotKey, staged);
+    }
+    return staged;
+  }
+
+  async #loadCapsuleFromDb(dbSlotKey: string): Promise<Buffer | null> {
+    const dataBuffer = await this.#capsules.getAsync(dbSlotKey);
+    if (!dataBuffer) {
+      return null;
+    }
+
+    return dataBuffer;
+  }
+
+  /**
+   * Commits staged data to main storage.
+   * Called by JobCoordinator when a job completes successfully.
+   * Note: JobCoordinator wraps all commits in a single transaction, so we don't
+   * need our own transactionAsync here (and using one would deadlock on IndexedDB).
+   * @param jobId - The jobId identifying which staged data to commit
+   */
+  async commit(jobId: string): Promise<void> {
+    const jobView = this.#getJobView(jobId);
+    if (!jobView) {
+      return;
+    }
+
+    for (const [key, value] of jobView) {
+      if (value === null) {
+        await this.#capsules.delete(key);
+      } else {
+        await this.#capsules.set(key, value);
+      }
+    }
+
+    this.#stagedCapsules.delete(jobId);
+  }
+
+  /**
+   * Discards staged data without committing.
+   */
+  discardStaged(jobId: string): Promise<void> {
+    this.#stagedCapsules.delete(jobId);
+    return Promise.resolve();
   }
 
   /**
@@ -25,12 +96,16 @@ export class CapsuleStore {
    * @param contractAddress - The contract address to scope the data under.
    * @param slot - The slot in the database in which to store the value. Slots need not be contiguous.
    * @param capsule - An array of field elements representing the capsule.
+   * @param jobId - The context in which this store will be visible until PXE decides to persist it to underlying KV store
    * @remarks A capsule is a "blob" of data that is passed to the contract through an oracle. It works similarly
    * to public contract storage in that it's indexed by the contract address and storage slot but instead of the global
    * network state it's backed by local PXE db.
    */
-  async storeCapsule(contractAddress: AztecAddress, slot: Fr, capsule: Fr[]): Promise<void> {
-    await this.#capsules.set(dbSlotToKey(contractAddress, slot), Buffer.concat(capsule.map(value => value.toBuffer())));
+  storeCapsule(contractAddress: AztecAddress, slot: Fr, capsule: Fr[], jobId: string) {
+    const dbSlotKey = dbSlotToKey(contractAddress, slot);
+
+    // A store overrides any pre-existing data on the slot
+    this.#getJobView(jobId).set(dbSlotKey, Buffer.concat(capsule.map(value => value.toBuffer())));
   }
 
   /**
@@ -39,8 +114,8 @@ export class CapsuleStore {
    * @param slot - The slot in the database to read.
    * @returns The stored data or `null` if no data is stored under the slot.
    */
-  async loadCapsule(contractAddress: AztecAddress, slot: Fr): Promise<Fr[] | null> {
-    const dataBuffer = await this.#capsules.getAsync(dbSlotToKey(contractAddress, slot));
+  async loadCapsule(contractAddress: AztecAddress, slot: Fr, jobId: string): Promise<Fr[] | null> {
+    const dataBuffer = await this.#getFromStage(jobId, dbSlotToKey(contractAddress, slot));
     if (!dataBuffer) {
       this.logger.trace(`Data not found for contract ${contractAddress.toString()} and slot ${slot.toString()}`);
       return null;
@@ -57,8 +132,9 @@ export class CapsuleStore {
    * @param contractAddress - The contract address under which the data is scoped.
    * @param slot - The slot in the database to delete.
    */
-  async deleteCapsule(contractAddress: AztecAddress, slot: Fr): Promise<void> {
-    await this.#capsules.delete(dbSlotToKey(contractAddress, slot));
+  deleteCapsule(contractAddress: AztecAddress, slot: Fr, jobId: string) {
+    // When we commit this, we will interpret null as a deletion, so we'll propagate the delete to the KV store
+    this.#getJobView(jobId).set(dbSlotToKey(contractAddress, slot), null);
   }
 
   /**
@@ -72,13 +148,26 @@ export class CapsuleStore {
    * @param dstSlot - The first slot to copy to.
    * @param numEntries - The number of entries to copy.
    */
-  copyCapsule(contractAddress: AztecAddress, srcSlot: Fr, dstSlot: Fr, numEntries: number): Promise<void> {
+  copyCapsule(
+    contractAddress: AztecAddress,
+    srcSlot: Fr,
+    dstSlot: Fr,
+    numEntries: number,
+    jobId: string,
+  ): Promise<void> {
+    // This transactional context in theory isn't so critical now because we aren't
+    // writing to DB so if there's exceptions midway and it blows up, no visible impact
+    // to persistent storage will happen.
+    // I'm leaving this transactional context here though because I'm assuming this
+    // gives us "copy atomicity": there shouldn't be concurrent writes to what's being copied
+    // here.
+    // This is one point we should revisit in the future if we want to relax the concurrency
+    // of jobs: different calls running concurrently on the same contract may cause trouble.
     return this.#store.transactionAsync(async () => {
       // In order to support overlapping source and destination regions, we need to check the relative positions of source
       // and destination. If destination is ahead of source, then by the time we overwrite source elements using forward
       // indexes we'll have already read those. On the contrary, if source is ahead of destination we need to use backward
       // indexes to avoid reading elements that've been overwritten.
-
       const indexes = Array.from(Array(numEntries).keys());
       if (srcSlot.lt(dstSlot)) {
         indexes.reverse();
@@ -88,12 +177,13 @@ export class CapsuleStore {
         const currentSrcSlot = dbSlotToKey(contractAddress, srcSlot.add(new Fr(i)));
         const currentDstSlot = dbSlotToKey(contractAddress, dstSlot.add(new Fr(i)));
 
-        const toCopy = await this.#capsules.getAsync(currentSrcSlot);
+        // const toCopy = await this.#capsules.getAsync(currentSrcSlot);
+        const toCopy = await this.#getFromStage(jobId, currentSrcSlot);
         if (!toCopy) {
           throw new Error(`Attempted to copy empty slot ${currentSrcSlot} for contract ${contractAddress.toString()}`);
         }
 
-        await this.#capsules.set(currentDstSlot, toCopy);
+        this.#getJobView(jobId).set(currentDstSlot, toCopy);
       }
     });
   }
@@ -106,35 +196,45 @@ export class CapsuleStore {
    * @param baseSlot - The slot where the array length is stored
    * @param content - Array of capsule data to append
    */
-  appendToCapsuleArray(contractAddress: AztecAddress, baseSlot: Fr, content: Fr[][]): Promise<void> {
-    return this.#store.transactionAsync(async () => {
-      // Load current length, defaulting to 0 if not found
-      const lengthData = await this.loadCapsule(contractAddress, baseSlot);
-      const currentLength = lengthData ? lengthData[0].toNumber() : 0;
+  async appendToCapsuleArray(
+    contractAddress: AztecAddress,
+    baseSlot: Fr,
+    content: Fr[][],
+    jobId: string,
+  ): Promise<void> {
+    // Load current length, defaulting to 0 if not found
+    const lengthData = await this.loadCapsule(contractAddress, baseSlot, jobId);
+    const currentLength = lengthData ? lengthData[0].toNumber() : 0;
 
-      // Store each capsule at consecutive slots after baseSlot + 1 + currentLength
-      for (let i = 0; i < content.length; i++) {
-        const nextSlot = arraySlot(baseSlot, currentLength + i);
-        await this.storeCapsule(contractAddress, nextSlot, content[i]);
-      }
+    // Store each capsule at consecutive slots after baseSlot + 1 + currentLength
+    for (let i = 0; i < content.length; i++) {
+      const nextSlot = arraySlot(baseSlot, currentLength + i);
+      this.storeCapsule(contractAddress, nextSlot, content[i], jobId);
+    }
 
-      // Update length to include all new capsules
-      const newLength = currentLength + content.length;
-      await this.storeCapsule(contractAddress, baseSlot, [new Fr(newLength)]);
-    });
+    // Update length to include all new capsules
+    const newLength = currentLength + content.length;
+    this.storeCapsule(contractAddress, baseSlot, [new Fr(newLength)], jobId);
+
+    return;
   }
 
-  readCapsuleArray(contractAddress: AztecAddress, baseSlot: Fr): Promise<Fr[][]> {
+  readCapsuleArray(contractAddress: AztecAddress, baseSlot: Fr, jobId: string): Promise<Fr[][]> {
+    // I'm leaving this transactional context here though because I'm assuming this
+    // gives us "read array atomicity": there shouldn't be concurrent writes to what's being copied
+    // here.
+    // This is one point we should revisit in the future if we want to relax the concurrency
+    // of jobs: different calls running concurrently on the same contract may cause trouble.
     return this.#store.transactionAsync(async () => {
       // Load length, defaulting to 0 if not found
-      const maybeLength = await this.loadCapsule(contractAddress, baseSlot);
+      const maybeLength = await this.loadCapsule(contractAddress, baseSlot, jobId);
       const length = maybeLength ? maybeLength[0].toBigInt() : 0n;
 
       const values: Fr[][] = [];
 
       // Read each capsule at consecutive slots after baseSlot
       for (let i = 0; i < length; i++) {
-        const currentValue = await this.loadCapsule(contractAddress, arraySlot(baseSlot, i));
+        const currentValue = await this.loadCapsule(contractAddress, arraySlot(baseSlot, i), jobId);
         if (currentValue == undefined) {
           throw new Error(
             `Expected non-empty value at capsule array in base slot ${baseSlot} at index ${i} for contract ${contractAddress}`,
@@ -148,23 +248,31 @@ export class CapsuleStore {
     });
   }
 
-  setCapsuleArray(contractAddress: AztecAddress, baseSlot: Fr, content: Fr[][]) {
+  setCapsuleArray(contractAddress: AztecAddress, baseSlot: Fr, content: Fr[][], jobId: string) {
+    // This transactional context in theory isn't so critical now because we aren't
+    // writing to DB so if there's exceptions midway and it blows up, no visible impact
+    // to persistent storage will happen.
+    // I'm leaving this transactional context here though because I'm assuming this
+    // gives us "write array atomicity": there shouldn't be concurrent writes to what's being copied
+    // here.
+    // This is one point we should revisit in the future if we want to relax the concurrency
+    // of jobs: different calls running concurrently on the same contract may cause trouble.
     return this.#store.transactionAsync(async () => {
       // Load current length, defaulting to 0 if not found
-      const maybeLength = await this.loadCapsule(contractAddress, baseSlot);
+      const maybeLength = await this.loadCapsule(contractAddress, baseSlot, jobId);
       const originalLength = maybeLength ? maybeLength[0].toNumber() : 0;
 
       // Set the new length
-      await this.storeCapsule(contractAddress, baseSlot, [new Fr(content.length)]);
+      this.storeCapsule(contractAddress, baseSlot, [new Fr(content.length)], jobId);
 
       // Store the new content, possibly overwriting existing values
       for (let i = 0; i < content.length; i++) {
-        await this.storeCapsule(contractAddress, arraySlot(baseSlot, i), content[i]);
+        this.storeCapsule(contractAddress, arraySlot(baseSlot, i), content[i], jobId);
       }
 
       // Clear any stragglers
       for (let i = content.length; i < originalLength; i++) {
-        await this.deleteCapsule(contractAddress, arraySlot(baseSlot, i));
+        this.deleteCapsule(contractAddress, arraySlot(baseSlot, i), jobId);
       }
     });
   }
