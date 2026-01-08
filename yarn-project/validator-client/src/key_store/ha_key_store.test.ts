@@ -214,7 +214,7 @@ describe('HAKeyStore', () => {
       slot: SlotNumber(100),
       blockNumber: BlockNumber(50),
       dutyType: DutyType.ATTESTATION,
-      blockIndexWithinCheckpoint: 0,
+      blockIndexWithinCheckpoint: -1,
     };
 
     beforeEach(() => {
@@ -232,14 +232,14 @@ describe('HAKeyStore', () => {
           slot: context.slot,
           blockNumber: context.blockNumber,
           dutyType: DutyType.ATTESTATION,
-          blockIndexWithinCheckpoint: 0,
+          blockIndexWithinCheckpoint: -1,
         },
         expect.any(Function),
       );
     });
 
     it('should throw DutyAlreadySignedError when duty was already signed', async () => {
-      const error = new DutyAlreadySignedError(SlotNumber(100), DutyType.ATTESTATION, 0, 'other-node');
+      const error = new DutyAlreadySignedError(SlotNumber(100), DutyType.ATTESTATION, -1, 'other-node');
       mockHASigner.signWithProtection.mockRejectedValue(error);
 
       await expect(haKeyStore.signTypedDataWithAddress(VALIDATOR_ADDRESS, mockTypedData, context)).rejects.toThrow(
@@ -251,7 +251,7 @@ describe('HAKeyStore', () => {
       const error = new SlashingProtectionError(
         SlotNumber(100),
         DutyType.ATTESTATION,
-        0,
+        -1,
         '0xexisting',
         '0xattempted',
         'other-node',
@@ -290,7 +290,7 @@ describe('HAKeyStore', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType,
-          blockIndexWithinCheckpoint: 0,
+          blockIndexWithinCheckpoint: dutyType === DutyType.BLOCK_PROPOSAL ? 0 : -1,
         };
         const result = await haKeyStore.signMessageWithAddress(VALIDATOR_ADDRESS, SIGNING_ROOT, context);
         expect(result).toBe(mockSignature);

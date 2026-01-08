@@ -57,8 +57,9 @@ export interface SigningContext {
    */
   blockNumber: BlockNumber | CheckpointNumber;
   /**
-   * Block index within checkpoint (0, 1, 2..., or -1 for checkpoint proposal).
-   * For attestations, use 0.
+   * Block index within checkpoint.
+   * For block proposals: 0, 1, 2...
+   * For checkpoint proposals, attestations, and attestations_and_signers: -1 (not applicable).
    */
   blockIndexWithinCheckpoint: number;
   /** Type of duty being performed */

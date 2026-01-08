@@ -106,7 +106,7 @@ export class ValidationService {
     const context: SigningContext = {
       slot: header.slotNumber,
       blockNumber: checkpointNumber,
-      blockIndexWithinCheckpoint: -1, // -1 for checkpoint proposal
+      blockIndexWithinCheckpoint: -1, // -1 indicates not applicable (checkpoint proposal, not a block within checkpoint)
       dutyType: DutyType.CHECKPOINT_PROPOSAL,
     };
 
@@ -164,7 +164,7 @@ export class ValidationService {
           ? {
               slot: proposal.slotNumber,
               blockNumber,
-              blockIndexWithinCheckpoint: 0,
+              blockIndexWithinCheckpoint: -1, // -1 indicates not applicable (attestation, not a block proposal)
               dutyType: DutyType.ATTESTATION,
             }
           : undefined;
@@ -205,7 +205,7 @@ export class ValidationService {
     const context: SigningContext = {
       slot,
       blockNumber,
-      blockIndexWithinCheckpoint: 0,
+      blockIndexWithinCheckpoint: -1, // -1 indicates not applicable (attestations and signers, not a block proposal)
       dutyType: DutyType.ATTESTATIONS_AND_SIGNERS,
     };
 

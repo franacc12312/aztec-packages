@@ -56,7 +56,7 @@ export interface ValidatorDutyRecord {
   slot: SlotNumber;
   /** Block number for this duty */
   blockNumber: BlockNumber;
-  /** Block index within checkpoint (0, 1, 2..., or -1 for checkpoint proposal) */
+  /** Block index within checkpoint (0, 1, 2... for block proposals, -1 for other duty types) */
   blockIndexWithinCheckpoint: number;
   /** Type of duty being performed */
   dutyType: DutyType;

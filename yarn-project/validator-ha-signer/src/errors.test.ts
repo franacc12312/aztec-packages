@@ -24,12 +24,12 @@ describe('DutyAlreadySignedError', () => {
   });
 
   it('should work with ATTESTATION duty type', () => {
-    const error = new DutyAlreadySignedError(SlotNumber(200), DutyType.ATTESTATION, 1, 'node-2');
+    const error = new DutyAlreadySignedError(SlotNumber(200), DutyType.ATTESTATION, -1, 'node-2');
     expect(error.message).toBe('Duty ATTESTATION for slot 200 already signed by node node-2');
   });
 
   it('should work with ATTESTATIONS_AND_SIGNERS duty type', () => {
-    const error = new DutyAlreadySignedError(SlotNumber(300), DutyType.ATTESTATIONS_AND_SIGNERS, 2, 'node-3');
+    const error = new DutyAlreadySignedError(SlotNumber(300), DutyType.ATTESTATIONS_AND_SIGNERS, -1, 'node-3');
     expect(error.message).toBe('Duty ATTESTATIONS_AND_SIGNERS for slot 300 already signed by node node-3');
   });
 
@@ -93,7 +93,7 @@ describe('SlashingProtectionError', () => {
     const error = new SlashingProtectionError(
       SlotNumber(200),
       DutyType.ATTESTATION,
-      1,
+      -1,
       existingRoot,
       attemptedRoot,
       'node-2',
@@ -106,7 +106,7 @@ describe('SlashingProtectionError', () => {
     const error = new SlashingProtectionError(
       SlotNumber(300),
       DutyType.ATTESTATIONS_AND_SIGNERS,
-      2,
+      -1,
       existingRoot,
       attemptedRoot,
       'node-3',

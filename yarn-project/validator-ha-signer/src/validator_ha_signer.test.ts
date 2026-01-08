@@ -271,7 +271,7 @@ describe('ValidatorHASigner', () => {
         slot: SlotNumber(100),
         blockNumber: BlockNumber(50),
         dutyType: DutyType.ATTESTATION,
-        blockIndexWithinCheckpoint: 0,
+        blockIndexWithinCheckpoint: -1,
         messageHash: messageHash.toString(),
         nodeId: NODE_ID,
       });
@@ -389,7 +389,7 @@ describe('ValidatorHASigner', () => {
         signFn,
       );
 
-      // Sign checkpoint proposal (index -1)
+      // Sign checkpoint proposal (index -1, since it's not a block within checkpoint)
       await signer.signWithProtection(
         VALIDATOR_ADDRESS,
         MESSAGE_HASH,
@@ -497,7 +497,7 @@ describe('ValidatorHASigner', () => {
             slot: SlotNumber(100),
             blockNumber: BlockNumber(50),
             dutyType,
-            blockIndexWithinCheckpoint: 0,
+            blockIndexWithinCheckpoint: dutyType === DutyType.BLOCK_PROPOSAL ? 0 : -1,
           },
           signFn,
         );
