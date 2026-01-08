@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1767837499431,
+  "lastUpdate": 1767851525283,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -451148,6 +451148,75 @@ window.BENCHMARK_DATA = {
             "name": "spartan/ci/network_deploy/aztec_infra",
             "value": 195,
             "unit": "seconds"
+          }
+        ]
+      }
+    ],
+    "Spartan": [
+      {
+        "commit": {
+          "author": {
+            "name": "Amin Sammara",
+            "username": "aminsammara",
+            "email": "84764772+aminsammara@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "83049d0681e353fc4de6ace812cfd0055d17d370",
+          "message": "chore: Base Fee -> Min Fee (#19375)\n\nChanged the L2 base fee to L2 min fee.",
+          "timestamp": "2026-01-08T01:09:01Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/83049d0681e353fc4de6ace812cfd0055d17d370"
+        },
+        "date": 1767851446937,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "yarn-project/end-to-end/unproven_0.5tps/avg_inclusion",
+            "value": 49.24,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_0.5tps/median_inclusion",
+            "value": 50,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_0.5tps/p99_inclusion",
+            "value": 84,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_1tps/avg_inclusion",
+            "value": 49.26,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_1tps/median_inclusion",
+            "value": 49,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_1tps/p99_inclusion",
+            "value": 84,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_2tps/avg_inclusion",
+            "value": 258.605,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_2tps/median_inclusion",
+            "value": 76,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_2tps/p99_inclusion",
+            "value": 937,
+            "unit": "s"
           }
         ]
       }
