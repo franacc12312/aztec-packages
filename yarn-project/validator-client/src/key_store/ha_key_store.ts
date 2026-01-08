@@ -49,15 +49,11 @@ export class HAKeyStore implements ExtendedValidatorKeyStore {
 
   constructor(
     private readonly baseKeyStore: ExtendedValidatorKeyStore,
-    private readonly haSigner: ValidatorHASigner | null,
+    private readonly haSigner: ValidatorHASigner,
   ) {
-    if (haSigner?.isEnabled) {
-      this.log.info('HAKeyStore initialized with HA protection enabled', {
-        nodeId: haSigner.nodeId,
-      });
-    } else {
-      this.log.info('HAKeyStore initialized without HA protection');
-    }
+    this.log.info('HAKeyStore initialized', {
+      nodeId: haSigner.nodeId,
+    });
   }
 
   /**
@@ -66,8 +62,8 @@ export class HAKeyStore implements ExtendedValidatorKeyStore {
    * Returns only signatures that were successfully claimed by this node.
    */
   async signTypedData(typedData: TypedDataDefinition, context?: SigningContext): Promise<Signature[]> {
-    // No context or HA disabled - sign directly
-    if (!context || !this.haSigner?.isEnabled) {
+    // No context provided - sign directly
+    if (!context) {
       return this.baseKeyStore.signTypedData(typedData);
     }
 
@@ -85,8 +81,8 @@ export class HAKeyStore implements ExtendedValidatorKeyStore {
    * Returns only signatures that were successfully claimed by this node.
    */
   async signMessage(message: Buffer32, context?: SigningContext): Promise<Signature[]> {
-    // No context or HA disabled - sign directly
-    if (!context || !this.haSigner?.isEnabled) {
+    // No context - sign directly
+    if (!context) {
       return this.baseKeyStore.signMessage(message);
     }
 
@@ -109,8 +105,8 @@ export class HAKeyStore implements ExtendedValidatorKeyStore {
     typedData: TypedDataDefinition,
     context?: SigningContext,
   ): Promise<Signature> {
-    // No context or HA disabled - sign directly
-    if (!context || !this.haSigner?.isEnabled) {
+    // No context provided - sign directly
+    if (!context) {
       return this.baseKeyStore.signTypedDataWithAddress(address, typedData);
     }
 
@@ -138,8 +134,8 @@ export class HAKeyStore implements ExtendedValidatorKeyStore {
    * @throws SlashingProtectionError if attempting to sign different data for the same slot
    */
   async signMessageWithAddress(address: EthAddress, message: Buffer32, context?: SigningContext): Promise<Signature> {
-    // No context or HA disabled - sign directly
-    if (!context || !this.haSigner?.isEnabled) {
+    // No context provided - sign directly
+    if (!context) {
       return this.baseKeyStore.signMessageWithAddress(address, message);
     }
 
@@ -154,13 +150,6 @@ export class HAKeyStore implements ExtendedValidatorKeyStore {
       this.logSigningError(error, context);
       throw error;
     }
-  }
-
-  /**
-   * Check if HA protection is enabled
-   */
-  isHAEnabled(): boolean {
-    return this.haSigner?.isEnabled ?? false;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

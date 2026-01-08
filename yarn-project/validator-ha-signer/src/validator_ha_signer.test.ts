@@ -56,22 +56,20 @@ describe('ValidatorHASigner', () => {
   });
 
   describe('initialization', () => {
-    it('should initialize with slashing protection enabled', () => {
-      const signer = new ValidatorHASigner(db, config);
-      expect(signer.isEnabled).toBe(true);
-      expect(signer.nodeId).toBe(NODE_ID);
-    });
-
     it('should not initialize when nodeId is not explicitly set', () => {
       const defaultConfig = { ...defaultValidatorHASignerConfig };
       expect(
         () =>
-          new ValidatorHASigner(db, { ...defaultConfig, databaseUrl: 'postgresql://user:pass@localhost:5432/testdb' }),
+          new ValidatorHASigner(db, {
+            ...defaultConfig,
+            databaseUrl: 'postgresql://user:pass@localhost:5432/testdb',
+            haSigningEnabled: true,
+          }),
       ).toThrow('NODE_ID is required for high-availability setups');
     });
 
     it('should not initialize when enabled is false', () => {
-      const disabledConfig = { ...config, enabled: false };
+      const disabledConfig = { ...config, haSigningEnabled: false };
       expect(() => new ValidatorHASigner(db, disabledConfig)).toThrow('Validator HA Signer is not enabled in config');
     });
   });
@@ -107,6 +105,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         signFn,
       );
@@ -120,6 +119,7 @@ describe('ValidatorHASigner', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SlotNumber(100),
         blockNumber: BlockNumber(50),
+        blockIndexWithinCheckpoint: 0,
         dutyType: DutyType.BLOCK_PROPOSAL,
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
@@ -141,6 +141,7 @@ describe('ValidatorHASigner', () => {
             slot: SlotNumber(100),
             blockNumber: BlockNumber(50),
             dutyType: DutyType.BLOCK_PROPOSAL,
+            blockIndexWithinCheckpoint: 0,
           },
           signFn,
         ),
@@ -152,6 +153,7 @@ describe('ValidatorHASigner', () => {
         slot: SlotNumber(100),
         blockNumber: BlockNumber(50),
         dutyType: DutyType.BLOCK_PROPOSAL,
+        blockIndexWithinCheckpoint: 0,
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
       });
@@ -167,6 +169,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         signFn,
       );
@@ -180,6 +183,7 @@ describe('ValidatorHASigner', () => {
             slot: SlotNumber(100),
             blockNumber: BlockNumber(50),
             dutyType: DutyType.BLOCK_PROPOSAL,
+            blockIndexWithinCheckpoint: 0,
           },
           signFn,
         ),
@@ -198,6 +202,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         signFn,
       );
@@ -211,6 +216,7 @@ describe('ValidatorHASigner', () => {
             slot: SlotNumber(100),
             blockNumber: BlockNumber(50),
             dutyType: DutyType.BLOCK_PROPOSAL,
+            blockIndexWithinCheckpoint: 0,
           },
           signFn,
         ),
@@ -230,6 +236,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         signFn,
       );
@@ -242,6 +249,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.ATTESTATION,
+          blockIndexWithinCheckpoint: 0,
         },
         signFn,
       );
@@ -254,6 +262,7 @@ describe('ValidatorHASigner', () => {
         slot: SlotNumber(100),
         blockNumber: BlockNumber(50),
         dutyType: DutyType.BLOCK_PROPOSAL,
+        blockIndexWithinCheckpoint: 0,
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
       });
@@ -262,6 +271,7 @@ describe('ValidatorHASigner', () => {
         slot: SlotNumber(100),
         blockNumber: BlockNumber(50),
         dutyType: DutyType.ATTESTATION,
+        blockIndexWithinCheckpoint: 0,
         messageHash: messageHash.toString(),
         nodeId: NODE_ID,
       });
@@ -279,6 +289,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         signFn,
       );
@@ -291,6 +302,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(101),
           blockNumber: BlockNumber(51),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         signFn,
       );
@@ -298,13 +310,195 @@ describe('ValidatorHASigner', () => {
       expect(signFn).toHaveBeenCalledTimes(2);
     });
 
+    it('should allow signing different block indices within slot', async () => {
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        MESSAGE_HASH,
+        {
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
+          dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
+        },
+        signFn,
+      );
+
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        MESSAGE_HASH,
+        {
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
+          dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 1,
+        },
+        signFn,
+      );
+
+      expect(signFn).toHaveBeenCalledTimes(2);
+
+      // Verify both duties exist
+      const blockDutyResult = await db.tryInsertOrGetExisting({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: SlotNumber(100),
+        blockNumber: BlockNumber(50),
+        dutyType: DutyType.BLOCK_PROPOSAL,
+        blockIndexWithinCheckpoint: 0,
+        messageHash: MESSAGE_HASH.toString(),
+        nodeId: NODE_ID,
+      });
+      const blockDutyResult2 = await db.tryInsertOrGetExisting({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: SlotNumber(100),
+        blockNumber: BlockNumber(50),
+        dutyType: DutyType.BLOCK_PROPOSAL,
+        blockIndexWithinCheckpoint: 1,
+        messageHash: MESSAGE_HASH.toString(),
+        nodeId: NODE_ID,
+      });
+      expect(blockDutyResult.isNew).toBe(false);
+      expect(blockDutyResult2.isNew).toBe(false);
+    });
+
+    it('should allow checkpoint proposal alongside block proposals in same slot', async () => {
+      const slot = SlotNumber(100);
+      const blockNumber = BlockNumber(50);
+
+      // Sign multiple block proposals
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        MESSAGE_HASH,
+        {
+          slot,
+          blockNumber,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
+        },
+        signFn,
+      );
+
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        MESSAGE_HASH,
+        {
+          slot,
+          blockNumber,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 1,
+        },
+        signFn,
+      );
+
+      // Sign checkpoint proposal (index -1)
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        MESSAGE_HASH,
+        {
+          slot,
+          blockNumber,
+          dutyType: DutyType.CHECKPOINT_PROPOSAL,
+          blockIndexWithinCheckpoint: -1,
+        },
+        signFn,
+      );
+
+      expect(signFn).toHaveBeenCalledTimes(3);
+
+      // Verify all three duties exist in database
+      const block0Result = await db.tryInsertOrGetExisting({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot,
+        blockNumber,
+        dutyType: DutyType.BLOCK_PROPOSAL,
+        blockIndexWithinCheckpoint: 0,
+        messageHash: MESSAGE_HASH.toString(),
+        nodeId: NODE_ID,
+      });
+      const block1Result = await db.tryInsertOrGetExisting({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot,
+        blockNumber,
+        dutyType: DutyType.BLOCK_PROPOSAL,
+        blockIndexWithinCheckpoint: 1,
+        messageHash: MESSAGE_HASH.toString(),
+        nodeId: NODE_ID,
+      });
+      const checkpointResult = await db.tryInsertOrGetExisting({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot,
+        blockNumber,
+        dutyType: DutyType.CHECKPOINT_PROPOSAL,
+        blockIndexWithinCheckpoint: -1,
+        messageHash: MESSAGE_HASH.toString(),
+        nodeId: NODE_ID,
+      });
+
+      expect(block0Result.isNew).toBe(false);
+      expect(block1Result.isNew).toBe(false);
+      expect(checkpointResult.isNew).toBe(false);
+    });
+
+    it('should reject duplicate signing for same slot, duty type, and block index', async () => {
+      await signer.signWithProtection(
+        VALIDATOR_ADDRESS,
+        MESSAGE_HASH,
+        {
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
+          dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
+        },
+        signFn,
+      );
+
+      // Try to sign again with same parameters - should throw
+      await expect(
+        signer.signWithProtection(
+          VALIDATOR_ADDRESS,
+          MESSAGE_HASH,
+          {
+            slot: SlotNumber(100),
+            blockNumber: BlockNumber(50),
+            dutyType: DutyType.BLOCK_PROPOSAL,
+            blockIndexWithinCheckpoint: 0,
+          },
+          signFn,
+        ),
+      ).rejects.toThrow(DutyAlreadySignedError);
+
+      // But different index should work
+      await expect(
+        signer.signWithProtection(
+          VALIDATOR_ADDRESS,
+          MESSAGE_HASH,
+          {
+            slot: SlotNumber(100),
+            blockNumber: BlockNumber(50),
+            dutyType: DutyType.BLOCK_PROPOSAL,
+            blockIndexWithinCheckpoint: 1,
+          },
+          signFn,
+        ),
+      ).resolves.toBeDefined();
+    });
+
     it('should handle all duty types', async () => {
-      const dutyTypes: DutyType[] = [DutyType.BLOCK_PROPOSAL, DutyType.ATTESTATION, DutyType.ATTESTATIONS_AND_SIGNERS];
+      const dutyTypes: DutyType[] = [
+        DutyType.BLOCK_PROPOSAL,
+        DutyType.ATTESTATION,
+        DutyType.ATTESTATIONS_AND_SIGNERS,
+        DutyType.CHECKPOINT_PROPOSAL,
+      ];
       for (const dutyType of dutyTypes) {
         await signer.signWithProtection(
           VALIDATOR_ADDRESS,
           MESSAGE_HASH,
-          { slot: SlotNumber(100), blockNumber: BlockNumber(50), dutyType },
+          {
+            slot: SlotNumber(100),
+            blockNumber: BlockNumber(50),
+            dutyType,
+            blockIndexWithinCheckpoint: 0,
+          },
           signFn,
         );
       }
@@ -323,6 +517,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         signFn,
       );
@@ -334,6 +529,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         signFn,
       );
@@ -358,6 +554,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         localSignFn,
       );
@@ -373,6 +570,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         localSignFn,
       );
@@ -407,6 +605,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         localSignFn,
       );
@@ -422,6 +621,7 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
         },
         localSignFn,
       );
@@ -441,6 +641,7 @@ describe('ValidatorHASigner', () => {
         slot: SlotNumber(100),
         blockNumber: BlockNumber(50),
         dutyType: DutyType.BLOCK_PROPOSAL,
+        blockIndexWithinCheckpoint: 0,
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
       });

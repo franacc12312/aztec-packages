@@ -175,12 +175,45 @@ export class CheckpointProposalJob {
         broadcastInvalidBlockProposal: this.config.broadcastInvalidBlockProposal,
       };
 
-      // Main loop: build blocks for the checkpoint
-      const { blocksInCheckpoint, pendingBroadcast } = await this.buildBlocksForCheckpoint(
-        checkpointBuilder,
-        checkpointGlobalVariables.timestamp,
-        blockProposalOptions,
-      );
+      let blocksInCheckpoint: L2BlockNew[] = [];
+      let pendingBroadcast: { block: L2BlockNew; txs: Tx[] } | undefined = undefined;
+
+      try {
+        // Main loop: build blocks for the checkpoint
+        const result = await this.buildBlocksForCheckpoint(
+          checkpointBuilder,
+          checkpointGlobalVariables.timestamp,
+          blockProposalOptions,
+        );
+        blocksInCheckpoint = result.blocksInCheckpoint;
+        pendingBroadcast = result.pendingBroadcast;
+      } catch (err) {
+        // These errors are expected in HA mode, so we yield and let another HA node handle the slot
+        // The only distinction between the 2 errors is SlashingProtectionError throws when the payload is different,
+        // which is normal for block building (may have picked different txs)
+        if (err instanceof DutyAlreadySignedError) {
+          this.log.info(
+            `Checkpoint proposal for slot ${this.slot} already signed by another HA node, stopping checkpoint proposal job`,
+            {
+              slot: this.slot,
+              signedByNode: err.signedByNode,
+            },
+          );
+          return undefined;
+        }
+        if (err instanceof SlashingProtectionError) {
+          this.log.warn(
+            `Checkpoint proposal for slot ${this.slot} blocked by slashing protection, stopping checkpoint proposal job`,
+            {
+              slot: this.slot,
+              existingMessageHash: err.existingMessageHash,
+              attemptedMessageHash: err.attemptedMessageHash,
+            },
+          );
+          return undefined;
+        }
+        throw err;
+      }
 
       if (blocksInCheckpoint.length === 0) {
         this.log.warn(`No blocks were built for slot ${this.slot}`, { slot: this.slot });
@@ -209,33 +242,14 @@ export class CheckpointProposalJob {
       }
 
       // TODO(palla/mbps): Wire this to the new p2p API once available, including the pendingBroadcast.block
-      let proposal: BlockProposal;
-      try {
-        proposal = await this.validatorClient.createCheckpointProposal(
-          checkpoint.header,
-          checkpoint.archive.root,
-          pendingBroadcast?.txs ?? [],
-          this.proposer,
-          blockProposalOptions,
-        );
-      } catch (err) {
-        if (err instanceof DutyAlreadySignedError) {
-          this.log.info(`Checkpoint proposal for slot ${this.slot} already signed by another HA node, yielding`, {
-            slot: this.slot,
-            signedByNode: err.signedByNode,
-          });
-          return undefined;
-        }
-        if (err instanceof SlashingProtectionError) {
-          this.log.warn(`Checkpoint proposal for slot ${this.slot} blocked by slashing protection`, {
-            slot: this.slot,
-            existingMessageHash: err.existingMessageHash,
-            attemptedMessageHash: err.attemptedMessageHash,
-          });
-          return undefined;
-        }
-        throw err;
-      }
+      const proposal: BlockProposal = await this.validatorClient.createCheckpointProposal(
+        checkpoint.header,
+        checkpoint.archive.root,
+        pendingBroadcast?.txs ?? [],
+        this.proposer,
+        blockProposalOptions,
+      );
+
       const blockProposedAt = this.dateProvider.now();
       await this.p2pClient.broadcastProposal(proposal);
 
@@ -385,38 +399,16 @@ export class CheckpointProposalJob {
       // If the block is the last one, we'll broadcast it along with the checkpoint at the end of the loop
       if (!this.config.fishermanMode) {
         // TODO(palla/mbps): Wire this to the new p2p API once available
-        try {
-          const proposal = await this.validatorClient.createBlockProposal(
-            block.header.globalVariables.blockNumber,
-            (await checkpointBuilder.getCheckpoint()).header,
-            block.archive.root,
-            usedTxs,
-            this.proposer,
-            blockProposalOptions,
-          );
-          await this.p2pClient.broadcastProposal(proposal);
-        } catch (err) {
-          if (err instanceof DutyAlreadySignedError) {
-            this.log.info(`Block proposal for slot ${this.slot} already signed by another HA node, yielding`, {
-              slot: this.slot,
-              blockNumber,
-              signedByNode: err.signedByNode,
-            });
-            // Another HA node is handling this slot, stop building
-            break;
-          }
-          if (err instanceof SlashingProtectionError) {
-            this.log.warn(`Block proposal for slot ${this.slot} blocked by slashing protection`, {
-              slot: this.slot,
-              blockNumber,
-              existingMessageHash: err.existingMessageHash,
-              attemptedMessageHash: err.attemptedMessageHash,
-            });
-            // Stop building to avoid further slashing issues
-            break;
-          }
-          throw err;
-        }
+        const proposal = await this.validatorClient.createBlockProposal(
+          block.header.globalVariables.blockNumber,
+          (await checkpointBuilder.getCheckpoint()).header,
+          block.archive.root,
+          usedTxs,
+          this.proposer,
+          blockProposalOptions,
+          indexWithinCheckpoint,
+        );
+        await this.p2pClient.broadcastProposal(proposal);
       }
 
       // Wait until the next block's start time

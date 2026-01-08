@@ -14,6 +14,7 @@ export class DutyAlreadySignedError extends Error {
   constructor(
     public readonly slot: SlotNumber,
     public readonly dutyType: DutyType,
+    public readonly blockIndexWithinCheckpoint: number,
     public readonly signedByNode: string,
   ) {
     super(`Duty ${dutyType} for slot ${slot} already signed by node ${signedByNode}`);
@@ -32,8 +33,10 @@ export class SlashingProtectionError extends Error {
   constructor(
     public readonly slot: SlotNumber,
     public readonly dutyType: DutyType,
+    public readonly blockIndexWithinCheckpoint: number,
     public readonly existingMessageHash: string,
     public readonly attemptedMessageHash: string,
+    public readonly signedByNode: string,
   ) {
     super(
       `Slashing protection: ${dutyType} for slot ${slot} was already signed with different data. ` +

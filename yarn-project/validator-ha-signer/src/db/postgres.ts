@@ -1,7 +1,7 @@
 /**
  * PostgreSQL implementation of SlashingProtectionDatabase
  */
-import type { SlotNumber } from '@aztec/foundation/branded-types';
+import { BlockNumber, SlotNumber } from '@aztec/foundation/branded-types';
 import { randomBytes } from '@aztec/foundation/crypto/random';
 import { EthAddress } from '@aztec/foundation/eth-address';
 import { type Logger, createLogger } from '@aztec/foundation/log';
@@ -82,6 +82,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
       params.validatorAddress.toString(),
       params.slot.toString(),
       params.blockNumber.toString(),
+      params.blockIndexWithinCheckpoint,
       params.dutyType,
       params.messageHash,
       params.nodeId,
@@ -110,6 +111,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
     validatorAddress: EthAddress,
     slot: SlotNumber,
     dutyType: DutyType,
+    blockIndexWithinCheckpoint: number,
     signature: string,
     lockToken: string,
   ): Promise<boolean> {
@@ -118,6 +120,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
       validatorAddress.toString(),
       slot.toString(),
       dutyType,
+      blockIndexWithinCheckpoint,
       lockToken,
     ]);
 
@@ -126,6 +129,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
         validatorAddress: validatorAddress.toString(),
         slot: slot.toString(),
         dutyType,
+        blockIndexWithinCheckpoint,
       });
       return false;
     }
@@ -143,12 +147,14 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
     validatorAddress: EthAddress,
     slot: SlotNumber,
     dutyType: DutyType,
+    blockIndexWithinCheckpoint: number,
     lockToken: string,
   ): Promise<boolean> {
     const result = await this.pool.query(DELETE_DUTY, [
       validatorAddress.toString(),
       slot.toString(),
       dutyType,
+      blockIndexWithinCheckpoint,
       lockToken,
     ]);
 
@@ -157,6 +163,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
         validatorAddress: validatorAddress.toString(),
         slot: slot.toString(),
         dutyType,
+        blockIndexWithinCheckpoint,
       });
       return false;
     }
@@ -169,8 +176,9 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
   private rowToRecord(row: DutyRow): ValidatorDutyRecord {
     return {
       validatorAddress: EthAddress.fromString(row.validator_address),
-      slot: BigInt(row.slot),
-      blockNumber: BigInt(row.block_number),
+      slot: SlotNumber.fromString(row.slot),
+      blockNumber: BlockNumber.fromString(row.block_number),
+      blockIndexWithinCheckpoint: row.block_index_within_checkpoint,
       dutyType: row.duty_type,
       status: row.status,
       messageHash: row.message_hash,

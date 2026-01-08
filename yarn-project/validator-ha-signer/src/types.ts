@@ -56,6 +56,11 @@ export interface SigningContext {
    * For checkpoint proposals, this is the checkpoint number.
    */
   blockNumber: BlockNumber | CheckpointNumber;
+  /**
+   * Block index within checkpoint (0, 1, 2..., or -1 for checkpoint proposal).
+   * For attestations, use 0.
+   */
+  blockIndexWithinCheckpoint: number;
   /** Type of duty being performed */
   dutyType: DutyType;
 }
@@ -88,6 +93,7 @@ export interface SlashingProtectionDatabase {
     validatorAddress: EthAddress,
     slot: SlotNumber,
     dutyType: DutyType,
+    blockIndexWithinCheckpoint: number,
     signature: string,
     lockToken: string,
   ): Promise<boolean>;
@@ -99,7 +105,13 @@ export interface SlashingProtectionDatabase {
    *
    * @returns true if the delete succeeded, false if token didn't match or duty not found
    */
-  deleteDuty(validatorAddress: EthAddress, slot: SlotNumber, dutyType: DutyType, lockToken: string): Promise<boolean>;
+  deleteDuty(
+    validatorAddress: EthAddress,
+    slot: SlotNumber,
+    dutyType: DutyType,
+    blockIndexWithinCheckpoint: number,
+    lockToken: string,
+  ): Promise<boolean>;
 
   /**
    * Cleanup own stuck duties

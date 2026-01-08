@@ -55,7 +55,7 @@ describe('ValidatorClient', () => {
   let keyStoreManager: KeystoreManager;
   let blobClient: MockProxy<BlobClientInterface>;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     p2pClient = mock<P2P>();
     p2pClient.getAttestationsForSlot.mockImplementation(() => Promise.resolve([]));
     p2pClient.handleAuthRequestFromPeer.mockResolvedValue(StatusMessage.random());
@@ -136,6 +136,7 @@ describe('ValidatorClient', () => {
         txs,
         EthAddress.fromString(validatorAccounts[0].address),
         { publishFullTxs: false },
+        0,
       );
 
       expect(blockProposal).toBeDefined();

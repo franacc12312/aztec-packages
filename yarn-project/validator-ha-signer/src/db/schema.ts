@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS validator_duties (
   validator_address VARCHAR(42) NOT NULL,
   slot BIGINT NOT NULL,
   block_number BIGINT NOT NULL,
+  block_index_within_checkpoint INTEGER NOT NULL DEFAULT 0,
   duty_type VARCHAR(30) NOT NULL CHECK (duty_type IN ('BLOCK_PROPOSAL', 'CHECKPOINT_PROPOSAL', 'ATTESTATION', 'ATTESTATIONS_AND_SIGNERS')),
   status VARCHAR(20) NOT NULL CHECK (status IN ('signing', 'signed', 'failed')),
   message_hash VARCHAR(66) NOT NULL,
@@ -29,7 +30,7 @@ CREATE TABLE IF NOT EXISTS validator_duties (
   completed_at TIMESTAMP,
   error_message TEXT,
 
-  PRIMARY KEY (validator_address, slot, duty_type),
+  PRIMARY KEY (validator_address, slot, duty_type, block_index_within_checkpoint),
   CHECK (completed_at IS NULL OR completed_at >= started_at)
 );
 `;
@@ -99,18 +100,20 @@ WITH inserted AS (
     validator_address,
     slot,
     block_number,
+    block_index_within_checkpoint,
     duty_type,
     status,
     message_hash,
     node_id,
     lock_token,
     started_at
-  ) VALUES ($1, $2, $3, $4, 'signing', $5, $6, $7, CURRENT_TIMESTAMP)
-  ON CONFLICT (validator_address, slot, duty_type) DO NOTHING
+  ) VALUES ($1, $2, $3, $4, $5, 'signing', $6, $7, $8, CURRENT_TIMESTAMP)
+  ON CONFLICT (validator_address, slot, duty_type, block_index_within_checkpoint) DO NOTHING
   RETURNING
     validator_address,
     slot,
     block_number,
+    block_index_within_checkpoint,
     duty_type,
     status,
     message_hash,
@@ -128,6 +131,7 @@ SELECT
   validator_address,
   slot,
   block_number,
+  block_index_within_checkpoint,
   duty_type,
   status,
   message_hash,
@@ -141,7 +145,8 @@ SELECT
 FROM validator_duties
 WHERE validator_address = $1
   AND slot = $2
-  AND duty_type = $4
+  AND duty_type = $5
+  AND block_index_within_checkpoint = $4
   AND NOT EXISTS (SELECT 1 FROM inserted);
 `;
 
@@ -156,8 +161,9 @@ SET status = 'signed',
 WHERE validator_address = $2
   AND slot = $3
   AND duty_type = $4
+  AND block_index_within_checkpoint = $5
   AND status = 'signing'
-  AND lock_token = $5;
+  AND lock_token = $6;
 `;
 
 /**
@@ -169,8 +175,9 @@ DELETE FROM validator_duties
 WHERE validator_address = $1
   AND slot = $2
   AND duty_type = $3
+  AND block_index_within_checkpoint = $4
   AND status = 'signing'
-  AND lock_token = $4;
+  AND lock_token = $5;
 `;
 
 /**
@@ -223,6 +230,7 @@ SELECT
   validator_address,
   slot,
   block_number,
+  block_index_within_checkpoint,
   duty_type,
   status,
   message_hash,

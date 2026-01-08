@@ -98,9 +98,16 @@ export class SlashingProtectionService {
             existingNodeId: record.nodeId,
             attemptingNodeId: nodeId,
           });
-          throw new SlashingProtectionError(slot, dutyType, record.messageHash, messageHash);
+          throw new SlashingProtectionError(
+            slot,
+            dutyType,
+            record.blockIndexWithinCheckpoint,
+            record.messageHash,
+            messageHash,
+            record.nodeId,
+          );
         }
-        throw new DutyAlreadySignedError(slot, dutyType, record.nodeId);
+        throw new DutyAlreadySignedError(slot, dutyType, record.blockIndexWithinCheckpoint, record.nodeId);
       } else if (record.status === DutyStatus.SIGNING) {
         // Another node is currently signing - check for timeout
         if (Date.now() - startTime > this.signingTimeoutMs) {
@@ -109,7 +116,7 @@ export class SlashingProtectionService {
             timeoutMs: this.signingTimeoutMs,
             signingNodeId: record.nodeId,
           });
-          throw new DutyAlreadySignedError(slot, dutyType, 'unknown (timeout)');
+          throw new DutyAlreadySignedError(slot, dutyType, record.blockIndexWithinCheckpoint, 'unknown (timeout)');
         }
 
         // Wait and poll
@@ -133,9 +140,16 @@ export class SlashingProtectionService {
    * @returns true if the update succeeded, false if token didn't match
    */
   async recordSuccess(params: RecordSuccessParams): Promise<boolean> {
-    const { validatorAddress, slot, dutyType, signature, nodeId, lockToken } = params;
+    const { validatorAddress, slot, dutyType, blockIndexWithinCheckpoint, signature, nodeId, lockToken } = params;
 
-    const success = await this.db.updateDutySigned(validatorAddress, slot, dutyType, signature.toString(), lockToken);
+    const success = await this.db.updateDutySigned(
+      validatorAddress,
+      slot,
+      dutyType,
+      blockIndexWithinCheckpoint,
+      signature.toString(),
+      lockToken,
+    );
 
     if (success) {
       this.log.info(`Recorded successful signing for duty ${dutyType} at slot ${slot}`, {
@@ -160,9 +174,9 @@ export class SlashingProtectionService {
    * @returns true if the delete succeeded, false if token didn't match
    */
   async deleteDuty(params: DeleteDutyParams): Promise<boolean> {
-    const { validatorAddress, slot, dutyType, lockToken } = params;
+    const { validatorAddress, slot, dutyType, blockIndexWithinCheckpoint, lockToken } = params;
 
-    const success = await this.db.deleteDuty(validatorAddress, slot, dutyType, lockToken);
+    const success = await this.db.deleteDuty(validatorAddress, slot, dutyType, blockIndexWithinCheckpoint, lockToken);
 
     if (success) {
       this.log.info(`Deleted duty ${dutyType} at slot ${slot} to allow retry`, {

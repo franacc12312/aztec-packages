@@ -432,6 +432,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     txs: Tx[],
     proposerAddress: EthAddress | undefined,
     options: BlockProposalOptions,
+    blockIndexWithinCheckpoint: number,
   ): Promise<BlockProposal> {
     // TODO(palla/mbps): Prevent double proposals properly
     // if (this.previousProposal?.slotNumber === header.slotNumber) {
@@ -450,6 +451,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
         broadcastInvalidBlockProposal: this.config.broadcastInvalidBlockProposal,
       },
       blockNumber,
+      blockIndexWithinCheckpoint,
     );
     this.previousProposal = newProposal;
     return newProposal;
@@ -464,7 +466,19 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     options: BlockProposalOptions,
   ): Promise<BlockProposal> {
     this.log.info(`Assembling checkpoint proposal for slot ${header.slotNumber}`);
-    return this.createBlockProposal(0 as BlockNumber, header, archive, txs, proposerAddress, options);
+    // Derive checkpoint number from the header's slot
+    const checkpointNumber = header.slotNumber as unknown as CheckpointNumber;
+    return this.validationService.createCheckpointProposal(
+      header,
+      archive,
+      txs,
+      proposerAddress,
+      {
+        ...options,
+        broadcastInvalidBlockProposal: this.config.broadcastInvalidBlockProposal,
+      },
+      checkpointNumber,
+    );
   }
 
   async broadcastBlockProposal(proposal: BlockProposal): Promise<void> {

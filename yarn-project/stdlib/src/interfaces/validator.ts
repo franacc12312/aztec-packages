@@ -90,6 +90,7 @@ export interface Validator {
     txs: Tx[],
     proposerAddress: EthAddress | undefined,
     options: BlockProposalOptions,
+    blockIndexWithinCheckpoint: number,
   ): Promise<BlockProposal | undefined>;
   attestToProposal(proposal: BlockProposal, sender: PeerId): Promise<BlockAttestation[] | undefined>;
 

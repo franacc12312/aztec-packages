@@ -27,6 +27,7 @@ describe('PostgreSQL Queries', () => {
   const VALIDATOR_ADDRESS = EthAddress.random().toString();
   const SLOT = 100n;
   const BLOCK_NUMBER = 50n;
+  const BLOCK_INDEX_WITHIN_CHECKPOINT = 0;
   const DUTY_TYPE = DutyType.BLOCK_PROPOSAL;
   const MESSAGE_HASH = Buffer32.random().toString();
   const NODE_ID = 'node-1';
@@ -49,6 +50,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -71,6 +73,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -82,6 +85,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         'node-2', // Different node trying to acquire
@@ -100,6 +104,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -113,6 +118,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         'competing-node',
@@ -128,6 +134,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DutyType.BLOCK_PROPOSAL,
         MESSAGE_HASH,
         NODE_ID,
@@ -139,6 +146,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        0,
         DutyType.ATTESTATION,
         MESSAGE_HASH,
         NODE_ID,
@@ -154,6 +162,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         '100',
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -164,6 +173,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         '101',
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -182,6 +192,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -194,6 +205,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         LOCK_TOKEN,
       ]);
 
@@ -202,8 +214,8 @@ describe('PostgreSQL Queries', () => {
       // Verify the update
       const selectResult = await db.query<DutyRow>(
         `SELECT status, signature, completed_at FROM validator_duties
-         WHERE validator_address = $1 AND slot = $2 AND duty_type = $3`,
-        [VALIDATOR_ADDRESS.toString(), SLOT.toString(), DUTY_TYPE],
+         WHERE validator_address = $1 AND slot = $2 AND duty_type = $3 AND block_index_within_checkpoint = $4`,
+        [VALIDATOR_ADDRESS.toString(), SLOT.toString(), DUTY_TYPE, BLOCK_INDEX_WITHIN_CHECKPOINT],
       );
 
       const row = selectResult.rows[0];
@@ -217,6 +229,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -229,6 +242,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         'wrong-token',
       ]);
 
@@ -248,6 +262,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -258,6 +273,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         LOCK_TOKEN,
       ]);
 
@@ -267,6 +283,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         LOCK_TOKEN,
       ]);
 
@@ -287,6 +304,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -297,6 +315,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         LOCK_TOKEN,
       ]);
 
@@ -315,6 +334,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -325,6 +345,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         'wrong-token',
       ]);
 
@@ -343,6 +364,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -353,6 +375,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         LOCK_TOKEN,
       ]);
 
@@ -361,6 +384,7 @@ describe('PostgreSQL Queries', () => {
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         DUTY_TYPE,
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         LOCK_TOKEN,
       ]);
 
@@ -376,11 +400,12 @@ describe('PostgreSQL Queries', () => {
   });
 
   describe('constraints', () => {
-    it('should enforce primary key constraint (validator_address, slot, duty_type)', async () => {
+    it('should enforce primary key constraint (validator_address, slot, duty_type, block_index_within_checkpoint)', async () => {
       await db.query(INSERT_OR_GET_DUTY, [
         VALIDATOR_ADDRESS.toString(),
         SLOT.toString(),
         BLOCK_NUMBER.toString(),
+        BLOCK_INDEX_WITHIN_CHECKPOINT,
         DUTY_TYPE,
         MESSAGE_HASH,
         NODE_ID,
@@ -390,12 +415,13 @@ describe('PostgreSQL Queries', () => {
       // Direct insert should fail due to primary key constraint
       await expect(
         db.query(
-          `INSERT INTO validator_duties (validator_address, slot, block_number, duty_type, status, message_hash, node_id, lock_token)
-           VALUES ($1, $2, $3, $4, 'signing', $5, $6, $7)`,
+          `INSERT INTO validator_duties (validator_address, slot, block_number, block_index_within_checkpoint, duty_type, status, message_hash, node_id, lock_token)
+           VALUES ($1, $2, $3, $4, $5, 'signing', $6, $7, $8)`,
           [
             VALIDATOR_ADDRESS.toString(),
             SLOT.toString(),
             BLOCK_NUMBER.toString(),
+            BLOCK_INDEX_WITHIN_CHECKPOINT,
             DUTY_TYPE,
             MESSAGE_HASH,
             'node-2',
@@ -408,9 +434,17 @@ describe('PostgreSQL Queries', () => {
     it('should enforce duty_type check constraint', async () => {
       await expect(
         db.query(
-          `INSERT INTO validator_duties (validator_address, slot, block_number, duty_type, status, message_hash, node_id, lock_token)
-           VALUES ($1, $2, $3, 'INVALID_TYPE', 'signing', $4, $5, $6)`,
-          [VALIDATOR_ADDRESS.toString(), SLOT.toString(), BLOCK_NUMBER.toString(), MESSAGE_HASH, NODE_ID, LOCK_TOKEN],
+          `INSERT INTO validator_duties (validator_address, slot, block_number, block_index_within_checkpoint, duty_type, status, message_hash, node_id, lock_token)
+           VALUES ($1, $2, $3, $4, 'INVALID_TYPE', 'signing', $5, $6, $7)`,
+          [
+            VALIDATOR_ADDRESS.toString(),
+            SLOT.toString(),
+            BLOCK_NUMBER.toString(),
+            BLOCK_INDEX_WITHIN_CHECKPOINT,
+            MESSAGE_HASH,
+            NODE_ID,
+            LOCK_TOKEN,
+          ],
         ),
       ).rejects.toThrow();
     });
@@ -418,12 +452,13 @@ describe('PostgreSQL Queries', () => {
     it('should enforce status check constraint', async () => {
       await expect(
         db.query(
-          `INSERT INTO validator_duties (validator_address, slot, block_number, duty_type, status, message_hash, node_id, lock_token)
-           VALUES ($1, $2, $3, $4, 'invalid_status', $5, $6, $7)`,
+          `INSERT INTO validator_duties (validator_address, slot, block_number, block_index_within_checkpoint, duty_type, status, message_hash, node_id, lock_token)
+           VALUES ($1, $2, $3, $4, $5, 'invalid_status', $6, $7, $8)`,
           [
             VALIDATOR_ADDRESS.toString(),
             SLOT.toString(),
             BLOCK_NUMBER.toString(),
+            BLOCK_INDEX_WITHIN_CHECKPOINT,
             DUTY_TYPE,
             MESSAGE_HASH,
             NODE_ID,
@@ -524,7 +559,7 @@ describe('PostgresSlashingProtectionDatabase', () => {
     });
   });
 
-  describe('bigint handling', () => {
+  describe('large numbers handling', () => {
     const VALIDATOR_ADDRESS = EthAddress.random();
     const SLOT = SlotNumber(100);
     const BLOCK_NUMBER = BlockNumber(50);
@@ -539,13 +574,14 @@ describe('PostgresSlashingProtectionDatabase', () => {
     });
 
     it('should handle large slot numbers correctly', async () => {
-      const largeSlot = SlotNumber.fromBigInt(9007199254740991n); // Max safe integer
+      const largeSlot = SlotNumber(Number.MAX_SAFE_INTEGER); // Max safe integer
 
       const db = new PostgresSlashingProtectionDatabase(pool);
       const result = await db.tryInsertOrGetExisting({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: largeSlot,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: 0,
         dutyType: DutyType.BLOCK_PROPOSAL,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -556,13 +592,14 @@ describe('PostgresSlashingProtectionDatabase', () => {
     });
 
     it('should handle large block numbers correctly', async () => {
-      const largeBlockNumber = BlockNumber.fromBigInt(9007199254740991n);
+      const largeBlockNumber = BlockNumber(Number.MAX_SAFE_INTEGER);
 
       const db = new PostgresSlashingProtectionDatabase(pool);
       const result = await db.tryInsertOrGetExisting({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: largeBlockNumber,
+        blockIndexWithinCheckpoint: 0,
         dutyType: DutyType.BLOCK_PROPOSAL,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,

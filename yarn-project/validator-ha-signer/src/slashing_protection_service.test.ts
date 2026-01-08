@@ -16,6 +16,7 @@ import { type CheckAndRecordParams, DutyStatus, DutyType, type ValidatorHASigner
 const VALIDATOR_ADDRESS = EthAddress.random();
 const SLOT = SlotNumber(100);
 const BLOCK_NUMBER = BlockNumber(50);
+const BLOCK_INDEX_WITHIN_CHECKPOINT = 0;
 const DUTY_TYPE: DutyType = DutyType.BLOCK_PROPOSAL;
 const MESSAGE_HASH = Buffer32.random().toString();
 const MESSAGE_HASH_2 = Buffer32.random().toString();
@@ -59,6 +60,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -79,6 +81,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -89,6 +92,7 @@ describe('SlashingProtectionService', () => {
       await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
@@ -105,6 +109,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -115,6 +120,7 @@ describe('SlashingProtectionService', () => {
       await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
@@ -131,6 +137,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -141,6 +148,7 @@ describe('SlashingProtectionService', () => {
       await service.deleteDuty({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         lockToken,
       });
@@ -160,6 +168,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -177,6 +186,7 @@ describe('SlashingProtectionService', () => {
       await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
@@ -192,6 +202,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -209,6 +220,7 @@ describe('SlashingProtectionService', () => {
       await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
@@ -224,6 +236,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -236,6 +249,7 @@ describe('SlashingProtectionService', () => {
       await service.deleteDuty({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         lockToken,
       });
@@ -260,6 +274,7 @@ describe('SlashingProtectionService', () => {
           validatorAddress: VALIDATOR_ADDRESS,
           slot: SLOT,
           blockNumber: BLOCK_NUMBER,
+          blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
           dutyType: DUTY_TYPE,
           messageHash: MESSAGE_HASH,
           nodeId: NODE_ID,
@@ -283,6 +298,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -292,6 +308,7 @@ describe('SlashingProtectionService', () => {
       const success = await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
@@ -311,6 +328,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -320,6 +338,7 @@ describe('SlashingProtectionService', () => {
       const success = await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: NODE_ID,
@@ -339,6 +358,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -348,6 +368,7 @@ describe('SlashingProtectionService', () => {
       const success = await service.deleteDuty({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         lockToken,
       });
@@ -363,6 +384,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
@@ -372,6 +394,7 @@ describe('SlashingProtectionService', () => {
       const success = await service.deleteDuty({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         lockToken: 'wrong-token',
       });
@@ -389,6 +412,7 @@ describe('SlashingProtectionService', () => {
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
         blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: 'node-1',
@@ -406,6 +430,7 @@ describe('SlashingProtectionService', () => {
       await service.recordSuccess({
         validatorAddress: VALIDATOR_ADDRESS,
         slot: SLOT,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
         dutyType: DUTY_TYPE,
         signature: { toString: () => SIGNATURE } as any,
         nodeId: winner.nodeId,
@@ -436,11 +461,12 @@ describe('SlashingProtectionService', () => {
       for (let i = 0; i < 5; i++) {
         const params: CheckAndRecordParams = {
           validatorAddress: VALIDATOR_ADDRESS,
-          slot: SlotNumber(100 + i),
-          blockNumber: BlockNumber(50 + i),
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DUTY_TYPE,
           messageHash: MESSAGE_HASH,
           nodeId: NODE_ID,
+          blockIndexWithinCheckpoint: i,
         };
         promises.push(service.checkAndRecord(params));
       }
@@ -451,11 +477,12 @@ describe('SlashingProtectionService', () => {
       for (let i = 0; i < 5; i++) {
         const result = await db.tryInsertOrGetExisting({
           validatorAddress: VALIDATOR_ADDRESS,
-          slot: SlotNumber(100 + i),
-          blockNumber: BlockNumber(50 + i),
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
           dutyType: DUTY_TYPE,
           messageHash: MESSAGE_HASH,
           nodeId: NODE_ID,
+          blockIndexWithinCheckpoint: i,
         });
         expect(result.isNew).toBe(false);
         expect(result.record.status).toBe(DutyStatus.SIGNING);
@@ -485,6 +512,7 @@ describe('SlashingProtectionService', () => {
         dutyType: DUTY_TYPE,
         messageHash: MESSAGE_HASH,
         nodeId: NODE_ID,
+        blockIndexWithinCheckpoint: BLOCK_INDEX_WITHIN_CHECKPOINT,
       };
 
       // Insert a duty that will be "stuck"

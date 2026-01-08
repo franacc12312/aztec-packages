@@ -34,6 +34,7 @@ export class ValidationService {
    * @param txs - TxHash[] ordered list of transactions
    * @param options - Block proposal options (including broadcastInvalidBlockProposal for testing)
    * @param blockNumber - The block number for HA signing context
+   * @param blockIndexWithinCheckpoint - The block index within checkpoint for HA signing context
    *
    * @returns A block proposal signing the above information
    * @throws DutyAlreadySignedError if HA signer indicates duty already signed by another node
@@ -46,10 +47,12 @@ export class ValidationService {
     proposerAttesterAddress: EthAddress | undefined,
     options: BlockProposalOptions,
     blockNumber: BlockNumber,
+    blockIndexWithinCheckpoint: number,
   ): Promise<BlockProposal> {
     const context: SigningContext = {
       slot: header.slotNumber,
       blockNumber,
+      blockIndexWithinCheckpoint,
       dutyType: DutyType.BLOCK_PROPOSAL,
     };
 
@@ -69,6 +72,59 @@ export class ValidationService {
     if (options.broadcastInvalidBlockProposal) {
       archive = Fr.random();
       this.log.warn(`Creating INVALID block proposal for slot ${header.slotNumber}`);
+    }
+
+    return BlockProposal.createProposalFromSigner(
+      new ConsensusPayload(header, archive),
+      txHashes,
+      options.publishFullTxs ? txs : undefined,
+      payloadSigner,
+    );
+  }
+
+  /**
+   * Create a checkpoint proposal with the given header, archive, and transactions
+   *
+   * @param header - The checkpoint header
+   * @param archive - The archive of the checkpoint
+   * @param txs - TxHash[] ordered list of transactions
+   * @param options - Block proposal options
+   * @param checkpointNumber - The checkpoint number for HA signing context
+   *
+   * @returns A block proposal signing the checkpoint
+   * @throws DutyAlreadySignedError if HA signer indicates duty already signed by another node
+   * @throws SlashingProtectionError if attempting to sign different data for same slot
+   */
+  async createCheckpointProposal(
+    header: CheckpointHeader,
+    archive: Fr,
+    txs: Tx[],
+    proposerAttesterAddress: EthAddress | undefined,
+    options: BlockProposalOptions,
+    checkpointNumber: CheckpointNumber,
+  ): Promise<BlockProposal> {
+    const context: SigningContext = {
+      slot: header.slotNumber,
+      blockNumber: checkpointNumber,
+      blockIndexWithinCheckpoint: -1, // -1 for checkpoint proposal
+      dutyType: DutyType.CHECKPOINT_PROPOSAL,
+    };
+
+    let payloadSigner: (payload: Buffer32) => Promise<Signature>;
+    if (proposerAttesterAddress !== undefined) {
+      payloadSigner = (payload: Buffer32) =>
+        this.keyStore.signMessageWithAddress(proposerAttesterAddress, payload, context);
+    } else {
+      // if there is no proposer attester address, just use the first signer
+      const signer = this.keyStore.getAddress(0);
+      payloadSigner = (payload: Buffer32) => this.keyStore.signMessageWithAddress(signer, payload, context);
+    }
+    const txHashes = await Promise.all(txs.map(tx => tx.getTxHash()));
+
+    // For testing: change the new archive to trigger state_mismatch validation failure
+    if (options.broadcastInvalidBlockProposal) {
+      archive = Fr.random();
+      this.log.warn(`Creating INVALID checkpoint proposal for slot ${header.slotNumber}`);
     }
 
     return BlockProposal.createProposalFromSigner(
@@ -108,6 +164,7 @@ export class ValidationService {
           ? {
               slot: proposal.slotNumber,
               blockNumber,
+              blockIndexWithinCheckpoint: 0,
               dutyType: DutyType.ATTESTATION,
             }
           : undefined;
@@ -148,6 +205,7 @@ export class ValidationService {
     const context: SigningContext = {
       slot,
       blockNumber,
+      blockIndexWithinCheckpoint: 0,
       dutyType: DutyType.ATTESTATIONS_AND_SIGNERS,
     };
 

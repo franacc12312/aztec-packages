@@ -87,28 +87,6 @@ describe('HAKeyStore', () => {
     mockHASigner.signWithProtection.mockResolvedValue(mockSignature);
   });
 
-  describe('initialization', () => {
-    it('should initialize with HA protection enabled', () => {
-      const haKeyStore = new HAKeyStore(mockBaseKeyStore, mockHASigner);
-      expect(haKeyStore.isHAEnabled()).toBe(true);
-    });
-
-    it('should initialize without HA protection when signer is null', () => {
-      const haKeyStore = new HAKeyStore(mockBaseKeyStore, null);
-      expect(haKeyStore.isHAEnabled()).toBe(false);
-    });
-
-    it('should initialize without HA protection when signer is disabled', () => {
-      const disabledMockHASigner = {
-        isEnabled: false,
-        nodeId: NODE_ID,
-        signWithProtection: jest.fn<ValidatorHASigner['signWithProtection']>(),
-      } as unknown as jest.Mocked<ValidatorHASigner>;
-      const haKeyStore = new HAKeyStore(mockBaseKeyStore, disabledMockHASigner);
-      expect(haKeyStore.isHAEnabled()).toBe(false);
-    });
-  });
-
   describe('ValidatorKeyStore interface delegation (no context)', () => {
     let haKeyStore: HAKeyStore;
 
@@ -161,6 +139,7 @@ describe('HAKeyStore', () => {
       slot: SlotNumber(100),
       blockNumber: BlockNumber(50),
       dutyType: DutyType.BLOCK_PROPOSAL,
+      blockIndexWithinCheckpoint: 0,
     };
 
     beforeEach(() => {
@@ -174,13 +153,18 @@ describe('HAKeyStore', () => {
       expect(mockHASigner.signWithProtection).toHaveBeenCalledWith(
         VALIDATOR_ADDRESS,
         SIGNING_ROOT,
-        { slot: context.slot, blockNumber: context.blockNumber, dutyType: DutyType.BLOCK_PROPOSAL },
+        {
+          slot: context.slot,
+          blockNumber: context.blockNumber,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+          blockIndexWithinCheckpoint: 0,
+        },
         expect.any(Function),
       );
     });
 
     it('should throw DutyAlreadySignedError when duty was already signed', async () => {
-      const error = new DutyAlreadySignedError(SlotNumber(100), DutyType.BLOCK_PROPOSAL, 'other-node');
+      const error = new DutyAlreadySignedError(SlotNumber(100), DutyType.BLOCK_PROPOSAL, 0, 'other-node');
       mockHASigner.signWithProtection.mockRejectedValue(error);
 
       await expect(haKeyStore.signMessageWithAddress(VALIDATOR_ADDRESS, SIGNING_ROOT, context)).rejects.toThrow(
@@ -189,7 +173,14 @@ describe('HAKeyStore', () => {
     });
 
     it('should throw SlashingProtectionError when slashing protection triggers', async () => {
-      const error = new SlashingProtectionError(SlotNumber(100), DutyType.BLOCK_PROPOSAL, '0xexisting', '0xattempted');
+      const error = new SlashingProtectionError(
+        SlotNumber(100),
+        DutyType.BLOCK_PROPOSAL,
+        0,
+        '0xexisting',
+        '0xattempted',
+        'other-node',
+      );
       mockHASigner.signWithProtection.mockRejectedValue(error);
 
       await expect(haKeyStore.signMessageWithAddress(VALIDATOR_ADDRESS, SIGNING_ROOT, context)).rejects.toThrow(
@@ -217,39 +208,13 @@ describe('HAKeyStore', () => {
     });
   });
 
-  describe('signMessageWithAddress with context (HA disabled)', () => {
-    let haKeyStore: HAKeyStore;
-    let disabledMockHASigner: jest.Mocked<ValidatorHASigner>;
-    const context: SigningContext = {
-      slot: SlotNumber(100),
-      blockNumber: BlockNumber(50),
-      dutyType: DutyType.BLOCK_PROPOSAL,
-    };
-
-    beforeEach(() => {
-      disabledMockHASigner = {
-        isEnabled: false,
-        nodeId: NODE_ID,
-        signWithProtection: jest.fn<ValidatorHASigner['signWithProtection']>(),
-      } as unknown as jest.Mocked<ValidatorHASigner>;
-      haKeyStore = new HAKeyStore(mockBaseKeyStore, disabledMockHASigner);
-    });
-
-    it('should sign directly without HA protection even with context', async () => {
-      const result = await haKeyStore.signMessageWithAddress(VALIDATOR_ADDRESS, SIGNING_ROOT, context);
-
-      expect(result).toBe(mockSignature);
-      expect(mockBaseKeyStore.signMessageWithAddress).toHaveBeenCalledWith(VALIDATOR_ADDRESS, SIGNING_ROOT);
-      expect(disabledMockHASigner.signWithProtection).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('signTypedDataWithAddress with context (HA enabled)', () => {
+  describe('signTypedDataWithAddress with context', () => {
     let haKeyStore: HAKeyStore;
     const context: SigningContext = {
       slot: SlotNumber(100),
       blockNumber: BlockNumber(50),
       dutyType: DutyType.ATTESTATION,
+      blockIndexWithinCheckpoint: 0,
     };
 
     beforeEach(() => {
@@ -263,13 +228,18 @@ describe('HAKeyStore', () => {
       expect(mockHASigner.signWithProtection).toHaveBeenCalledWith(
         VALIDATOR_ADDRESS,
         expect.any(Buffer32),
-        { slot: context.slot, blockNumber: context.blockNumber, dutyType: DutyType.ATTESTATION },
+        {
+          slot: context.slot,
+          blockNumber: context.blockNumber,
+          dutyType: DutyType.ATTESTATION,
+          blockIndexWithinCheckpoint: 0,
+        },
         expect.any(Function),
       );
     });
 
     it('should throw DutyAlreadySignedError when duty was already signed', async () => {
-      const error = new DutyAlreadySignedError(SlotNumber(100), DutyType.ATTESTATION, 'other-node');
+      const error = new DutyAlreadySignedError(SlotNumber(100), DutyType.ATTESTATION, 0, 'other-node');
       mockHASigner.signWithProtection.mockRejectedValue(error);
 
       await expect(haKeyStore.signTypedDataWithAddress(VALIDATOR_ADDRESS, mockTypedData, context)).rejects.toThrow(
@@ -278,7 +248,14 @@ describe('HAKeyStore', () => {
     });
 
     it('should throw SlashingProtectionError when slashing protection triggers', async () => {
-      const error = new SlashingProtectionError(SlotNumber(100), DutyType.ATTESTATION, '0xexisting', '0xattempted');
+      const error = new SlashingProtectionError(
+        SlotNumber(100),
+        DutyType.ATTESTATION,
+        0,
+        '0xexisting',
+        '0xattempted',
+        'other-node',
+      );
       mockHASigner.signWithProtection.mockRejectedValue(error);
 
       await expect(haKeyStore.signTypedDataWithAddress(VALIDATOR_ADDRESS, mockTypedData, context)).rejects.toThrow(
@@ -301,15 +278,25 @@ describe('HAKeyStore', () => {
     it('should handle all duty types', async () => {
       const haKeyStore = new HAKeyStore(mockBaseKeyStore, mockHASigner);
 
-      const dutyTypes = [DutyType.BLOCK_PROPOSAL, DutyType.ATTESTATION, DutyType.ATTESTATIONS_AND_SIGNERS];
+      const dutyTypes = [
+        DutyType.BLOCK_PROPOSAL,
+        DutyType.ATTESTATION,
+        DutyType.ATTESTATIONS_AND_SIGNERS,
+        DutyType.CHECKPOINT_PROPOSAL,
+      ];
 
       for (const dutyType of dutyTypes) {
-        const context: SigningContext = { slot: SlotNumber(100), blockNumber: BlockNumber(50), dutyType };
+        const context: SigningContext = {
+          slot: SlotNumber(100),
+          blockNumber: BlockNumber(50),
+          dutyType,
+          blockIndexWithinCheckpoint: 0,
+        };
         const result = await haKeyStore.signMessageWithAddress(VALIDATOR_ADDRESS, SIGNING_ROOT, context);
         expect(result).toBe(mockSignature);
       }
 
-      expect(mockHASigner.signWithProtection).toHaveBeenCalledTimes(3);
+      expect(mockHASigner.signWithProtection).toHaveBeenCalledTimes(dutyTypes.length);
     });
   });
 });

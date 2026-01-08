@@ -9,6 +9,7 @@ export interface DutyRow {
   validator_address: string;
   slot: string;
   block_number: string;
+  block_index_within_checkpoint: number;
   duty_type: DutyType;
   status: DutyStatus;
   message_hash: string;
@@ -32,6 +33,7 @@ export interface InsertOrGetRow extends DutyRow {
  */
 export enum DutyType {
   BLOCK_PROPOSAL = 'BLOCK_PROPOSAL',
+  CHECKPOINT_PROPOSAL = 'CHECKPOINT_PROPOSAL',
   ATTESTATION = 'ATTESTATION',
   ATTESTATIONS_AND_SIGNERS = 'ATTESTATIONS_AND_SIGNERS',
 }
@@ -51,9 +53,11 @@ export interface ValidatorDutyRecord {
   /** Ethereum address of the validator */
   validatorAddress: EthAddress;
   /** Slot number for this duty */
-  slot: bigint;
+  slot: SlotNumber;
   /** Block number for this duty */
-  blockNumber: bigint;
+  blockNumber: BlockNumber;
+  /** Block index within checkpoint (0, 1, 2..., or -1 for checkpoint proposal) */
+  blockIndexWithinCheckpoint: number;
   /** Type of duty being performed */
   dutyType: DutyType;
   /** Current status of the duty */
@@ -80,6 +84,7 @@ export interface ValidatorDutyRecord {
 export interface DutyIdentifier {
   validatorAddress: EthAddress;
   slot: SlotNumber;
+  blockIndexWithinCheckpoint: number;
   dutyType: DutyType;
 }
 
@@ -90,6 +95,7 @@ export interface CheckAndRecordParams {
   validatorAddress: EthAddress;
   slot: SlotNumber;
   blockNumber: BlockNumber | CheckpointNumber;
+  blockIndexWithinCheckpoint: number;
   dutyType: DutyType;
   messageHash: string;
   nodeId: string;
@@ -101,6 +107,7 @@ export interface CheckAndRecordParams {
 export interface RecordSuccessParams {
   validatorAddress: EthAddress;
   slot: SlotNumber;
+  blockIndexWithinCheckpoint: number;
   dutyType: DutyType;
   signature: Signature;
   nodeId: string;
@@ -113,6 +120,7 @@ export interface RecordSuccessParams {
 export interface DeleteDutyParams {
   validatorAddress: EthAddress;
   slot: SlotNumber;
+  blockIndexWithinCheckpoint: number;
   dutyType: DutyType;
   lockToken: string;
 }

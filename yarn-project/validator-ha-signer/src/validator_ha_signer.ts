@@ -35,7 +35,7 @@ import type { SigningContext, SlashingProtectionDatabase } from './types.js';
  */
 export class ValidatorHASigner {
   private readonly log: Logger;
-  private readonly slashingProtection: SlashingProtectionService | undefined;
+  private readonly slashingProtection: SlashingProtectionService;
 
   constructor(
     db: SlashingProtectionDatabase,
@@ -80,25 +80,14 @@ export class ValidatorHASigner {
     context: SigningContext,
     signFn: (messageHash: Buffer32) => Promise<Signature>,
   ): Promise<Signature> {
-    // If slashing protection is disabled, just sign directly
-    if (!this.slashingProtection) {
-      this.log.info('Signing without slashing protection enabled', {
-        validatorAddress: validatorAddress.toString(),
-        nodeId: this.config.nodeId,
-        dutyType: context.dutyType,
-        slot: context.slot,
-        blockNumber: context.blockNumber,
-      });
-      return await signFn(messageHash);
-    }
-
-    const { slot, blockNumber, dutyType } = context;
+    const { slot, blockNumber, blockIndexWithinCheckpoint, dutyType } = context;
 
     // Acquire lock and get the token for ownership verification
     const lockToken = await this.slashingProtection.checkAndRecord({
       validatorAddress,
       slot,
       blockNumber,
+      blockIndexWithinCheckpoint,
       dutyType,
       messageHash: messageHash.toString(),
       nodeId: this.config.nodeId,
@@ -113,6 +102,7 @@ export class ValidatorHASigner {
       await this.slashingProtection.deleteDuty({
         validatorAddress,
         slot,
+        blockIndexWithinCheckpoint,
         dutyType,
         lockToken,
       });
@@ -123,6 +113,7 @@ export class ValidatorHASigner {
     await this.slashingProtection.recordSuccess({
       validatorAddress,
       slot,
+      blockIndexWithinCheckpoint,
       dutyType,
       signature,
       nodeId: this.config.nodeId,
@@ -130,13 +121,6 @@ export class ValidatorHASigner {
     });
 
     return signature;
-  }
-
-  /**
-   * Check if slashing protection is enabled
-   */
-  get isEnabled(): boolean {
-    return this.slashingProtection !== undefined;
   }
 
   /**
@@ -151,7 +135,7 @@ export class ValidatorHASigner {
    * Should be called after construction and before signing operations.
    */
   start() {
-    this.slashingProtection?.start();
+    this.slashingProtection.start();
   }
 
   /**
@@ -159,6 +143,6 @@ export class ValidatorHASigner {
    * Should be called during graceful shutdown.
    */
   async stop() {
-    await this.slashingProtection?.stop();
+    await this.slashingProtection.stop();
   }
 }
