@@ -82,45 +82,6 @@ TYPED_TEST(OpcodeGateCountTests, Quad)
               std::vector<size_t>({ QUAD<TypeParam>, QUAD<TypeParam> - ZERO_GATE - MEGA_OFFSET<TypeParam> }));
 }
 
-// TODO(AD): We no longer have the ability to serialize to ACIR format. the recommended flow is to add a test in
-// acir_tests. It can call into C++ tests as needed.
-// TYPED_TEST(OpcodeGateCountTests, BigQuad)
-// {
-//     Acir::Expression expr{
-//         .mul_terms = { std::make_tuple(
-//                            bb::fr::one().to_buffer(), Acir::Witness{ .value = 0 }, Acir::Witness{ .value = 1 }),
-//                        std::make_tuple(
-//                            bb::fr::one().to_buffer(), Acir::Witness{ .value = 2 }, Acir::Witness{ .value = 3 }) },
-//         .linear_combinations = { std::make_tuple(bb::fr::one().to_buffer(), Acir::Witness{ .value = 2 }) },
-//         .q_c = bb::fr(-2).to_buffer(),
-//     };
-
-//     WitnessVector witness_values = { fr(1), fr(1), fr(1), fr(-1) };
-
-//     Acir::Opcode::AssertZero assert_zero{ .value = expr };
-
-//     // Create an ACIR circuit with this opcode
-//     Acir::Circuit circuit{
-//         .current_witness_index = 3,
-//         .opcodes = { Acir::Opcode{ .value = assert_zero } },
-//         .return_values = {},
-//     };
-
-//     Acir::Program acir_program{ .functions = { circuit } };
-
-//     // Serialize the program to bytes
-//     auto acir_program_bytes = msgpack_compact_serialize(acir_program);
-
-//     // Process through circuit_buf_to_acir_format (this calls handle_arithmetic internally)
-//     AcirFormat constraint_system = circuit_buf_to_acir_format(std::move(acir_program_bytes));
-
-//     AcirProgram program{ constraint_system, witness_values };
-//     const ProgramMetadata metadata{ .collect_gates_per_opcode = true };
-//     auto builder = create_circuit<TypeParam>(program, metadata);
-
-//     EXPECT_EQ(program.constraints.gates_per_opcode, std::vector<size_t>({ BIG_QUAD<TypeParam> }));
-// }
-
 TYPED_TEST(OpcodeGateCountTests, LogicXor32)
 {
     LogicConstraint logic_constraint{
