@@ -17,6 +17,7 @@ import type { PXEConfig } from '@aztec/pxe/config';
 import type { PXE } from '@aztec/pxe/server';
 import { createPXE, getPXEConfig } from '@aztec/pxe/server';
 import { AztecAddress } from '@aztec/stdlib/aztec-address';
+import type { ContractClassMetadata, ContractMetadata } from '@aztec/stdlib/contract';
 import { deriveSigningKey } from '@aztec/stdlib/keys';
 import { NoteDao } from '@aztec/stdlib/note';
 import type { NotesFilter } from '@aztec/stdlib/note';
@@ -262,5 +263,15 @@ export class CLIWallet extends BaseWallet {
   // this is just a CLI wallet.
   getNotes(filter: NotesFilter): Promise<NoteDao[]> {
     return this.pxe.debug.getNotes(filter);
+  }
+
+  // Exposed for CLI commands that need local contract metadata for display purposes.
+  getContractMetadata(address: AztecAddress): Promise<ContractMetadata> {
+    return this.pxe.getContractMetadata(address);
+  }
+
+  // Exposed for CLI commands that need local contract class metadata for display purposes.
+  getContractClassMetadata(id: Fr, includeArtifact: boolean = false): Promise<ContractClassMetadata> {
+    return this.pxe.getContractClassMetadata(id, includeArtifact);
   }
 }

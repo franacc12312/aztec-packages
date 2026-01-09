@@ -1,8 +1,9 @@
 import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { Fr } from '@aztec/aztec.js/fields';
-import type { Wallet } from '@aztec/aztec.js/wallet';
+import type { AztecNode } from '@aztec/aztec.js/node';
 import { BlockNumber } from '@aztec/foundation/branded-types';
 import { EventOnlyContract, type TestEvent } from '@aztec/noir-test-contracts.js/EventOnly';
+import type { TestWallet } from '@aztec/test-wallet/server';
 
 import { jest } from '@jest/globals';
 
@@ -15,7 +16,8 @@ describe('EventOnly', () => {
   let eventOnlyContract: EventOnlyContract;
   jest.setTimeout(TIMEOUT);
 
-  let wallet: Wallet;
+  let wallet: TestWallet;
+  let aztecNode: AztecNode;
   let defaultAccountAddress: AztecAddress;
   let teardown: () => Promise<void>;
 
@@ -23,9 +25,10 @@ describe('EventOnly', () => {
     ({
       teardown,
       wallet,
+      aztecNode,
       accounts: [defaultAccountAddress],
     } = await setup(1));
-    await ensureAccountContractsPublished(wallet, [defaultAccountAddress]);
+    await ensureAccountContractsPublished(wallet, [defaultAccountAddress], aztecNode);
     eventOnlyContract = await EventOnlyContract.deploy(wallet).send({ from: defaultAccountAddress }).deployed();
   });
 

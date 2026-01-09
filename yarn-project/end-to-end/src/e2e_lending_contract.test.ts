@@ -1,6 +1,7 @@
 import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { Fr } from '@aztec/aztec.js/fields';
 import type { Logger } from '@aztec/aztec.js/log';
+import type { AztecNode } from '@aztec/aztec.js/node';
 import { CheatCodes } from '@aztec/aztec/testing';
 import { RollupContract } from '@aztec/ethereum/contracts';
 import type { DeployAztecL1ContractsReturnType } from '@aztec/ethereum/deploy-aztec-l1-contracts';
@@ -19,6 +20,7 @@ import { LendingAccount, LendingSimulator, TokenSimulator } from './simulators/i
 describe('e2e_lending_contract', () => {
   jest.setTimeout(100_000);
   let wallet: TestWallet;
+  let aztecNode: AztecNode;
   let defaultAccountAddress: AztecAddress;
   let deployL1ContractsValues: DeployAztecL1ContractsReturnType;
 
@@ -74,12 +76,13 @@ describe('e2e_lending_contract', () => {
       logger,
       cheatCodes: cc,
       wallet,
+      aztecNode,
       deployL1ContractsValues,
       dateProvider,
       accounts: [defaultAccountAddress],
     } = ctx);
     ({ lendingContract, priceFeedContract, collateralAsset, stableCoin } = await deployContracts());
-    await ensureAccountContractsPublished(wallet, [defaultAccountAddress]);
+    await ensureAccountContractsPublished(wallet, [defaultAccountAddress], aztecNode);
 
     const rollup = new RollupContract(
       deployL1ContractsValues.l1Client,

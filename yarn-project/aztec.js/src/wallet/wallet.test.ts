@@ -7,7 +7,7 @@ import { EventSelector, FunctionSelector, FunctionType } from '@aztec/stdlib/abi
 import { AuthWitness } from '@aztec/stdlib/auth-witness';
 import { AztecAddress } from '@aztec/stdlib/aztec-address';
 import { L2BlockHash } from '@aztec/stdlib/block';
-import type { ContractClassMetadata, ContractInstanceWithAddress, ContractMetadata } from '@aztec/stdlib/contract';
+import type { ContractInstanceWithAddress } from '@aztec/stdlib/contract';
 import { PublicKeys } from '@aztec/stdlib/keys';
 import {
   ExecutionPayload,
@@ -58,32 +58,6 @@ describe('WalletSchema', () => {
     expect(result).toEqual({
       chainId: expect.any(Fr),
       version: expect.any(Fr),
-    });
-  });
-
-  it('getContractClassMetadata', async () => {
-    const result = await context.client.getContractClassMetadata(Fr.random(), true);
-    expect(result.contractClass).toBeDefined();
-    expect(result.contractClass?.id).toBeInstanceOf(Fr);
-    expect(result.isContractClassPubliclyRegistered).toBe(true);
-    expect(result.artifact).toBeDefined();
-  });
-
-  it('getContractMetadata', async () => {
-    const result = await context.client.getContractMetadata(await AztecAddress.random());
-    expect(result).toEqual({
-      contractInstance: {
-        address: expect.any(AztecAddress),
-        currentContractClassId: expect.any(Fr),
-        deployer: expect.any(AztecAddress),
-        initializationHash: expect.any(Fr),
-        originalContractClassId: expect.any(Fr),
-        publicKeys: expect.any(PublicKeys),
-        salt: expect.any(Fr),
-        version: 1,
-      },
-      isContractInitialized: true,
-      isContractPublished: true,
     });
   });
 
@@ -300,46 +274,6 @@ class MockWallet implements Wallet {
       chainId: Fr.random(),
       version: Fr.random(),
     });
-  }
-
-  getContractClassMetadata(_id: Fr, _includeArtifact?: boolean): Promise<ContractClassMetadata> {
-    return Promise.resolve({
-      contractClass: {
-        version: 1,
-        id: Fr.random(),
-        artifactHash: Fr.random(),
-        privateFunctions: [],
-        publicBytecodeCommitment: Fr.random(),
-        unconstrainedFunctionsArtifactTreeRoot: Fr.random(),
-        packedBytecode: Buffer.from('1234', 'hex'),
-      },
-      isContractClassPubliclyRegistered: true,
-      artifact: {
-        name: 'MockContract',
-        functions: [],
-        nonDispatchPublicFunctions: [],
-        outputs: { structs: {}, globals: {} },
-        fileMap: {},
-        storageLayout: {},
-      },
-    });
-  }
-
-  async getContractMetadata(_address: AztecAddress): Promise<ContractMetadata> {
-    return {
-      contractInstance: {
-        version: 1,
-        address: await AztecAddress.random(),
-        currentContractClassId: Fr.random(),
-        deployer: await AztecAddress.random(),
-        initializationHash: Fr.random(),
-        originalContractClassId: Fr.random(),
-        publicKeys: await PublicKeys.random(),
-        salt: Fr.random(),
-      },
-      isContractInitialized: true,
-      isContractPublished: true,
-    };
   }
 
   getPrivateEvents<T>(

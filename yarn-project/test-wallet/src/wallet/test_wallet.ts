@@ -15,7 +15,7 @@ import { Fq, Fr } from '@aztec/foundation/curves/bn254';
 import { GrumpkinScalar } from '@aztec/foundation/curves/grumpkin';
 import { AuthWitness } from '@aztec/stdlib/auth-witness';
 import { AztecAddress } from '@aztec/stdlib/aztec-address';
-import type { ContractInstanceWithAddress } from '@aztec/stdlib/contract';
+import type { ContractClassMetadata, ContractInstanceWithAddress, ContractMetadata } from '@aztec/stdlib/contract';
 import type { NoteDao, NotesFilter } from '@aztec/stdlib/note';
 import type { TxSimulationResult } from '@aztec/stdlib/tx';
 import { ExecutionPayload, mergeExecutionPayloads } from '@aztec/stdlib/tx';
@@ -262,5 +262,24 @@ export abstract class BaseTestWallet extends BaseWallet {
    */
   stop(): Promise<void> {
     return this.pxe.stop();
+  }
+
+  /**
+   * Get metadata about a contract instance (if registered in this PXE) and its public deployment status.
+   * This is a test-only convenience method that proxies to the underlying PXE.
+   * @param address - The contract address.
+   */
+  getContractMetadata(address: AztecAddress): Promise<ContractMetadata> {
+    return this.pxe.getContractMetadata(address);
+  }
+
+  /**
+   * Get metadata about a contract class and its public registration status.
+   * This is a test-only convenience method that proxies to the underlying PXE.
+   * @param id - The contract class ID.
+   * @param includeArtifact - Whether to include the full artifact (optional, defaults to false).
+   */
+  getContractClassMetadata(id: Fr, includeArtifact = false): Promise<ContractClassMetadata> {
+    return this.pxe.getContractClassMetadata(id, includeArtifact);
   }
 }

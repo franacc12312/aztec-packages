@@ -3,6 +3,7 @@ import { type DeployOptions, getContractInstanceFromInstantiationParams } from '
 import { ContractDeployer } from '@aztec/aztec.js/deployment';
 import { Fr } from '@aztec/aztec.js/fields';
 import type { Logger } from '@aztec/aztec.js/log';
+import { type AztecNode, isContractClassPubliclyRegistered, isContractPublished } from '@aztec/aztec.js/node';
 import { TxStatus } from '@aztec/aztec.js/tx';
 import { TokenContractArtifact } from '@aztec/noir-contracts.js/Token';
 import { StatefulTestContract } from '@aztec/noir-test-contracts.js/StatefulTest';
@@ -17,10 +18,11 @@ describe('e2e_deploy_contract legacy', () => {
 
   let logger: Logger;
   let wallet: TestWallet;
+  let aztecNode: AztecNode;
   let defaultAccountAddress: AztecAddress;
 
   beforeAll(async () => {
-    ({ logger, wallet, defaultAccountAddress } = await t.setup());
+    ({ logger, wallet, defaultAccountAddress, aztecNode } = await t.setup());
   });
 
   afterAll(() => t.teardown());
@@ -41,8 +43,8 @@ describe('e2e_deploy_contract legacy', () => {
       .send({ from: defaultAccountAddress, contractAddressSalt: salt })
       .wait({ wallet });
     expect(receipt.contract.address).toEqual(deploymentData.address);
-    expect((await wallet.getContractMetadata(deploymentData.address)).contractInstance).toBeDefined();
-    expect((await wallet.getContractMetadata(deploymentData.address)).isContractPublished).toBeTrue();
+    expect(await aztecNode.getContract(deploymentData.address)).toBeDefined();
+    expect(await isContractPublished(aztecNode, deploymentData.address)).toBeTrue();
   });
 
   /**
@@ -124,10 +126,8 @@ describe('e2e_deploy_contract legacy', () => {
 
     expect(badTxReceipt.status).toEqual(TxStatus.APP_LOGIC_REVERTED);
 
-    const { isContractClassPubliclyRegistered } = await wallet.getContractClassMetadata(
-      (await badDeploy.getInstance()).currentContractClassId,
-    );
+    const classId = (await badDeploy.getInstance()).currentContractClassId;
     // But the bad tx did not deploy
-    expect(isContractClassPubliclyRegistered).toBeFalse();
+    expect(await isContractClassPubliclyRegistered(aztecNode, classId)).toBeFalse();
   });
 });

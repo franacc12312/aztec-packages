@@ -1,6 +1,6 @@
 import type { AztecAddress } from '@aztec/aztec.js/addresses';
 import { type Logger, createLogger } from '@aztec/aztec.js/log';
-import type { AztecNode } from '@aztec/aztec.js/node';
+import { type AztecNode, isContractPublished } from '@aztec/aztec.js/node';
 import { CheatCodes } from '@aztec/aztec/testing';
 import { createExtendedL1Client } from '@aztec/ethereum/client';
 import { RollupContract } from '@aztec/ethereum/contracts';
@@ -208,7 +208,7 @@ export class FeesTest {
 
   async applyPublicDeployAccountsSnapshot() {
     await this.snapshotManager.snapshot('public_deploy_accounts', () =>
-      ensureAccountContractsPublished(this.wallet, this.accounts),
+      ensureAccountContractsPublished(this.wallet, this.accounts, this.aztecNode),
     );
   }
 
@@ -274,7 +274,7 @@ export class FeesTest {
       'fpc_setup',
       async context => {
         const feeJuiceContract = this.feeJuiceBridgeTestHarness.feeJuice;
-        expect((await context.wallet.getContractMetadata(feeJuiceContract.address)).isContractPublished).toBe(true);
+        expect(await isContractPublished(context.aztecNode, feeJuiceContract.address)).toBe(true);
 
         const bananaCoin = this.bananaCoin;
         const bananaFPC = await FPCContract.deploy(this.wallet, bananaCoin.address, this.fpcAdmin)
@@ -343,7 +343,7 @@ export class FeesTest {
       'sponsored_fpc_setup',
       async context => {
         const feeJuiceContract = this.feeJuiceBridgeTestHarness.feeJuice;
-        expect((await context.wallet.getContractMetadata(feeJuiceContract.address)).isContractPublished).toBe(true);
+        expect(await isContractPublished(context.aztecNode, feeJuiceContract.address)).toBe(true);
 
         const sponsoredFPC = await setupSponsoredFPC(this.wallet);
         this.logger.info(`SponsoredFPC at ${sponsoredFPC.address}`);

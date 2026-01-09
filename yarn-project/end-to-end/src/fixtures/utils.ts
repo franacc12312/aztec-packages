@@ -7,7 +7,13 @@ import { BatchCall, type ContractMethod } from '@aztec/aztec.js/contracts';
 import { publishContractClass, publishInstance } from '@aztec/aztec.js/deployment';
 import { Fr } from '@aztec/aztec.js/fields';
 import { type Logger, createLogger } from '@aztec/aztec.js/log';
-import { type AztecNode, createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
+import {
+  type AztecNode,
+  createAztecNodeClient,
+  isContractClassPubliclyRegistered,
+  isContractPublished,
+  waitForNode,
+} from '@aztec/aztec.js/node';
 import type { Wallet } from '@aztec/aztec.js/wallet';
 import { AnvilTestWatcher, CheatCodes } from '@aztec/aztec/testing';
 import { createBlobClientWithFileStores } from '@aztec/blob-client/client';
@@ -676,14 +682,18 @@ export async function setup(
  * @param accountsToDeploy - Which accounts to publicly deploy.
  */
 
-export async function ensureAccountContractsPublished(wallet: Wallet, accountsToDeploy: AztecAddress[]) {
+export async function ensureAccountContractsPublished(
+  wallet: TestWallet,
+  accountsToDeploy: AztecAddress[],
+  aztecNode: AztecNode,
+) {
   // We have to check whether the accounts are already deployed. This can happen if the test runs against
   // the local network and the test accounts exist
   const accountsAndAddresses = await Promise.all(
     accountsToDeploy.map(async address => {
       return {
         address,
-        deployed: (await wallet.getContractMetadata(address)).isContractPublished,
+        deployed: await isContractPublished(aztecNode, address),
       };
     }),
   );
@@ -695,12 +705,12 @@ export async function ensureAccountContractsPublished(wallet: Wallet, accountsTo
     )
   ).map(contractMetadata => contractMetadata.contractInstance);
   const contractClass = await getContractClassFromArtifact(SchnorrAccountContractArtifact);
-  if (!(await wallet.getContractClassMetadata(contractClass.id, true)).isContractClassPubliclyRegistered) {
+  if (!(await isContractClassPubliclyRegistered(aztecNode, contractClass.id))) {
     await (await publishContractClass(wallet, SchnorrAccountContractArtifact))
       .send({ from: accountsToDeploy[0] })
       .wait();
   }
-  const requests = await Promise.all(instances.map(async instance => await publishInstance(wallet, instance!)));
+  const requests = instances.map(instance => publishInstance(wallet, instance!));
   const batch = new BatchCall(wallet, requests);
   await batch.send({ from: accountsToDeploy[0] }).wait();
 }

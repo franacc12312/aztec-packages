@@ -2,12 +2,12 @@ import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { BatchCall } from '@aztec/aztec.js/contracts';
 import { Fr } from '@aztec/aztec.js/fields';
 import type { Logger } from '@aztec/aztec.js/log';
-import { type AztecNode, createAztecNodeClient } from '@aztec/aztec.js/node';
-import type { Wallet } from '@aztec/aztec.js/wallet';
+import { type AztecNode, createAztecNodeClient, isContractClassPubliclyRegistered } from '@aztec/aztec.js/node';
 import { TokenContract } from '@aztec/noir-contracts.js/Token';
 import { CounterContract } from '@aztec/noir-test-contracts.js/Counter';
 import { NoConstructorContract } from '@aztec/noir-test-contracts.js/NoConstructor';
 import { StatefulTestContract } from '@aztec/noir-test-contracts.js/StatefulTest';
+import { getContractClassFromArtifact } from '@aztec/stdlib/contract';
 import { GasFees } from '@aztec/stdlib/gas';
 import { TestWallet } from '@aztec/test-wallet/server';
 
@@ -17,7 +17,7 @@ describe('e2e_deploy_contract deploy method', () => {
   const t = new DeployTest('deploy method');
 
   let logger: Logger;
-  let wallet: Wallet;
+  let wallet: TestWallet;
   let aztecNode: AztecNode;
   let defaultAccountAddress: AztecAddress;
 
@@ -46,10 +46,8 @@ describe('e2e_deploy_contract deploy method', () => {
     logger.debug(`Calling public method on stateful test contract at ${contract.address.toString()}`);
     await contract.methods.increment_public_value(owner, 84).send({ from: defaultAccountAddress }).wait();
     expect(await contract.methods.get_public_value(owner).simulate({ from: defaultAccountAddress })).toEqual(84n);
-    const instance = (await wallet.getContractMetadata(contract.address)).contractInstance!;
-    expect(
-      (await wallet.getContractClassMetadata(instance.currentContractClassId)).isContractClassPubliclyRegistered,
-    ).toBeTrue();
+    const { id: contractClassId } = await getContractClassFromArtifact(contract.artifact);
+    expect(await isContractClassPubliclyRegistered(aztecNode, contractClassId)).toBeTrue();
   });
 
   it('publicly universally deploys and initializes a contract', async () => {

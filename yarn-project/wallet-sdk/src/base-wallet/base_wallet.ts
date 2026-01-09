@@ -34,9 +34,7 @@ import {
 import type { AuthWitness } from '@aztec/stdlib/auth-witness';
 import type { AztecAddress } from '@aztec/stdlib/aztec-address';
 import {
-  type ContractClassMetadata,
   type ContractInstanceWithAddress,
-  type ContractMetadata,
   computePartialAddress,
   getContractClassFromArtifact,
 } from '@aztec/stdlib/contract';
@@ -313,13 +311,6 @@ export abstract class BaseWallet implements Wallet {
 
   simulateUtility(call: FunctionCall, authwits?: AuthWitness[]): Promise<UtilitySimulationResult> {
     return this.pxe.simulateUtility(call, authwits);
-  }
-
-  getContractClassMetadata(id: Fr, includeArtifact: boolean = false): Promise<ContractClassMetadata> {
-    return this.pxe.getContractClassMetadata(id, includeArtifact);
-  }
-  getContractMetadata(address: AztecAddress): Promise<ContractMetadata> {
-    return this.pxe.getContractMetadata(address);
   }
 
   getTxReceipt(txHash: TxHash): Promise<TxReceipt> {

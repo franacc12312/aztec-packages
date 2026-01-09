@@ -283,6 +283,7 @@ export function Landing() {
     setDefaultContractCreationParams,
     setCurrentContractAddress,
     setFrom,
+    node,
     embeddedWalletSelected,
     playgroundDB,
     from,
@@ -351,7 +352,7 @@ export function Landing() {
     const aliasedContracts = await playgroundDB.listAliases('contracts');
     if (wallet && aliasedContracts.length > 0) {
       const contracts = parseAliasedBuffersAsString(aliasedContracts);
-      const deployedContracts = await filterDeployedAliasedContracts(contracts, wallet);
+      const deployedContracts = await filterDeployedAliasedContracts(contracts, node);
       for (const contract of deployedContracts) {
         const artifactAsString = await playgroundDB.retrieveAlias(`artifacts:${contract.item}`);
         const contractArtifact = loadContractArtifact(parse(convertFromUTF8BufferAsString(artifactAsString)));

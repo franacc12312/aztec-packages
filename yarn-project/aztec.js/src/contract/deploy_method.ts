@@ -184,17 +184,11 @@ export class DeployMethod<TContract extends ContractBase = ContractBase> extends
 
     // Publish the contract class if it hasn't been published already.
     if (!options?.skipClassPublication) {
-      if ((await this.wallet.getContractClassMetadata(contractClass.id)).isContractClassPubliclyRegistered) {
-        this.log.debug(
-          `Skipping publication of already-registered contract class ${contractClass.id.toString()} for ${instance.address.toString()}`,
-        );
-      } else {
-        this.log.info(
-          `Creating request for publishing contract class ${contractClass.id.toString()} as part of deployment for ${instance.address.toString()}`,
-        );
-        const registerContractClassInteraction = await publishContractClass(this.wallet, this.artifact);
-        calls.push(await registerContractClassInteraction.request());
-      }
+      this.log.info(
+        `Creating request for publishing contract class ${contractClass.id.toString()} as part of deployment for ${instance.address.toString()}`,
+      );
+      const registerContractClassInteraction = await publishContractClass(this.wallet, this.artifact);
+      calls.push(await registerContractClassInteraction.request());
     }
 
     // Publish the contract instance:
@@ -202,7 +196,7 @@ export class DeployMethod<TContract extends ContractBase = ContractBase> extends
       // TODO(https://github.com/AztecProtocol/aztec-packages/issues/15596):
       // Read the artifact, and if there are no public functions, warn the caller that publication of the
       // contract instance is not necessary (until such time as they wish to update the instance (i.e. change its class_id)).
-      const deploymentInteraction = await publishInstance(this.wallet, instance);
+      const deploymentInteraction = publishInstance(this.wallet, instance);
       calls.push(await deploymentInteraction.request());
     }
 

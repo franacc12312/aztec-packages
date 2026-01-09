@@ -27,6 +27,7 @@ import { ContractDescriptions, ContractDocumentationLinks, ContractMethodOrder }
 import Box from '@mui/material/Box';
 import { trackButtonClick } from '../../utils/matomo';
 import { colors, commonStyles } from '../../global.styles';
+import { isContractPublished } from '@aztec/aztec.js/node';
 
 const container = css({
   display: 'flex',
@@ -198,9 +199,7 @@ export function ContractComponent() {
         utility: true,
       });
       if (currentContractAddress) {
-        const { isContractPublished } = await wallet.getContractMetadata(currentContractAddress);
-        // Temporarily filter out not-yet-published contracts
-        if (isContractPublished) {
+        if (await isContractPublished(node, currentContractAddress)) {
           const contractInstance = await node.getContract(currentContractAddress);
 
           await wallet.registerContract(contractInstance, currentContractArtifact);

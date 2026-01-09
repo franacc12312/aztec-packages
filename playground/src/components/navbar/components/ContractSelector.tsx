@@ -36,6 +36,7 @@ export function ContractSelector() {
   const {
     currentContractAddress,
     wallet,
+    node,
     playgroundDB,
     pendingTxUpdateCounter,
     setCurrentContractArtifact,
@@ -50,7 +51,7 @@ export function ContractSelector() {
       const aliasedContracts = await playgroundDB.listAliases('contracts');
       const contracts = parseAliasedBuffersAsString(aliasedContracts);
       // Temporarily filter out undeployed contracts
-      const deployedContracts = await filterDeployedAliasedContracts(contracts, wallet);
+      const deployedContracts = await filterDeployedAliasedContracts(contracts, node);
       setContracts(deployedContracts);
       setIsContractsLoading(false);
     };
@@ -58,7 +59,7 @@ export function ContractSelector() {
     if (playgroundDB && wallet) {
       refreshContracts();
     }
-  }, [currentContractAddress, playgroundDB, wallet, pendingTxUpdateCounter]);
+  }, [currentContractAddress, playgroundDB, wallet, pendingTxUpdateCounter, node]);
 
   const handleContractChange = async (event: SelectChangeEvent) => {
     const contractValue = event.target.value;

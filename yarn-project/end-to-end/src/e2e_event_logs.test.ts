@@ -3,12 +3,13 @@ import { getDecodedPublicEvents } from '@aztec/aztec.js/events';
 import { Fr } from '@aztec/aztec.js/fields';
 import type { Logger } from '@aztec/aztec.js/log';
 import type { AztecNode } from '@aztec/aztec.js/node';
-import type { PrivateEventFilter, Wallet } from '@aztec/aztec.js/wallet';
+import type { PrivateEventFilter } from '@aztec/aztec.js/wallet';
 import { makeTuple } from '@aztec/foundation/array';
 import { BlockNumber } from '@aztec/foundation/branded-types';
 import { timesParallel } from '@aztec/foundation/collection';
 import type { Tuple } from '@aztec/foundation/serialize';
 import { type ExampleEvent0, type ExampleEvent1, TestLogContract } from '@aztec/noir-test-contracts.js/TestLog';
+import type { TestWallet } from '@aztec/test-wallet/server';
 
 import { jest } from '@jest/globals';
 
@@ -20,7 +21,7 @@ describe('Logs', () => {
   let testLogContract: TestLogContract;
   jest.setTimeout(TIMEOUT);
 
-  let wallet: Wallet;
+  let wallet: TestWallet;
   let aztecNode: AztecNode;
 
   let account1Address: AztecAddress;
@@ -39,7 +40,7 @@ describe('Logs', () => {
     } = await setup(2));
 
     log.warn(`Setup complete, checking account contracts published`);
-    await ensureAccountContractsPublished(wallet, [account1Address, account2Address]);
+    await ensureAccountContractsPublished(wallet, [account1Address, account2Address], aztecNode);
 
     log.warn(`Deploying test contract`);
     testLogContract = await TestLogContract.deploy(wallet).send({ from: account1Address }).deployed();
