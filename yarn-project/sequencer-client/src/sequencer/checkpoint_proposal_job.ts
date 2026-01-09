@@ -192,24 +192,18 @@ export class CheckpointProposalJob {
         // The only distinction between the 2 errors is SlashingProtectionError throws when the payload is different,
         // which is normal for block building (may have picked different txs)
         if (err instanceof DutyAlreadySignedError) {
-          this.log.info(
-            `Checkpoint proposal for slot ${this.slot} already signed by another HA node, stopping checkpoint proposal job`,
-            {
-              slot: this.slot,
-              signedByNode: err.signedByNode,
-            },
-          );
+          this.log.info(`Checkpoint proposal for slot ${this.slot} already signed by another HA node, yielding`, {
+            slot: this.slot,
+            signedByNode: err.signedByNode,
+          });
           return undefined;
         }
         if (err instanceof SlashingProtectionError) {
-          this.log.warn(
-            `Checkpoint proposal for slot ${this.slot} blocked by slashing protection, stopping checkpoint proposal job`,
-            {
-              slot: this.slot,
-              existingMessageHash: err.existingMessageHash,
-              attemptedMessageHash: err.attemptedMessageHash,
-            },
-          );
+          this.log.info(`Checkpoint proposal for slot ${this.slot} blocked by slashing protection, yielding`, {
+            slot: this.slot,
+            existingMessageHash: err.existingMessageHash,
+            attemptedMessageHash: err.attemptedMessageHash,
+          });
           return undefined;
         }
         throw err;
@@ -271,6 +265,8 @@ export class CheckpointProposalJob {
           this.checkpointNumber,
         );
       } catch (err) {
+        // We shouldn't really get here since we yield to another HA node
+        // as soon as we see these errors when creating block proposals.
         if (err instanceof DutyAlreadySignedError) {
           this.log.info(`Attestations signature for slot ${this.slot} already signed by another HA node, yielding`, {
             slot: this.slot,
@@ -279,7 +275,7 @@ export class CheckpointProposalJob {
           return undefined;
         }
         if (err instanceof SlashingProtectionError) {
-          this.log.warn(`Attestations signature for slot ${this.slot} blocked by slashing protection`, {
+          this.log.info(`Attestations signature for slot ${this.slot} blocked by slashing protection, yielding`, {
             slot: this.slot,
             existingMessageHash: err.existingMessageHash,
             attemptedMessageHash: err.attemptedMessageHash,
