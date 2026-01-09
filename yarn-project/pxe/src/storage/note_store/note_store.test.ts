@@ -30,9 +30,6 @@ const DUMMY_SILOED_NULLIFIER_3 = new Fr(3n);
 //   note2 → CONTRACT_A, SLOT_Y, SCOPE_1, siloedNullifier: DUMMY_SILOED_NULLIFIER_2
 //   note3 → CONTRACT_B, SLOT_X, SCOPE_2, siloedNullifier: DUMMY_SILOED_NULLIFIER_3
 //
-// Each note varies by contractAddress, storageSlot, and recipient (scope).
-// The siloedNullifier is used as the unique identifier for assertions.
-//
 // ───────────────────────────────────────────────────────────────────────────
 
 describe('NoteStore', () => {
