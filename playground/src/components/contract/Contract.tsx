@@ -198,15 +198,13 @@ export function ContractComponent() {
         public: true,
         utility: true,
       });
-      if (currentContractAddress) {
-        if (await isContractPublished(node, currentContractAddress)) {
-          const contractInstance = await node.getContract(currentContractAddress);
-
-          await wallet.registerContract(contractInstance, currentContractArtifact);
-          const contract = Contract.at(currentContractAddress, currentContractArtifact, wallet);
-          setCurrentContractClassId(contractInstance.currentContractClassId);
-          setCurrentContract(contract);
-        }
+      // Temporarily filter out not-yet-published contracts
+      if (currentContractAddress && (await isContractPublished(node, currentContractAddress))) {
+        const contractInstance = await node.getContract(currentContractAddress);
+        await wallet.registerContract(contractInstance, currentContractArtifact);
+        const contract = Contract.at(currentContractAddress, currentContractArtifact, wallet);
+        setCurrentContractClassId(contractInstance.currentContractClassId);
+        setCurrentContract(contract);
       }
       setIsLoadingArtifact(false);
     };
