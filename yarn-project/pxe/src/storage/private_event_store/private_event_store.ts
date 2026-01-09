@@ -84,9 +84,11 @@ export class PrivateEventStore {
 
     return this.#store.transactionAsync(async () => {
       const key = this.#keyFor(contractAddress, scope, eventSelector);
+
+      // The siloed event commitment is guaranteed to be unique as it's inserted into the nullifier tree. For this
+      // reason we use it as id.
       const eventId = siloedEventCommitment.toString();
 
-      // Check if this exact log has already been stored using siloedEventCommitment as unique identifier
       const hasBeenSeen = await this.#seenLogs.getAsync(eventId);
       if (hasBeenSeen) {
         this.logger.verbose('Ignoring duplicate event log', { txHash: txHash.toString(), siloedEventCommitment });
@@ -110,7 +112,7 @@ export class PrivateEventStore {
       const existingBlockIds = (await this.#eventsByBlockNumber.getAsync(l2BlockNumber)) || [];
       await this.#eventsByBlockNumber.set(l2BlockNumber, [...existingBlockIds, eventId]);
 
-      // Mark this log as seen using siloedEventCommitment
+      // Mark this log as seen
       await this.#seenLogs.set(eventId, true);
     });
   }
@@ -123,8 +125,8 @@ export class PrivateEventStore {
    *  fromBlock: The block number to search from (inclusive).
    *  toBlock: The block number to search upto (exclusive).
    *  scope: - The addresses that decrypted the logs.
-   * @returns - The event log contents, augmented with metadata about
-   *  the transaction and block it the event was included in .
+   * @returns - The event log contents, augmented with metadata about the transaction and block in which the event was
+   * included.
    */
   public async getPrivateEvents(
     eventSelector: EventSelector,

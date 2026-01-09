@@ -49,8 +49,7 @@ export function packAsRetrievedNote({
   isPending: boolean;
   note: Note;
 }) {
-  // If the note is pending it means it come from note execution cache which implies it has a non-zero note hash
-  // counter.
+  // If the note is pending it means it has a non-zero note hash counter associated with it.
   const nonZeroNoteHashCounter = isPending;
 
   // To pack the note as retrieved note we first need to reconstruct the note metadata.
