@@ -40,7 +40,7 @@ export class SenderTaggingStore implements StagedStore {
 
   // jobId => directional app tagging secret => highest finalized index
   // note: null means "checked kv store, there was nothing"
-  #stagedLastFinalizedIndexes: Map<string, Map<string, number | null>>;
+  #stagedLastFinalizedIndexes: Map<string, Map<string, number>>;
 
   constructor(store: AztecAsyncKVStore) {
     this.#store = store;
@@ -52,40 +52,37 @@ export class SenderTaggingStore implements StagedStore {
     this.#stagedLastFinalizedIndexes = new Map();
   }
 
-  #getPendingIndexesJobView(jobId: string): Map<string, { index: number; txHash: string }[]> {
-    let jobView = this.#stagedPendingIndexes.get(jobId);
-    if (!jobView) {
-      jobView = new Map();
-      this.#stagedPendingIndexes.set(jobId, jobView);
+  #getJobStagedPendingIndexes(jobId: string): Map<string, { index: number; txHash: string }[]> {
+    let jobStagedPendingIndexes = this.#stagedPendingIndexes.get(jobId);
+    if (!jobStagedPendingIndexes) {
+      jobStagedPendingIndexes = new Map();
+      this.#stagedPendingIndexes.set(jobId, jobStagedPendingIndexes);
     }
-    return jobView;
+    return jobStagedPendingIndexes;
   }
 
-  #getLastFinalizedIndexesJobView(jobId: string): Map<string, number | null> {
-    let jobView = this.#stagedLastFinalizedIndexes.get(jobId);
-    if (!jobView) {
-      jobView = new Map();
-      this.#stagedLastFinalizedIndexes.set(jobId, jobView);
+  #getJobStagedLastFinalizedIndexes(jobId: string): Map<string, number> {
+    let jobStagedLastFinalizedIndexes = this.#stagedLastFinalizedIndexes.get(jobId);
+    if (!jobStagedLastFinalizedIndexes) {
+      jobStagedLastFinalizedIndexes = new Map();
+      this.#stagedLastFinalizedIndexes.set(jobId, jobStagedLastFinalizedIndexes);
     }
-    return jobView;
+    return jobStagedLastFinalizedIndexes;
   }
 
   async #getPendingIndexes(jobId: string, secret: string): Promise<{ index: number; txHash: string }[]> {
-    const jobView = this.#getPendingIndexesJobView(jobId);
+    const jobView = this.#getJobStagedPendingIndexes(jobId);
     let staged: { index: number; txHash: string }[] | undefined = jobView.get(secret);
     if (staged === undefined) {
       // If we don't have a staged version of this, first we check if there's one in DB
-      // If it's not in DB, we'll get an undefined here, we store an empty array instead so we signal
-      // that we already checked the DB for this job.
+      // If it's not in DB, we'll get an undefined here, which we coerce to []
       staged = (await this.#pendingIndexes.getAsync(secret)) ?? [];
-      jobView.set(secret, staged);
     }
     return staged;
   }
 
   #setPendingIndexes(jobId: string, secret: string, pendingIndexes: { index: number; txHash: string }[]) {
-    const jobView = this.#getPendingIndexesJobView(jobId);
-    jobView.set(secret, pendingIndexes);
+    this.#getJobStagedPendingIndexes(jobId).set(secret, pendingIndexes);
   }
 
   /**
@@ -95,25 +92,21 @@ export class SenderTaggingStore implements StagedStore {
    */
   async #allSecretsWithPendingIndexes(jobId: string): Promise<string[]> {
     const allSecretsInKV = new Set(await toArray(this.#pendingIndexes.keysAsync()));
-    const allSecretsInJobView = this.#getPendingIndexesJobView(jobId).keys();
+    const allSecretsInJobView = this.#getJobStagedPendingIndexes(jobId).keys();
     return [...allSecretsInKV.union(new Set(allSecretsInJobView))];
   }
 
-  async #getLastFinalizedIndex(jobId: string, secret: string): Promise<number | null> {
-    const jobView = this.#getLastFinalizedIndexesJobView(jobId);
-    // If we don't have a staged version of this, first we check if there's one in DB
-    // If it's not in DB, we'll get an undefined here, we store a null instead so we signal
-    // that we already checked the DB for this job.
-    let staged: number | undefined | null = jobView.get(secret);
+  async #getLastFinalizedIndex(jobId: string, secret: string): Promise<number | undefined> {
+    const jobView = this.#getJobStagedLastFinalizedIndexes(jobId);
+    let staged: number | undefined = jobView.get(secret);
     if (staged === undefined) {
-      staged = (await this.#lastFinalizedIndexes.getAsync(secret)) ?? null;
-      jobView.set(secret, staged);
+      staged = await this.#lastFinalizedIndexes.getAsync(secret);
     }
     return staged;
   }
 
   #setLastFinalizedIndex(jobId: string, secret: string, lastFinalizedIndex: number) {
-    const jobView = this.#getLastFinalizedIndexesJobView(jobId);
+    const jobView = this.#getJobStagedLastFinalizedIndexes(jobId);
     jobView.set(secret, lastFinalizedIndex);
   }
 
@@ -171,7 +164,7 @@ export class SenderTaggingStore implements StagedStore {
 
       // Throw if the new pending index is lower than or equal to the last finalized index
       const secretStr = secret.toString();
-      const lastFinalizedIndex = await this.#lastFinalizedIndexes.getAsync(secretStr);
+      const lastFinalizedIndex = await this.#getLastFinalizedIndex(jobId, secretStr);
       if (lastFinalizedIndex !== undefined && index <= lastFinalizedIndex) {
         throw new Error(
           `Cannot store pending index ${index} for secret ${secretStr}: ` +
