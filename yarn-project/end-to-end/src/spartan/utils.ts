@@ -1094,10 +1094,12 @@ export async function getL1DeploymentAddresses(env: TestConfig): Promise<L1Contr
  *        Defaults to false, which preserves the existing storage.
  */
 export async function rollAztecPods(namespace: string, clearState: boolean = false) {
-  const components = ['p2p-bootstrap', 'prover-node', 'prover-broker', 'prover-agent', 'validator', 'rpc'];
+  // Pod components use 'validator', but PVCs use 'sequencer-node' for validators
+  const podComponents = ['p2p-bootstrap', 'prover-node', 'prover-broker', 'prover-agent', 'validator', 'rpc'];
+  const pvcComponents = ['p2p-bootstrap', 'prover-node', 'sequencer-node', 'rpc'];
 
   // Delete pods
-  for (const component of components) {
+  for (const component of podComponents) {
     await deleteResourceByLabel({
       resource: 'pods',
       namespace: namespace,
@@ -1107,9 +1109,9 @@ export async function rollAztecPods(namespace: string, clearState: boolean = fal
 
   // If clearState is true, also delete PVCs to clear persistent storage
   if (clearState) {
-    for (const component of components) {
+    for (const component of pvcComponents) {
       await deleteResourceByLabel({
-        resource: 'pvc',
+        resource: 'persistentvolumeclaims',
         namespace: namespace,
         label: `app.kubernetes.io/component=${component}`,
       });
@@ -1119,7 +1121,7 @@ export async function rollAztecPods(namespace: string, clearState: boolean = fal
   await sleep(10 * 1000);
 
   // Wait for pods to come back
-  for (const component of components) {
+  for (const component of podComponents) {
     await waitForResourceByLabel({
       resource: 'pods',
       namespace: namespace,

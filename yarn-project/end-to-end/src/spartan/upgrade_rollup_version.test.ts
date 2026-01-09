@@ -1,6 +1,4 @@
-import { getInitialTestAccountsData } from '@aztec/accounts/testing';
 import { type AztecNode, type NodeInfo, createAztecNodeClient } from '@aztec/aztec.js/node';
-import { getSponsoredFPCAddress } from '@aztec/cli/cli-utils';
 import { createEthereumChain } from '@aztec/ethereum/chain';
 import { createExtendedL1Client } from '@aztec/ethereum/client';
 import { getL1ContractsConfigEnvVars } from '@aztec/ethereum/config';
@@ -19,7 +17,6 @@ import {
 } from '@aztec/l1-artifacts';
 import { getVKTreeRoot } from '@aztec/noir-protocol-circuits-types/vk-tree';
 import { protocolContractsHash } from '@aztec/protocol-contracts';
-import { getGenesisValues } from '@aztec/world-state/testing';
 
 import { jest } from '@jest/globals';
 import type { ChildProcess } from 'child_process';
@@ -88,19 +85,16 @@ describe('spartan_upgrade_rollup_version', () => {
     const l1Client = createExtendedL1Client(ETHEREUM_HOSTS, MNEMONIC, chain.chainInfo);
     debugLogger.info(`L1 Client address: ${l1Client.account.address}`);
 
-    // Get genesis values matching the network configuration
-    // The network may have TEST_ACCOUNTS and/or SPONSORED_FPC enabled
-    const testAccounts =
-      process.env.TEST_ACCOUNTS === 'true' ? (await getInitialTestAccountsData()).map(a => a.address) : [];
-    const sponsoredFPCAccounts = process.env.SPONSORED_FPC !== 'false' ? [await getSponsoredFPCAddress()] : [];
-    const initialFundedAccounts = testAccounts.concat(sponsoredFPCAccounts);
-    debugLogger.info(`Initial funded accounts for genesis: ${initialFundedAccounts.map(a => a.toString()).join(', ')}`);
-    const { genesisArchiveRoot, fundingNeeded } = await getGenesisValues(initialFundedAccounts);
+    // Get the original rollup's genesis archive root directly from L1
+    // This ensures the new rollup has the same genesis as the original,
+    // avoiding version mismatches between local build and deployed network
+    const rollup = new RollupContract(l1Client, originalL1ContractAddresses.rollupAddress.toString());
+    const genesisArchiveRoot = await rollup.getGenesisArchiveTreeRoot();
+    debugLogger.info(`Original rollup genesis archive root: ${genesisArchiveRoot.toString()}`);
 
     // Get default L1 contracts config values
     const l1Config = getL1ContractsConfigEnvVars();
 
-    const rollup = new RollupContract(l1Client, originalL1ContractAddresses.rollupAddress.toString());
     const { rollup: newRollup } = await deployRollupForUpgrade(
       privateKey,
       ETHEREUM_HOSTS[0],
@@ -127,7 +121,7 @@ describe('spartan_upgrade_rollup_version', () => {
         localEjectionThreshold: l1Config.localEjectionThreshold,
         manaTarget: l1Config.manaTarget,
         provingCostPerMana: l1Config.provingCostPerMana,
-        feeJuicePortalInitialBalance: fundingNeeded,
+        feeJuicePortalInitialBalance: 0n,
         realVerifier: false,
         exitDelaySeconds: l1Config.exitDelaySeconds,
         slasherFlavor: l1Config.slasherFlavor,
@@ -354,10 +348,10 @@ describe('spartan_upgrade_rollup_version', () => {
       // Log ballot after voting
       try {
         const ballot = (await governance.read.getBallot([proposalId, l1Client.account.address])) as {
-          yes: bigint;
-          no: bigint;
+          yea: bigint;
+          nay: bigint;
         };
-        debugLogger.info(`Local ballot: yes=${ballot.yes} no=${ballot.no}`);
+        debugLogger.info(`Local ballot: yea=${ballot.yea} nay=${ballot.nay}`);
       } catch {
         // ignore ballot read failure
       }

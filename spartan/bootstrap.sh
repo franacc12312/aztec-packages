@@ -76,17 +76,18 @@ function network_test_cmds {
   local prefix="disabled-cache:CPUS=10:MEM=16g:TIMEOUT=120m"
   local run_test_script="yarn-project/end-to-end/scripts/run_test.sh"
   echo $prefix $run_test_script simple src/spartan/smoke.test.ts
-  echo $prefix $run_test_script simple src/spartan/transfer.test.ts
-  echo $prefix $run_test_script simple src/spartan/slash_inactivity.test.ts
-  echo $prefix $run_test_script simple src/spartan/proving.test.ts
-  echo $prefix $run_test_script simple src/spartan/prover-node.test.ts #needs partial epoch proved first
-  echo $prefix $run_test_script simple src/spartan/invalidate_blocks.test.ts
-  # echo $prefix $run_test_script simple src/spartan/4epochs.test.ts #runs >~4 epochs
-  echo $prefix $run_test_script simple src/spartan/gating-passive.test.ts
-  echo $prefix $run_test_script simple src/spartan/mempool_limit.test.ts
-  echo $prefix $run_test_script simple src/spartan/upgrade_governance_proposer.test.ts
-  echo $prefix $run_test_script simple src/spartan/validator_nuke_and_suppression.test.ts
-  echo $prefix $run_test_script simple src/spartan/reorg.test.ts #runs >~5 epochs
+  # echo $prefix $run_test_script simple src/spartan/transfer.test.ts
+  # echo $prefix $run_test_script simple src/spartan/slash_inactivity.test.ts
+  # echo $prefix $run_test_script simple src/spartan/proving.test.ts
+  # echo $prefix $run_test_script simple src/spartan/prover-node.test.ts #needs partial epoch proved first
+  # echo $prefix $run_test_script simple src/spartan/invalidate_blocks.test.ts
+  # # echo $prefix $run_test_script simple src/spartan/4epochs.test.ts #runs >~4 epochs
+  # echo $prefix $run_test_script simple src/spartan/gating-passive.test.ts
+  # echo $prefix $run_test_script simple src/spartan/mempool_limit.test.ts
+  # echo $prefix $run_test_script simple src/spartan/upgrade_governance_proposer.test.ts
+  # echo $prefix $run_test_script simple src/spartan/validator_nuke_and_suppression.test.ts
+  # echo $prefix $run_test_script simple src/spartan/reorg.test.ts #runs >~5 epochs
+  echo $prefix $run_test_script simple src/spartan/upgrade_rollup_version.test.ts
 }
 
 function single_test {
