@@ -5,7 +5,7 @@ import { openTmpStore } from '@aztec/kv-store/lmdb-v2';
 import { AztecAddress } from '@aztec/stdlib/aztec-address';
 import { L2BlockHash, randomDataInBlock } from '@aztec/stdlib/block';
 import type { CompleteAddress } from '@aztec/stdlib/contract';
-import { computeUniqueNoteHash, siloNoteHash } from '@aztec/stdlib/hash';
+import { computeUniqueNoteHash, siloNoteHash, siloNullifier } from '@aztec/stdlib/hash';
 import type { AztecNode } from '@aztec/stdlib/interfaces/client';
 import { NoteDao, NoteStatus } from '@aztec/stdlib/note';
 import { MerkleTreeId } from '@aztec/stdlib/trees';
@@ -227,26 +227,12 @@ describe('NoteService', () => {
         Promise.resolve(queryTxHash == txHash ? indexedTxEffect : undefined),
       );
 
-      aztecNode.findLeavesIndexes.mockImplementation((queryBlockNum, treeId, leaves) => {
-        if (queryBlockNum != blockNumber) {
-          throw new Error(`Got a tree query for block ${queryBlockNum} but synced block is ${blockNumber}`);
-        }
-
-        if (treeId == MerkleTreeId.NOTE_HASH_TREE && leaves[0].equals(uniqueNoteHash)) {
-          return Promise.resolve([
-            {
-              data: BigInt(0),
-              l2BlockNumber: indexedTxEffect.l2BlockNumber,
-              l2BlockHash: indexedTxEffect.l2BlockHash,
-            },
-          ]);
-        } else {
-          throw new Error();
-        }
+      aztecNode.findLeavesIndexes.mockImplementation((_queryBlockNum, _treeId, _leaves) => {
+        return Promise.resolve([undefined]);
       });
     });
 
-    it('should store note if it exists in note hash tree', async () => {
+    it('should store note if it exists in a tx effect', async () => {
       await noteService.deliverNote(
         contractAddress,
         owner,
@@ -265,6 +251,50 @@ describe('NoteService', () => {
 
       expect(notes).toHaveLength(1);
       expect(notes[0].noteHash.equals(noteHash)).toBe(true);
+    });
+
+    it('should nullify note if nullifier index is found', async () => {
+      const siloedNullifier = await siloNullifier(contractAddress, nullifier);
+      const nullifierIndex = randomDataInBlock(123n);
+
+      // Override the mock to return a nullifier index (indicating the note has been nullified)
+      aztecNode.findLeavesIndexes.mockImplementation((_queryBlockNum, treeId, leaves) => {
+        if (treeId == MerkleTreeId.NULLIFIER_TREE && leaves[0].equals(siloedNullifier)) {
+          return Promise.resolve([nullifierIndex]);
+        }
+        return Promise.resolve([undefined]);
+      });
+
+      await noteService.deliverNote(
+        contractAddress,
+        owner,
+        storageSlot,
+        randomness,
+        noteNonce,
+        content,
+        noteHash,
+        nullifier,
+        txHash,
+        recipient.address,
+      );
+
+      // Now we verify that the note is stored as nullified by checking it can be retrieved only with
+      // the ACTIVE_OR_NULLIFIED status on the input.
+      const allNotes = await noteStore.getNotes({
+        contractAddress,
+        scopes: [recipient.address],
+        status: NoteStatus.ACTIVE_OR_NULLIFIED,
+      });
+      expect(allNotes).toHaveLength(1);
+      expect(allNotes[0].noteHash.equals(noteHash)).toBe(true);
+
+      // Verify the note is nullified (not in active notes)
+      const activeNotes = await noteStore.getNotes({
+        contractAddress,
+        scopes: [recipient.address],
+        status: NoteStatus.ACTIVE,
+      });
+      expect(activeNotes).toHaveLength(0);
     });
 
     it('should throw if tx hash does not exist', async () => {

@@ -180,7 +180,7 @@ export class NoteService {
     await this.noteStore.addNotes([noteDao], recipient);
 
     if (nullifierIndex !== undefined) {
-      // We found nullifier index which implies tht the note has already been nullified.
+      // We found nullifier index which implies that the note has already been nullified.
       const { data: _, ...blockHashAndNum } = nullifierIndex;
       await this.noteStore.applyNullifiers([{ data: siloedNullifier, ...blockHashAndNum }]);
     }
