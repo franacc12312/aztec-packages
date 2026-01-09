@@ -11,6 +11,8 @@
 #include "barretenberg/avm_fuzzer/fuzz_lib/control_flow.hpp"
 #include "barretenberg/avm_fuzzer/fuzz_lib/fuzz.hpp"
 #include "barretenberg/avm_fuzzer/fuzzer_comparison_helper.hpp"
+#include "barretenberg/avm_fuzzer/mutations/basic_types/uint64_t.hpp"
+#include "barretenberg/avm_fuzzer/mutations/configuration.hpp"
 #include "barretenberg/avm_fuzzer/mutations/fuzzer_data.hpp"
 #include "barretenberg/avm_fuzzer/mutations/tx_data.hpp"
 #include "barretenberg/avm_fuzzer/mutations/tx_types/gas.hpp"
@@ -346,8 +348,16 @@ size_t mutate_tx_data(FuzzerContext& context,
     case FuzzerTxDataMutationType::ContractInstanceMutation:
         mutate_contract_instances(tx_data.contract_instances, tx_data.contract_addresses, rng);
         break;
-        // case TxDataMutationType::GlobalVariablesMutation:
-        //     break;
+    case FuzzerTxDataMutationType::GlobalVariablesMutation:
+        // This is just mutating the gas values and timestamp
+        mutate_uint64_t(tx_data.global_variables.timestamp, rng, BASIC_UINT64_T_MUTATION_CONFIGURATION);
+        mutate_gas_fees(tx_data.global_variables.gas_fees, rng);
+        // This must be less than or equal to the tx max fees per gas
+        tx_data.global_variables.gas_fees.fee_per_da_gas = std::min(
+            tx_data.global_variables.gas_fees.fee_per_da_gas, tx_data.tx.gas_settings.max_fees_per_gas.fee_per_da_gas);
+        tx_data.global_variables.gas_fees.fee_per_l2_gas = std::min(
+            tx_data.global_variables.gas_fees.fee_per_l2_gas, tx_data.tx.gas_settings.max_fees_per_gas.fee_per_l2_gas);
+        break;
         // case TxDataMutationType::ProtocolContractsMutation:
         // break;
     }
