@@ -1,7 +1,7 @@
 import { range } from '@aztec/foundation/array';
 import { times } from '@aztec/foundation/collection';
 import { Fr } from '@aztec/foundation/curves/bn254';
-import { openTmpStore } from '@aztec/kv-store/lmdb-v2';
+import { AztecLMDBStoreV2, openTmpStore } from '@aztec/kv-store/lmdb-v2';
 import { AztecAddress } from '@aztec/stdlib/aztec-address';
 
 import { CapsuleStore } from './capsule_store.js';
@@ -9,12 +9,13 @@ import { CapsuleStore } from './capsule_store.js';
 describe('capsule data provider', () => {
   let contract: AztecAddress;
   let capsuleStore: CapsuleStore;
+  let store: AztecLMDBStoreV2;
 
   beforeEach(async () => {
     // Setup mock contract address
     contract = await AztecAddress.random();
-    // Setup data provider
-    const store = await openTmpStore('capsule_store_test');
+    // Setup store
+    store = await openTmpStore('capsule_store_test');
     capsuleStore = new CapsuleStore(store);
   });
 
@@ -327,6 +328,10 @@ describe('capsule data provider', () => {
           times(NUMBER_OF_ITEMS, () => range(ARRAY_LENGTH).map(x => new Fr(x))),
           'test',
         );
+
+        await store.transactionAsync(async () => {
+          await capsuleStore.commit('test');
+        });
       },
       TEST_TIMEOUT_MS,
     );
@@ -340,6 +345,10 @@ describe('capsule data provider', () => {
           times(NUMBER_OF_ITEMS, () => range(ARRAY_LENGTH).map(x => new Fr(x))),
           'test',
         );
+
+        await store.transactionAsync(async () => {
+          await capsuleStore.commit('test');
+        });
       },
       TEST_TIMEOUT_MS,
     );
@@ -354,8 +363,16 @@ describe('capsule data provider', () => {
           'test',
         );
 
+        await store.transactionAsync(async () => {
+          await capsuleStore.commit('test');
+        });
+
         // Append a single element
         await capsuleStore.appendToCapsuleArray(contract, new Fr(0), [range(ARRAY_LENGTH).map(x => new Fr(x))], 'test');
+
+        await store.transactionAsync(async () => {
+          await capsuleStore.commit('test');
+        });
       },
       TEST_TIMEOUT_MS,
     );
@@ -370,8 +387,16 @@ describe('capsule data provider', () => {
           'test',
         );
 
+        await store.transactionAsync(async () => {
+          await capsuleStore.commit('test');
+        });
+
         // We just move the entire thing one slot.
         await capsuleStore.copyCapsule(contract, new Fr(0), new Fr(1), NUMBER_OF_ITEMS, 'test');
+
+        await store.transactionAsync(async () => {
+          await capsuleStore.commit('test');
+        });
       },
       TEST_TIMEOUT_MS,
     );
@@ -386,7 +411,15 @@ describe('capsule data provider', () => {
           'test',
         );
 
+        await store.transactionAsync(async () => {
+          await capsuleStore.commit('test');
+        });
+
         await capsuleStore.readCapsuleArray(contract, new Fr(0), 'test');
+
+        await store.transactionAsync(async () => {
+          await capsuleStore.commit('test');
+        });
       },
       TEST_TIMEOUT_MS,
     );
@@ -401,7 +434,15 @@ describe('capsule data provider', () => {
           'test',
         );
 
+        await store.transactionAsync(async () => {
+          await capsuleStore.commit('test');
+        });
+
         await capsuleStore.setCapsuleArray(contract, new Fr(0), [], 'test');
+
+        await store.transactionAsync(async () => {
+          await capsuleStore.commit('test');
+        });
       },
       TEST_TIMEOUT_MS,
     );
