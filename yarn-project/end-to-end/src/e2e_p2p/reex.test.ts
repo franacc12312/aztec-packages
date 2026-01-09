@@ -143,10 +143,10 @@ describe('e2e_p2p_reex', () => {
           .keyStore as ValidatorKeyStore;
         const newProposal = new BlockProposal(
           proposal.payload,
-          (await signer.signMessageWithAddress(
+          await signer.signMessageWithAddress(
             proposerAddress!,
             getHashedSignaturePayload(proposal.payload, SignatureDomainSeparator.blockProposal),
-          ))!,
+          ),
           proposal.txHashes,
         );
 
