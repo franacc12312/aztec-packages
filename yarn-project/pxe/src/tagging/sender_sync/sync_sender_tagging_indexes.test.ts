@@ -44,11 +44,11 @@ describe('syncSenderTaggingIndexes', () => {
       return Promise.resolve(tags.map((_tag: SiloedTag) => []));
     });
 
-    await syncSenderTaggingIndexes(secret, contractAddress, aztecNode, taggingStore);
+    await syncSenderTaggingIndexes(secret, contractAddress, aztecNode, taggingStore, 'test');
 
     // Highest used and finalized indexes should stay undefined
-    expect(await taggingStore.getLastUsedIndex(secret)).toBeUndefined();
-    expect(await taggingStore.getLastFinalizedIndex(secret)).toBeUndefined();
+    expect(await taggingStore.getLastUsedIndex(secret, 'test')).toBeUndefined();
+    expect(await taggingStore.getLastFinalizedIndex(secret, 'test')).toBeUndefined();
   });
 
   // These tests need to be run together in sequence.
@@ -86,13 +86,13 @@ describe('syncSenderTaggingIndexes', () => {
         finalized: { number: finalizedBlockNumberStep1 },
       } as any);
 
-      await syncSenderTaggingIndexes(secret, contractAddress, aztecNode, taggingStore);
+      await syncSenderTaggingIndexes(secret, contractAddress, aztecNode, taggingStore, 'test');
 
       // Verify the highest finalized index is updated to 3
-      expect(await taggingStore.getLastFinalizedIndex(secret)).toBe(finalizedIndexStep1);
+      expect(await taggingStore.getLastFinalizedIndex(secret, 'test')).toBe(finalizedIndexStep1);
       // Verify the highest used index also returns 3 (when there is no higher pending index the highest used index is
       // the highest finalized index).
-      expect(await taggingStore.getLastUsedIndex(secret)).toBe(finalizedIndexStep1);
+      expect(await taggingStore.getLastUsedIndex(secret, 'test')).toBe(finalizedIndexStep1);
     });
 
     it('step 2: pending log is synced', async () => {
@@ -115,12 +115,12 @@ describe('syncSenderTaggingIndexes', () => {
         finalized: { number: finalizedBlockNumberStep1 },
       } as any);
 
-      await syncSenderTaggingIndexes(secret, contractAddress, aztecNode, taggingStore);
+      await syncSenderTaggingIndexes(secret, contractAddress, aztecNode, taggingStore, 'test');
 
       // Verify the highest finalized index was not updated
-      expect(await taggingStore.getLastFinalizedIndex(secret)).toBe(finalizedIndexStep1);
+      expect(await taggingStore.getLastFinalizedIndex(secret, 'test')).toBe(finalizedIndexStep1);
       // Verify the highest used index was updated to the pending index
-      expect(await taggingStore.getLastUsedIndex(secret)).toBe(pendingIndexStep2);
+      expect(await taggingStore.getLastUsedIndex(secret, 'test')).toBe(pendingIndexStep2);
     });
 
     it('step 3: syncs logs across 2 windows', async () => {
@@ -184,10 +184,10 @@ describe('syncSenderTaggingIndexes', () => {
         finalized: { number: newFinalizedBlockNumber },
       } as any);
 
-      await syncSenderTaggingIndexes(secret, contractAddress, aztecNode, taggingStore);
+      await syncSenderTaggingIndexes(secret, contractAddress, aztecNode, taggingStore, 'test');
 
-      expect(await taggingStore.getLastFinalizedIndex(secret)).toBe(newHighestFinalizedIndex);
-      expect(await taggingStore.getLastUsedIndex(secret)).toBe(newHighestUsedIndex);
+      expect(await taggingStore.getLastFinalizedIndex(secret, 'test')).toBe(newHighestFinalizedIndex);
+      expect(await taggingStore.getLastUsedIndex(secret, 'test')).toBe(newHighestUsedIndex);
     });
   });
 
@@ -238,10 +238,10 @@ describe('syncSenderTaggingIndexes', () => {
     } as any);
 
     // Sync tagged logs
-    await syncSenderTaggingIndexes(secret, contractAddress, aztecNode, taggingStore);
+    await syncSenderTaggingIndexes(secret, contractAddress, aztecNode, taggingStore, 'test');
 
     // Verify that both highest finalized and highest used were set to the pending and finalized index
-    expect(await taggingStore.getLastFinalizedIndex(secret)).toBe(pendingAndFinalizedIndex);
-    expect(await taggingStore.getLastUsedIndex(secret)).toBe(pendingAndFinalizedIndex);
+    expect(await taggingStore.getLastFinalizedIndex(secret, 'test')).toBe(pendingAndFinalizedIndex);
+    expect(await taggingStore.getLastUsedIndex(secret, 'test')).toBe(pendingAndFinalizedIndex);
   });
 });
