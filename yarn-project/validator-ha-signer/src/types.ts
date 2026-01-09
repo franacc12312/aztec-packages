@@ -61,7 +61,7 @@ export interface SigningContext {
    * For block proposals: 0, 1, 2...
    * For checkpoint proposals, attestations, and attestations_and_signers: -1 (not applicable).
    */
-  blockIndexWithinCheckpoint: number;
+  blockIndexWithinCheckpoint?: number;
   /** Type of duty being performed */
   dutyType: DutyType;
 }
@@ -94,9 +94,9 @@ export interface SlashingProtectionDatabase {
     validatorAddress: EthAddress,
     slot: SlotNumber,
     dutyType: DutyType,
-    blockIndexWithinCheckpoint: number,
     signature: string,
     lockToken: string,
+    blockIndexWithinCheckpoint?: number,
   ): Promise<boolean>;
 
   /**
@@ -110,8 +110,8 @@ export interface SlashingProtectionDatabase {
     validatorAddress: EthAddress,
     slot: SlotNumber,
     dutyType: DutyType,
-    blockIndexWithinCheckpoint: number,
     lockToken: string,
+    blockIndexWithinCheckpoint?: number,
   ): Promise<boolean>;
 
   /**

@@ -249,7 +249,6 @@ describe('ValidatorHASigner', () => {
           slot: SlotNumber(100),
           blockNumber: BlockNumber(50),
           dutyType: DutyType.ATTESTATION,
-          blockIndexWithinCheckpoint: -1,
         },
         signFn,
       );
@@ -271,7 +270,6 @@ describe('ValidatorHASigner', () => {
         slot: SlotNumber(100),
         blockNumber: BlockNumber(50),
         dutyType: DutyType.ATTESTATION,
-        blockIndexWithinCheckpoint: -1,
         messageHash: messageHash.toString(),
         nodeId: NODE_ID,
       });
@@ -397,7 +395,6 @@ describe('ValidatorHASigner', () => {
           slot,
           blockNumber,
           dutyType: DutyType.CHECKPOINT_PROPOSAL,
-          blockIndexWithinCheckpoint: -1,
         },
         signFn,
       );
@@ -428,7 +425,6 @@ describe('ValidatorHASigner', () => {
         slot,
         blockNumber,
         dutyType: DutyType.CHECKPOINT_PROPOSAL,
-        blockIndexWithinCheckpoint: -1,
         messageHash: MESSAGE_HASH.toString(),
         nodeId: NODE_ID,
       });

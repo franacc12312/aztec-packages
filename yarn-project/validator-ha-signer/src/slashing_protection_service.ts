@@ -146,9 +146,9 @@ export class SlashingProtectionService {
       validatorAddress,
       slot,
       dutyType,
-      blockIndexWithinCheckpoint,
       signature.toString(),
       lockToken,
+      blockIndexWithinCheckpoint,
     );
 
     if (success) {
@@ -176,7 +176,13 @@ export class SlashingProtectionService {
   async deleteDuty(params: DeleteDutyParams): Promise<boolean> {
     const { validatorAddress, slot, dutyType, blockIndexWithinCheckpoint, lockToken } = params;
 
-    const success = await this.db.deleteDuty(validatorAddress, slot, dutyType, blockIndexWithinCheckpoint, lockToken);
+    const success = await this.db.deleteDuty(
+      validatorAddress,
+      slot,
+      dutyType,
+      lockToken,
+      blockIndexWithinCheckpoint ?? -1,
+    );
 
     if (success) {
       this.log.info(`Deleted duty ${dutyType} at slot ${slot} to allow retry`, {

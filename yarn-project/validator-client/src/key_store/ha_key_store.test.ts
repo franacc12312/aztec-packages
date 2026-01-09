@@ -218,7 +218,6 @@ describe('HAKeyStore', () => {
       slot: SlotNumber(100),
       blockNumber: BlockNumber(50),
       dutyType: DutyType.ATTESTATION,
-      blockIndexWithinCheckpoint: -1,
     };
 
     beforeEach(() => {
@@ -236,7 +235,6 @@ describe('HAKeyStore', () => {
           slot: context.slot,
           blockNumber: context.blockNumber,
           dutyType: DutyType.ATTESTATION,
-          blockIndexWithinCheckpoint: -1,
         },
         expect.any(Function),
       );

@@ -84,31 +84,26 @@ export interface ValidatorDutyRecord {
 export interface DutyIdentifier {
   validatorAddress: EthAddress;
   slot: SlotNumber;
-  blockIndexWithinCheckpoint: number;
+  blockIndexWithinCheckpoint?: number;
   dutyType: DutyType;
 }
 
 /**
  * Parameters for checking and recording a new duty
  */
-export interface CheckAndRecordParams {
-  validatorAddress: EthAddress;
-  slot: SlotNumber;
+export interface CheckAndRecordParams extends DutyIdentifier {
+  /** Block number for this duty */
   blockNumber: BlockNumber | CheckpointNumber;
-  blockIndexWithinCheckpoint: number;
-  dutyType: DutyType;
+  /** The signing root (hash) for this duty */
   messageHash: string;
+  /** Unique identifier for the node that acquired the lock */
   nodeId: string;
 }
 
 /**
  * Parameters for recording a successful signing
  */
-export interface RecordSuccessParams {
-  validatorAddress: EthAddress;
-  slot: SlotNumber;
-  blockIndexWithinCheckpoint: number;
-  dutyType: DutyType;
+export interface RecordSuccessParams extends DutyIdentifier {
   signature: Signature;
   nodeId: string;
   lockToken: string;
@@ -117,10 +112,6 @@ export interface RecordSuccessParams {
 /**
  * Parameters for deleting a duty
  */
-export interface DeleteDutyParams {
-  validatorAddress: EthAddress;
-  slot: SlotNumber;
-  blockIndexWithinCheckpoint: number;
-  dutyType: DutyType;
+export interface DeleteDutyParams extends DutyIdentifier {
   lockToken: string;
 }

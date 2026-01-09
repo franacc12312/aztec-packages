@@ -91,7 +91,7 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
           params.validatorAddress.toString(),
           params.slot.toString(),
           params.blockNumber.toString(),
-          params.blockIndexWithinCheckpoint,
+          params.blockIndexWithinCheckpoint ?? -1,
           params.dutyType,
           params.messageHash,
           params.nodeId,
@@ -133,16 +133,16 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
     validatorAddress: EthAddress,
     slot: SlotNumber,
     dutyType: DutyType,
-    blockIndexWithinCheckpoint: number,
     signature: string,
     lockToken: string,
+    blockIndexWithinCheckpoint?: number,
   ): Promise<boolean> {
     const result = await this.pool.query(UPDATE_DUTY_SIGNED, [
       signature,
       validatorAddress.toString(),
       slot.toString(),
       dutyType,
-      blockIndexWithinCheckpoint,
+      blockIndexWithinCheckpoint ?? -1,
       lockToken,
     ]);
 
@@ -169,14 +169,14 @@ export class PostgresSlashingProtectionDatabase implements SlashingProtectionDat
     validatorAddress: EthAddress,
     slot: SlotNumber,
     dutyType: DutyType,
-    blockIndexWithinCheckpoint: number,
     lockToken: string,
+    blockIndexWithinCheckpoint?: number,
   ): Promise<boolean> {
     const result = await this.pool.query(DELETE_DUTY, [
       validatorAddress.toString(),
       slot.toString(),
       dutyType,
-      blockIndexWithinCheckpoint,
+      blockIndexWithinCheckpoint ?? -1,
       lockToken,
     ]);
 
