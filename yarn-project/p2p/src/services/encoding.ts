@@ -52,8 +52,8 @@ export function getMsgIdFn(message: Message) {
 }
 
 const DefaultMaxSizesKb: Record<TopicType, number> = {
-  // Tx effects should not exceed 128kb, so 512kb for the full tx obj should be sufficient
-  [TopicType.tx]: 512,
+  // Tx effects should not exceed 128kb, so 256kb for the full tx obj should be sufficient
+  [TopicType.tx]: 256,
   // An attestation has roughly 30 fields, which is 1kb, so 5x is plenty
   [TopicType.block_attestation]: 5,
   // Proposals may carry some tx objects, so we allow a larger size capped at 10mb

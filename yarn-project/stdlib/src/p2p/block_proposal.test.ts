@@ -43,6 +43,12 @@ describe('Block Proposal serialization / deserialization', () => {
     checkEquivalence(proposal, deserialized);
   });
 
+  it('Tx size', () => {
+    const tx = Tx.random();
+    const serialized = tx.toBuffer();
+    expect(serialized.length).toEqual(tx.getSize());
+  });
+
   it('Should serialize / deserialize with or without included txs', async () => {
     const txs = await Promise.all([Tx.random(), Tx.random()]);
     const proposalWithTxs = makeBlockProposal({ txs });
