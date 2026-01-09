@@ -412,7 +412,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
       });
       return undefined;
     }
-    return this.createBlockAttestationsFromProposal(proposal, attestors);
+    return this.createBlockAttestationsFromProposal(proposal, attestors, validationResult.blockNumber);
   }
 
   private slashInvalidBlock(proposal: BlockProposal) {
@@ -506,7 +506,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
 
   async collectOwnAttestations(
     proposal: BlockProposal,
-    blockNumber?: BlockNumber | CheckpointNumber,
+    blockNumber: BlockNumber | CheckpointNumber,
   ): Promise<BlockAttestation[]> {
     const slot = proposal.payload.header.slotNumber;
     const inCommittee = await this.epochCache.filterInCommittee(slot, this.getValidatorAddresses());
@@ -526,7 +526,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     proposal: BlockProposal,
     required: number,
     deadline: Date,
-    blockNumber?: BlockNumber | CheckpointNumber,
+    blockNumber: BlockNumber | CheckpointNumber,
   ): Promise<BlockAttestation[]> {
     // Wait and poll the p2pClient's attestation pool for this block until we have enough attestations
     const slot = proposal.payload.header.slotNumber;
@@ -597,7 +597,7 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
   private async createBlockAttestationsFromProposal(
     proposal: BlockProposal,
     attestors: EthAddress[] = [],
-    blockNumber?: BlockNumber | CheckpointNumber,
+    blockNumber: BlockNumber | CheckpointNumber,
   ): Promise<BlockAttestation[]> {
     const attestations = await this.validationService.attestToProposal(proposal, attestors, blockNumber);
     await this.p2pClient.addAttestations(attestations);

@@ -142,13 +142,13 @@ export class ValidationService {
    *
    * @param proposal - The proposal to attest to
    * @param attestors - The validators to attest with
-   * @param blockNumber - The block or checkpoint number for HA signing context (optional - not always known for attestations)
+   * @param blockNumber - The block or checkpoint number for HA signing context
    * @returns attestations (only includes attestations that were successfully signed; excludes any already signed by other HA nodes)
    */
   async attestToProposal(
     proposal: BlockProposal,
     attestors: EthAddress[],
-    blockNumber?: BlockNumber | CheckpointNumber,
+    blockNumber: BlockNumber | CheckpointNumber,
   ): Promise<BlockAttestation[]> {
     const buf = Buffer32.fromBuffer(
       keccak256(proposal.payload.getPayloadToSign(SignatureDomainSeparator.blockAttestation)),
@@ -157,14 +157,12 @@ export class ValidationService {
     // Sign each attestor in parallel, catching HA errors per-attestor
     const results = await Promise.allSettled(
       attestors.map(async attestor => {
-        // Create signing context if blockNumber is available
-        const context: SigningContext | undefined = blockNumber
-          ? {
-              slot: proposal.slotNumber,
-              blockNumber,
-              dutyType: DutyType.ATTESTATION,
-            }
-          : undefined;
+        const context: SigningContext = {
+          slot: proposal.slotNumber,
+          blockNumber,
+          blockIndexWithinCheckpoint: -1, // -1 indicates not applicable (attestation, not a block proposal)
+          dutyType: DutyType.ATTESTATION,
+        };
 
         const sig = await this.keyStore.signMessageWithAddress(attestor, buf, context);
         return new BlockAttestation(proposal.payload, sig, proposal.signature);
