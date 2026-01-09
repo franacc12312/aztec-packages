@@ -163,7 +163,6 @@ describe('PXE', () => {
     let l2BlockHash: L2BlockHash;
     let scope: AztecAddress;
     let privateEventStore: PrivateEventStore;
-    let eventIndex = 0;
 
     beforeEach(async () => {
       // Set up basic state
@@ -219,14 +218,21 @@ describe('PXE', () => {
       };
 
       const randomness = Fr.random();
+      const siloedEventCommitment = Fr.random();
 
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, event.packedEvent, eventIndex++, {
-        contractAddress,
-        scope,
-        txHash: event.txHash,
-        l2BlockNumber: event.l2BlockNumber,
-        l2BlockHash: event.l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        event.packedEvent,
+        siloedEventCommitment,
+        {
+          contractAddress,
+          scope,
+          txHash: event.txHash,
+          l2BlockNumber: event.l2BlockNumber,
+          l2BlockHash: event.l2BlockHash,
+        },
+      );
 
       return event;
     }

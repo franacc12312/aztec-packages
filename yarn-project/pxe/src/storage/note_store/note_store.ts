@@ -1,4 +1,3 @@
-import { toBufferBE } from '@aztec/foundation/bigint-buffer';
 import type { Fr } from '@aztec/foundation/curves/bn254';
 import { toArray } from '@aztec/foundation/iterable';
 import type { AztecAsyncKVStore, AztecAsyncMap, AztecAsyncMultiMap } from '@aztec/kv-store';
@@ -92,9 +91,8 @@ export class NoteStore {
   /**
    * Adds multiple notes to the data provider under the specified scope.
    *
-   * Notes are stored using their index from the notes hash tree as the key, which provides
-   * uniqueness and maintains creation order. Each note is indexed by multiple criteria
-   * for efficient retrieval.
+   * Notes are stored using their siloedNullifier as the key, which provides
+   * uniqueness. Each note is indexed by multiple criteria for efficient retrieval.
    *
    * @param notes - Notes to store
    * @param scope - The scope (user/account) under which to store the notes
@@ -106,13 +104,13 @@ export class NoteStore {
       }
 
       for (const dao of notes) {
-        const noteIndex = toBufferBE(dao.index, 32).toString('hex');
-        await this.#notes.set(noteIndex, dao.toBuffer());
-        await this.#notesToScope.set(noteIndex, scope.toString());
-        await this.#nullifierToNoteId.set(dao.siloedNullifier.toString(), noteIndex);
+        const noteId = dao.siloedNullifier.toString();
+        await this.#notes.set(noteId, dao.toBuffer());
+        await this.#notesToScope.set(noteId, scope.toString());
+        await this.#nullifierToNoteId.set(noteId, noteId);
 
-        await this.#notesByContractAndScope.get(scope.toString())!.set(dao.contractAddress.toString(), noteIndex);
-        await this.#notesByStorageSlotAndScope.get(scope.toString())!.set(dao.storageSlot.toString(), noteIndex);
+        await this.#notesByContractAndScope.get(scope.toString())!.set(dao.contractAddress.toString(), noteId);
+        await this.#notesByStorageSlotAndScope.get(scope.toString())!.set(dao.storageSlot.toString(), noteId);
       }
     });
   }
@@ -147,14 +145,14 @@ export class NoteStore {
     for (const note of notes) {
       const noteDao = NoteDao.fromBuffer(note);
       if (noteDao.l2BlockNumber > blockNumber) {
-        const noteIndex = toBufferBE(noteDao.index, 32).toString('hex');
-        await this.#notes.delete(noteIndex);
-        await this.#notesToScope.delete(noteIndex);
-        await this.#nullifierToNoteId.delete(noteDao.siloedNullifier.toString());
+        const noteId = noteDao.siloedNullifier.toString();
+        await this.#notes.delete(noteId);
+        await this.#notesToScope.delete(noteId);
+        await this.#nullifierToNoteId.delete(noteId);
         const scopes = await toArray(this.#scopes.keysAsync());
         for (const scope of scopes) {
-          await this.#notesByContractAndScope.get(scope)!.deleteValue(noteDao.contractAddress.toString(), noteIndex);
-          await this.#notesByStorageSlotAndScope.get(scope)!.deleteValue(noteDao.storageSlot.toString(), noteIndex);
+          await this.#notesByContractAndScope.get(scope)!.deleteValue(noteDao.contractAddress.toString(), noteId);
+          await this.#notesByStorageSlotAndScope.get(scope)!.deleteValue(noteDao.storageSlot.toString(), noteId);
         }
       }
     }
@@ -176,42 +174,42 @@ export class NoteStore {
     for (let i = currentBlockNumber; i <= synchedBlockNumber; i++) {
       nullifiersToUndo.push(...(await toArray(this.#nullifiersByBlockNumber.getValuesAsync(i))));
     }
-    const notesIndexesToReinsert = await Promise.all(
+    const noteIdsToReinsert = await Promise.all(
       nullifiersToUndo.map(nullifier => this.#nullifiedNotesByNullifier.getAsync(nullifier)),
     );
-    const notNullNoteIndexes = notesIndexesToReinsert.filter(noteIndex => noteIndex != undefined);
+    const notNullNoteIds = noteIdsToReinsert.filter(noteId => noteId != undefined);
     const nullifiedNoteBuffers = await Promise.all(
-      notNullNoteIndexes.map(noteIndex => this.#nullifiedNotes.getAsync(noteIndex!)),
+      notNullNoteIds.map(noteId => this.#nullifiedNotes.getAsync(noteId!)),
     );
     const noteDaos = nullifiedNoteBuffers
       .filter(buffer => buffer != undefined)
       .map(buffer => NoteDao.fromBuffer(buffer!));
 
     for (const dao of noteDaos) {
-      const noteIndex = toBufferBE(dao.index, 32).toString('hex');
-      await this.#notes.set(noteIndex, dao.toBuffer());
-      await this.#nullifierToNoteId.set(dao.siloedNullifier.toString(), noteIndex);
+      const noteId = dao.siloedNullifier.toString();
+      await this.#notes.set(noteId, dao.toBuffer());
+      await this.#nullifierToNoteId.set(noteId, noteId);
 
-      const scopes = await toArray(this.#nullifiedNotesToScope.getValuesAsync(noteIndex));
+      const scopes = await toArray(this.#nullifiedNotesToScope.getValuesAsync(noteId));
 
       if (scopes.length === 0) {
         // We should never run into this error because notes always have a scope assigned to them - either on initial
         // insertion via `addNotes` or when removing their nullifiers.
-        throw new Error(`No scopes found for nullified note with index ${noteIndex}`);
+        throw new Error(`No scopes found for nullified note with id ${noteId}`);
       }
 
       for (const scope of scopes) {
-        await this.#notesByContractAndScope.get(scope.toString())!.set(dao.contractAddress.toString(), noteIndex);
-        await this.#notesByStorageSlotAndScope.get(scope.toString())!.set(dao.storageSlot.toString(), noteIndex);
-        await this.#notesToScope.set(noteIndex, scope);
+        await this.#notesByContractAndScope.get(scope.toString())!.set(dao.contractAddress.toString(), noteId);
+        await this.#notesByStorageSlotAndScope.get(scope.toString())!.set(dao.storageSlot.toString(), noteId);
+        await this.#notesToScope.set(noteId, scope);
       }
 
-      await this.#nullifiedNotes.delete(noteIndex);
-      await this.#nullifiedNotesToScope.delete(noteIndex);
-      await this.#nullifiersByBlockNumber.deleteValue(dao.l2BlockNumber, dao.siloedNullifier.toString());
-      await this.#nullifiedNotesByContract.deleteValue(dao.contractAddress.toString(), noteIndex);
-      await this.#nullifiedNotesByStorageSlot.deleteValue(dao.storageSlot.toString(), noteIndex);
-      await this.#nullifiedNotesByNullifier.delete(dao.siloedNullifier.toString());
+      await this.#nullifiedNotes.delete(noteId);
+      await this.#nullifiedNotesToScope.delete(noteId);
+      await this.#nullifiersByBlockNumber.deleteValue(dao.l2BlockNumber, noteId);
+      await this.#nullifiedNotesByContract.deleteValue(dao.contractAddress.toString(), noteId);
+      await this.#nullifiedNotesByStorageSlot.deleteValue(dao.storageSlot.toString(), noteId);
+      await this.#nullifiedNotesByNullifier.delete(noteId);
     }
   }
 
@@ -354,25 +352,25 @@ export class NoteStore {
 
       for (const blockScopedNullifier of nullifiers) {
         const { data: nullifier, l2BlockNumber: blockNumber } = blockScopedNullifier;
-        const nullifierKey = nullifier.toString();
+        const noteId = nullifier.toString();
 
-        const noteIndex = await this.#nullifierToNoteId.getAsync(nullifierKey);
-        if (!noteIndex) {
+        const existingNoteId = await this.#nullifierToNoteId.getAsync(noteId);
+        if (!existingNoteId) {
           // Check if already nullified?
-          const alreadyNullified = await this.#nullifiedNotesByNullifier.getAsync(nullifierKey);
+          const alreadyNullified = await this.#nullifiedNotesByNullifier.getAsync(noteId);
           if (alreadyNullified) {
             throw new Error(`Nullifier already applied in applyNullifiers`);
           }
           throw new Error('Nullifier not found in applyNullifiers');
         }
 
-        const noteBuffer = noteIndex ? await this.#notes.getAsync(noteIndex) : undefined;
+        const noteBuffer = existingNoteId ? await this.#notes.getAsync(existingNoteId) : undefined;
 
         if (!noteBuffer) {
           throw new Error('Note not found in applyNullifiers');
         }
 
-        const noteScopes = await toArray(this.#notesToScope.getValuesAsync(noteIndex));
+        const noteScopes = await toArray(this.#notesToScope.getValuesAsync(noteId));
         if (noteScopes.length === 0) {
           // We should never run into this error because notes always have a scope assigned to them - either on initial
           // insertion via `addNotes` or when removing their nullifiers.
@@ -383,26 +381,26 @@ export class NoteStore {
 
         nullifiedNotes.push(note);
 
-        await this.#notes.delete(noteIndex);
-        await this.#notesToScope.delete(noteIndex);
+        await this.#notes.delete(noteId);
+        await this.#notesToScope.delete(noteId);
 
         const scopes = await toArray(this.#scopes.keysAsync());
 
         for (const scope of scopes) {
-          await this.#notesByContractAndScope.get(scope)!.deleteValue(note.contractAddress.toString(), noteIndex);
-          await this.#notesByStorageSlotAndScope.get(scope)!.deleteValue(note.storageSlot.toString(), noteIndex);
+          await this.#notesByContractAndScope.get(scope)!.deleteValue(note.contractAddress.toString(), noteId);
+          await this.#notesByStorageSlotAndScope.get(scope)!.deleteValue(note.storageSlot.toString(), noteId);
         }
 
         for (const scope of noteScopes) {
-          await this.#nullifiedNotesToScope.set(noteIndex, scope);
+          await this.#nullifiedNotesToScope.set(noteId, scope);
         }
-        await this.#nullifiedNotes.set(noteIndex, note.toBuffer());
-        await this.#nullifiersByBlockNumber.set(blockNumber, nullifier.toString());
-        await this.#nullifiedNotesByContract.set(note.contractAddress.toString(), noteIndex);
-        await this.#nullifiedNotesByStorageSlot.set(note.storageSlot.toString(), noteIndex);
-        await this.#nullifiedNotesByNullifier.set(nullifier.toString(), noteIndex);
+        await this.#nullifiedNotes.set(noteId, note.toBuffer());
+        await this.#nullifiersByBlockNumber.set(blockNumber, noteId);
+        await this.#nullifiedNotesByContract.set(note.contractAddress.toString(), noteId);
+        await this.#nullifiedNotesByStorageSlot.set(note.storageSlot.toString(), noteId);
+        await this.#nullifiedNotesByNullifier.set(noteId, noteId);
 
-        await this.#nullifierToNoteId.delete(nullifier.toString());
+        await this.#nullifierToNoteId.delete(noteId);
       }
       return nullifiedNotes;
     });

@@ -41,7 +41,7 @@ export class NoteService {
       scopes,
     });
     return noteDaos.map(
-      ({ contractAddress, owner, storageSlot, randomness, noteNonce, note, noteHash, siloedNullifier, index }) => ({
+      ({ contractAddress, owner, storageSlot, randomness, noteNonce, note, noteHash, siloedNullifier }) => ({
         contractAddress,
         owner,
         storageSlot,
@@ -49,9 +49,8 @@ export class NoteService {
         noteNonce,
         note,
         noteHash,
+        isPending: false, // Note service deals only with settled notes
         siloedNullifier,
-        // PXE can use this index to get full MembershipWitness
-        index,
       }),
     );
   }
@@ -146,7 +145,10 @@ export class NoteService {
     const uniqueNoteHash = await computeUniqueNoteHash(noteNonce, await siloNoteHash(contractAddress, noteHash));
     const siloedNullifier = await siloNullifier(contractAddress, nullifier);
 
-    const txEffect = await this.aztecNode.getTxEffect(txHash);
+    const [txEffect, [nullifierIndex]] = await Promise.all([
+      this.aztecNode.getTxEffect(txHash),
+      this.aztecNode.findLeavesIndexes(syncedBlockNumber, MerkleTreeId.NULLIFIER_TREE, [siloedNullifier]),
+    ]);
     if (!txEffect) {
       throw new Error(`Could not find tx effect for tx hash ${txHash}`);
     }
@@ -160,20 +162,6 @@ export class NoteService {
       throw new Error(`Note hash ${noteHash} (uniqued as ${uniqueNoteHash}) is not present in tx ${txHash}`);
     }
 
-    // We store notes by their index in the global note hash tree, which has the convenient side effect of validating
-    // note existence in said tree. We concurrently also check if the note's nullifier exists, performing all node
-    // queries in a single round-trip.
-    const [[uniqueNoteHashTreeIndexInBlock], [nullifierIndex]] = await Promise.all([
-      this.aztecNode.findLeavesIndexes(syncedBlockNumber, MerkleTreeId.NOTE_HASH_TREE, [uniqueNoteHash]),
-      this.aztecNode.findLeavesIndexes(syncedBlockNumber, MerkleTreeId.NULLIFIER_TREE, [siloedNullifier]),
-    ]);
-
-    if (uniqueNoteHashTreeIndexInBlock === undefined) {
-      throw new Error(
-        `Note hash ${noteHash} (uniqued as ${uniqueNoteHash}) is not present on the tree at block ${syncedBlockNumber} (from tx ${txHash})`,
-      );
-    }
-
     const noteDao = new NoteDao(
       new Note(content),
       contractAddress,
@@ -184,15 +172,15 @@ export class NoteService {
       noteHash,
       siloedNullifier,
       txHash,
-      uniqueNoteHashTreeIndexInBlock.l2BlockNumber,
-      uniqueNoteHashTreeIndexInBlock.l2BlockHash.toString(),
-      uniqueNoteHashTreeIndexInBlock.data,
+      txEffect.l2BlockNumber,
+      txEffect.l2BlockHash.toString(),
     );
 
     // The note was found by `recipient`, so we use that as the scope when storing the note.
     await this.noteStore.addNotes([noteDao], recipient);
 
     if (nullifierIndex !== undefined) {
+      // We found nullifier index which implies tht the note has already been nullified.
       const { data: _, ...blockHashAndNum } = nullifierIndex;
       await this.noteStore.applyNullifiers([{ data: siloedNullifier, ...blockHashAndNum }]);
     }

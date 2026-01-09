@@ -491,7 +491,6 @@ describe('Private Execution test suite', () => {
   describe('stateful test contract', () => {
     let contractAddress: AztecAddress;
     const mockFirstNullifier = new Fr(1111);
-    let currentNoteIndex = 0n;
 
     const buildNote = async (amount: bigint, owner: AztecAddress, storageSlot: Fr): Promise<NoteDao> => {
       // WARNING: this is not actually how nonces are computed!
@@ -521,7 +520,6 @@ describe('Private Execution test suite', () => {
         TxHash.random(),
         BlockNumber(Math.abs(randomInt(1000))),
         L2BlockHash.random().toString(),
-        currentNoteIndex++,
       );
     };
 

@@ -5,7 +5,7 @@ import { openTmpStore } from '@aztec/kv-store/lmdb-v2';
 import { AztecAddress } from '@aztec/stdlib/aztec-address';
 import { L2BlockHash, randomDataInBlock } from '@aztec/stdlib/block';
 import type { CompleteAddress } from '@aztec/stdlib/contract';
-import { computeUniqueNoteHash, siloNoteHash, siloNullifier } from '@aztec/stdlib/hash';
+import { computeUniqueNoteHash, siloNoteHash } from '@aztec/stdlib/hash';
 import type { AztecNode } from '@aztec/stdlib/interfaces/client';
 import { NoteDao, NoteStatus } from '@aztec/stdlib/note';
 import { MerkleTreeId } from '@aztec/stdlib/trees';
@@ -174,14 +174,11 @@ describe('NoteService', () => {
     let noteHash: Fr;
     let uniqueNoteHash: Fr;
     let nullifier: Fr;
-    let siloedNullifier: Fr;
 
     let txHash: TxHash;
     let txEffect: TxEffect;
     let indexedTxEffect: IndexedTxEffect;
     let blockNumber: BlockNumber;
-
-    let nullified = false;
 
     const setSyncedBlockNumber = (blockNumber: BlockNumber) => {
       return anchorBlockStore.setHeader(
@@ -204,7 +201,6 @@ describe('NoteService', () => {
       content = [Fr.random(), Fr.random()];
 
       uniqueNoteHash = await computeUniqueNoteHash(noteNonce, await siloNoteHash(contractAddress, noteHash));
-      siloedNullifier = await siloNullifier(contractAddress, nullifier);
 
       blockNumber = BlockNumber(42);
 
@@ -244,25 +240,13 @@ describe('NoteService', () => {
               l2BlockHash: indexedTxEffect.l2BlockHash,
             },
           ]);
-        } else if (treeId == MerkleTreeId.NULLIFIER_TREE && leaves[0].equals(siloedNullifier)) {
-          // Note that returning undefined (i.e. the un-nullified case) covers both scenarios where the note has not
-          // been nullified and where the nullifier is in a block past the synced block.
-          return Promise.resolve([
-            nullified
-              ? {
-                  data: BigInt(0),
-                  l2BlockNumber: indexedTxEffect.l2BlockNumber,
-                  l2BlockHash: indexedTxEffect.l2BlockHash,
-                }
-              : undefined,
-          ]);
         } else {
           throw new Error();
         }
       });
     });
 
-    it('should store note if it exists in note hash tree and is not nullified', async () => {
+    it('should store note if it exists in note hash tree', async () => {
       await noteService.deliverNote(
         contractAddress,
         owner,
@@ -334,27 +318,6 @@ describe('NoteService', () => {
           recipient.address,
         ),
       ).rejects.toThrow(/as of block number/);
-    });
-
-    it('should store and immediately remove note if it is already nullified', async () => {
-      nullified = true;
-
-      await noteService.deliverNote(
-        contractAddress,
-        owner,
-        storageSlot,
-        randomness,
-        noteNonce,
-        content,
-        noteHash,
-        nullifier,
-        txHash,
-        recipient.address,
-      );
-
-      // Verify note was removed
-      const notes = await noteStore.getNotes({ contractAddress, scopes: [recipient.address] });
-      expect(notes).toHaveLength(0);
     });
   });
 });
