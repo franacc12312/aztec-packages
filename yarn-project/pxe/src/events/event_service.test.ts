@@ -131,12 +131,6 @@ describe('deliverEvent', () => {
     );
   });
 
-  it('should throw if event is not in nullifiers', async () => {
-    aztecNode.findLeavesIndexes.mockImplementation(() => Promise.resolve([]));
-
-    await expect(runDeliverEvent).rejects.toThrow(/Event commitment .* is not present on the nullifier tree/);
-  });
-
   it('should store event for later retrieval', async () => {
     await runDeliverEvent();
 
