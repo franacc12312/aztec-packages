@@ -48,10 +48,6 @@
 
 #define HAVOC_TESTING
 
-// This is a global variable, so that the execution handling class could alter it and signal to the input tester
-// that the input should fail
-bool circuit_should_fail = false;
-
 #include "barretenberg/common/fuzzer.hpp"
 
 // #define FUZZING_SHOW_INFORMATION

@@ -2,6 +2,7 @@
 #include "barretenberg/circuit_checker/circuit_checker.hpp"
 #include "barretenberg/common/assert.hpp"
 #include "barretenberg/numeric/uint256/uint256.hpp"
+#include <cstring>
 
 // NOLINTBEGIN(cppcoreguidelines-macro-usage, google-runtime-int)
 #define PARENS ()
@@ -55,6 +56,13 @@ HavocSettings fuzzer_havoc_settings;
 #endif
 // This is an external function in Libfuzzer used internally by custom mutators
 extern "C" size_t LLVMFuzzerMutate(uint8_t* Data, size_t Size, size_t MaxSize);
+
+/**
+ * @brief Global flag for ArithmeticFuzzHelper to signal expected circuit failures.
+ * Defined in fuzzer.cpp.
+ */
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+extern bool circuit_should_fail;
 
 /**
  * @brief Class for quickly deterministically creating new random values. We don't care about distribution much here.

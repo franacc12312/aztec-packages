@@ -14,10 +14,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wc99-designator"
 
-// This is a global variable, so that the execution handling class could alter it and signal to the input tester
-// that the input should fail
-bool circuit_should_fail = false;
-
 #define HAVOC_TESTING
 // #define DISABLE_DIVISION 1
 #include "barretenberg/common/fuzzer.hpp"
