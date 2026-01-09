@@ -74,22 +74,11 @@ describe('deliverEvent', () => {
 
     /* Happy path context conditions:
      ** - PXE is sync'd to _at least_ block including tx
-     ** - Node knows tx effect
-     ** - Node knows siloed event commitment
+     ** - Node returns the corresponding tx effect and the tx effect includes the event commitment
      */
     await setSyncedBlockNumber(blockNumber);
 
     aztecNode.getTxEffect.mockImplementation(() => Promise.resolve(indexedTxEffect));
-
-    aztecNode.findLeavesIndexes.mockImplementation(() =>
-      Promise.resolve([
-        {
-          data: BigInt(0),
-          l2BlockNumber: indexedTxEffect.l2BlockNumber,
-          l2BlockHash: indexedTxEffect.l2BlockHash,
-        },
-      ]),
-    );
 
     eventService = new EventService(anchorBlockStore, aztecNode, privateEventStore);
   });
@@ -125,7 +114,7 @@ describe('deliverEvent', () => {
     await expect(runDeliverEvent).rejects.toThrow(/Could not find tx effect for tx hash .* as of block number/);
   });
 
-  it('should throw if event is not in tx effects', async () => {
+  it('should throw if event commitment is not in the tx effects', async () => {
     await expect(runDeliverEvent({ eventCommitment: Fr.random() })).rejects.toThrow(
       /Event commitment .* is not present in tx/,
     );
