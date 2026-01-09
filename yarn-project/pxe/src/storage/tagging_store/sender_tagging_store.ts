@@ -71,8 +71,8 @@ export class SenderTaggingStore implements StagedStore {
   }
 
   async #getPendingIndexes(jobId: string, secret: string): Promise<{ index: number; txHash: string }[]> {
-    const jobView = this.#getJobStagedPendingIndexes(jobId);
-    let staged: { index: number; txHash: string }[] | undefined = jobView.get(secret);
+    const jobStagedPendingIndexes = this.#getJobStagedPendingIndexes(jobId);
+    let staged: { index: number; txHash: string }[] | undefined = jobStagedPendingIndexes.get(secret);
     if (staged === undefined) {
       // If we don't have a staged version of this, first we check if there's one in DB
       // If it's not in DB, we'll get an undefined here, which we coerce to []
@@ -92,13 +92,13 @@ export class SenderTaggingStore implements StagedStore {
    */
   async #allSecretsWithPendingIndexes(jobId: string): Promise<string[]> {
     const allSecretsInKV = new Set(await toArray(this.#pendingIndexes.keysAsync()));
-    const allSecretsInJobView = this.#getJobStagedPendingIndexes(jobId).keys();
-    return [...allSecretsInKV.union(new Set(allSecretsInJobView))];
+    const allSecretsInJobStage = this.#getJobStagedPendingIndexes(jobId).keys();
+    return [...allSecretsInKV.union(new Set(allSecretsInJobStage))];
   }
 
   async #getLastFinalizedIndex(jobId: string, secret: string): Promise<number | undefined> {
-    const jobView = this.#getJobStagedLastFinalizedIndexes(jobId);
-    let staged: number | undefined = jobView.get(secret);
+    const jobStagedLastFinalizedIndexes = this.#getJobStagedLastFinalizedIndexes(jobId);
+    let staged: number | undefined = jobStagedLastFinalizedIndexes.get(secret);
     if (staged === undefined) {
       staged = await this.#lastFinalizedIndexes.getAsync(secret);
     }
@@ -106,8 +106,8 @@ export class SenderTaggingStore implements StagedStore {
   }
 
   #setLastFinalizedIndex(jobId: string, secret: string, lastFinalizedIndex: number) {
-    const jobView = this.#getJobStagedLastFinalizedIndexes(jobId);
-    jobView.set(secret, lastFinalizedIndex);
+    const jobStagedLastFinalizedIndexes = this.#getJobStagedLastFinalizedIndexes(jobId);
+    jobStagedLastFinalizedIndexes.set(secret, lastFinalizedIndex);
   }
 
   async commit(jobId: string): Promise<void> {
