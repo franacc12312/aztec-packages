@@ -247,6 +247,7 @@ export class CheckpointProposalJob {
         checkpoint.archive.root,
         pendingBroadcast?.txs ?? [],
         this.proposer,
+        checkpoint.number,
         blockProposalOptions,
       );
 

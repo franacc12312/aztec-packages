@@ -210,17 +210,19 @@ describe('CheckpointProposalJob', () => {
         );
       },
     );
-    validatorClient.createCheckpointProposal.mockImplementation((checkpointHeader, archiveRoot, txs) => {
-      // Create a minimal BlockProposal for the checkpoint
-      const consensusPayload = new ConsensusPayload(checkpointHeader, archiveRoot);
-      return Promise.resolve(
-        new BlockProposal(
-          consensusPayload,
-          mockedSig,
-          (txs ?? []).map(tx => tx.txHash),
-        ),
-      );
-    });
+    validatorClient.createCheckpointProposal.mockImplementation(
+      (checkpointHeader, archiveRoot, txs, _proposerAddress, _checkpointNumber, _options) => {
+        // Create a minimal BlockProposal for the checkpoint
+        const consensusPayload = new ConsensusPayload(checkpointHeader, archiveRoot);
+        return Promise.resolve(
+          new BlockProposal(
+            consensusPayload,
+            mockedSig,
+            (txs ?? []).map(tx => tx.txHash),
+          ),
+        );
+      },
+    );
     validatorClient.signAttestationsAndSigners.mockImplementation(() => Promise.resolve(getSignatures()[0].signature));
     validatorClient.getCoinbaseForAttestor.mockReturnValue(coinbase);
     validatorClient.getFeeRecipientForAttestor.mockReturnValue(feeRecipient);

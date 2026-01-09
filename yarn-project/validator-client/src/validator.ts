@@ -16,7 +16,7 @@ import { OffenseType, WANT_TO_SLASH_EVENT, type Watcher, type WatcherEmitter } f
 import type { AztecAddress } from '@aztec/stdlib/aztec-address';
 import type { CommitteeAttestationsAndSigners, L2BlockSource } from '@aztec/stdlib/block';
 import type { IFullNodeBlockBuilder, Validator, ValidatorClientFullConfig } from '@aztec/stdlib/interfaces/server';
-import { CountedL2ToL1Message, type L1ToL2MessageSource } from '@aztec/stdlib/messaging';
+import type { L1ToL2MessageSource } from '@aztec/stdlib/messaging';
 import type { BlockAttestation, BlockProposal, BlockProposalOptions } from '@aztec/stdlib/p2p';
 import type { CheckpointHeader } from '@aztec/stdlib/rollup';
 import type { Tx } from '@aztec/stdlib/tx';
@@ -481,22 +481,14 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
     archive: Fr,
     txs: Tx[],
     proposerAddress: EthAddress | undefined,
+    checkpointNumber: CheckpointNumber,
     options: BlockProposalOptions,
   ): Promise<BlockProposal> {
-    this.log.info(`Assembling checkpoint proposal for slot ${header.slotNumber}`);
-    // Derive checkpoint number from the header's slot
-    const checkpointNumber = header.slotNumber as unknown as CheckpointNumber;
-    return this.validationService.createCheckpointProposal(
-      header,
-      archive,
-      txs,
-      proposerAddress,
-      {
-        ...options,
-        broadcastInvalidBlockProposal: this.config.broadcastInvalidBlockProposal,
-      },
-      checkpointNumber,
-    );
+    this.log.info(`Assembling checkpoint proposal for slot ${header.slotNumber}, checkpoint ${checkpointNumber}`);
+    return this.validationService.createCheckpointProposal(header, archive, txs, proposerAddress, checkpointNumber, {
+      ...options,
+      broadcastInvalidBlockProposal: this.config.broadcastInvalidBlockProposal,
+    });
   }
 
   async broadcastBlockProposal(proposal: BlockProposal): Promise<void> {

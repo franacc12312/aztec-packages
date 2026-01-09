@@ -88,8 +88,8 @@ export class ValidationService {
    * @param header - The checkpoint header
    * @param archive - The archive of the checkpoint
    * @param txs - TxHash[] ordered list of transactions
-   * @param options - Block proposal options
    * @param checkpointNumber - The checkpoint number for HA signing context
+   * @param options - Block proposal options
    *
    * @returns A block proposal signing the checkpoint
    * @throws DutyAlreadySignedError if HA signer indicates duty already signed by another node
@@ -100,8 +100,8 @@ export class ValidationService {
     archive: Fr,
     txs: Tx[],
     proposerAttesterAddress: EthAddress | undefined,
-    options: BlockProposalOptions,
     checkpointNumber: CheckpointNumber,
+    options: BlockProposalOptions,
   ): Promise<BlockProposal> {
     const context: SigningContext = {
       slot: header.slotNumber,
