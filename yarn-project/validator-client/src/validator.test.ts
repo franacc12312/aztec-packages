@@ -38,6 +38,7 @@ import { type MockProxy, mock } from 'jest-mock-extended';
 import { type PrivateKeyAccount, generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 import { type ValidatorClientConfig, validatorClientConfigMappings } from './config.js';
+import type { HAKeyStore } from './key_store/ha_key_store.js';
 import { ValidatorClient } from './validator.js';
 
 describe('ValidatorClient', () => {
@@ -54,6 +55,7 @@ describe('ValidatorClient', () => {
   let txProvider: MockProxy<TxProvider>;
   let keyStoreManager: KeystoreManager;
   let blobClient: MockProxy<BlobClientInterface>;
+  let haKeyStore: MockProxy<HAKeyStore>;
 
   beforeEach(async () => {
     p2pClient = mock<P2P>();
@@ -72,9 +74,15 @@ describe('ValidatorClient', () => {
     blobClient = mock<BlobClientInterface>();
     blobClient.canUpload.mockReturnValue(false);
     blobClient.sendBlobsToFilestore.mockResolvedValue(true);
+    haKeyStore = mock<HAKeyStore>();
+    haKeyStore.start.mockImplementation(() => {});
+    haKeyStore.stop.mockImplementation(() => Promise.resolve());
+    haKeyStore.isHAKeyStore.mockReturnValue(true);
 
     const validatorPrivateKeys = [generatePrivateKey(), generatePrivateKey()];
     validatorAccounts = validatorPrivateKeys.map(privateKey => privateKeyToAccount(privateKey));
+
+    haKeyStore.getAddresses.mockReturnValue(validatorAccounts.map(account => EthAddress.fromString(account.address)));
 
     config = {
       validatorPrivateKeys: new SecretValue(validatorPrivateKeys),
@@ -706,6 +714,17 @@ describe('ValidatorClient', () => {
       const addresses = validatorClient.getValidatorAddresses();
       validatorClient.updateConfig({ disabledValidators: [validatorClient.getValidatorAddresses()[0]] });
       expect(validatorClient.getValidatorAddresses()).toEqual(addresses.slice(1));
+    });
+  });
+
+  describe('lifecycle methods', () => {
+    it('should run start() / stop() on the HA key store', async () => {
+      (validatorClient as any).config.haSigningEnabled = true;
+      (validatorClient as any).keyStore = haKeyStore;
+      await validatorClient.start();
+      expect(haKeyStore.start).toHaveBeenCalledTimes(1);
+      await validatorClient.stop();
+      expect(haKeyStore.stop).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -68,6 +68,7 @@ describe('HAKeyStore', () => {
       getPublisherAddresses: jest.fn<(attesterAddress: EthAddress) => EthAddress[]>(),
       getFeeRecipient: jest.fn<(attesterAddress: EthAddress) => AztecAddress>(),
       getRemoteSignerConfig: jest.fn<(attesterAddress: EthAddress) => EthRemoteSignerConfig | undefined>(),
+      isHAKeyStore: jest.fn() as unknown as jest.MockedFunction<() => this is HAKeyStore>,
     };
 
     // Create mock HA signer
@@ -75,6 +76,8 @@ describe('HAKeyStore', () => {
       isEnabled: true,
       nodeId: NODE_ID,
       signWithProtection: jest.fn<ValidatorHASigner['signWithProtection']>(),
+      start: jest.fn<ValidatorHASigner['start']>(),
+      stop: jest.fn<ValidatorHASigner['stop']>(),
     } as unknown as jest.Mocked<ValidatorHASigner>;
 
     // Default implementations
@@ -84,6 +87,7 @@ describe('HAKeyStore', () => {
     mockBaseKeyStore.signTypedDataWithAddress.mockResolvedValue(mockSignature);
     mockBaseKeyStore.signMessage.mockResolvedValue([mockSignature]);
     mockBaseKeyStore.signTypedData.mockResolvedValue([mockSignature]);
+    mockBaseKeyStore.isHAKeyStore.mockReturnValue(true);
     mockHASigner.signWithProtection.mockResolvedValue(mockSignature);
   });
 
@@ -297,6 +301,24 @@ describe('HAKeyStore', () => {
       }
 
       expect(mockHASigner.signWithProtection).toHaveBeenCalledTimes(dutyTypes.length);
+    });
+  });
+
+  describe('lifecycle methods', () => {
+    let haKeyStore: HAKeyStore;
+
+    beforeEach(() => {
+      haKeyStore = new HAKeyStore(mockBaseKeyStore, mockHASigner);
+    });
+
+    it('should run start() on the HA signer', () => {
+      haKeyStore.start();
+      expect(mockHASigner.start).toHaveBeenCalledTimes(1);
+    });
+
+    it('should run stop() on the HA signer', async () => {
+      await haKeyStore.stop();
+      expect(mockHASigner.stop).toHaveBeenCalledTimes(1);
     });
   });
 });

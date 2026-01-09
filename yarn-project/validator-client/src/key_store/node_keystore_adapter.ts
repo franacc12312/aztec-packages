@@ -11,6 +11,7 @@ import type { SigningContext } from '@aztec/validator-ha-signer/types';
 import type { TypedDataDefinition } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 
+import type { HAKeyStore } from './ha_key_store.js';
 import type { ExtendedValidatorKeyStore } from './interface.js';
 
 type AddressHex = string;
@@ -380,5 +381,13 @@ export class NodeKeystoreAdapter implements ExtendedValidatorKeyStore {
   getRemoteSignerConfig(attesterAddress: EthAddress): EthRemoteSignerConfig | undefined {
     const validatorIndex = this.findValidatorIndexForAttester(attesterAddress);
     return this.keystoreManager.getEffectiveRemoteSignerConfig(validatorIndex, attesterAddress);
+  }
+
+  /**
+   * Is high-availability key store
+   * @returns false
+   */
+  isHAKeyStore(): this is HAKeyStore {
+    return false;
   }
 }

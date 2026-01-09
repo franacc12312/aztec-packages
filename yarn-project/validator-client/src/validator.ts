@@ -16,7 +16,7 @@ import { OffenseType, WANT_TO_SLASH_EVENT, type Watcher, type WatcherEmitter } f
 import type { AztecAddress } from '@aztec/stdlib/aztec-address';
 import type { CommitteeAttestationsAndSigners, L2BlockSource } from '@aztec/stdlib/block';
 import type { IFullNodeBlockBuilder, Validator, ValidatorClientFullConfig } from '@aztec/stdlib/interfaces/server';
-import type { L1ToL2MessageSource } from '@aztec/stdlib/messaging';
+import { CountedL2ToL1Message, type L1ToL2MessageSource } from '@aztec/stdlib/messaging';
 import type { BlockAttestation, BlockProposal, BlockProposalOptions } from '@aztec/stdlib/p2p';
 import type { CheckpointHeader } from '@aztec/stdlib/rollup';
 import type { Tx } from '@aztec/stdlib/tx';
@@ -239,6 +239,11 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
       return;
     }
 
+    if (this.config.haSigningEnabled && this.keyStore.isHAKeyStore()) {
+      // High-Availability keystore needs to be started & stopped
+      this.keyStore.start();
+    }
+
     await this.registerHandlers();
 
     const myAddresses = this.getValidatorAddresses();
@@ -254,6 +259,10 @@ export class ValidatorClient extends (EventEmitter as new () => WatcherEmitter) 
 
   public async stop() {
     await this.epochCacheUpdateLoop.stop();
+    if (this.config.haSigningEnabled && this.keyStore.isHAKeyStore()) {
+      // High-Availability keystore needs to be started & stopped
+      await this.keyStore.stop();
+    }
   }
 
   /** Register handlers on the p2p client */

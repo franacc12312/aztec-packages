@@ -537,6 +537,85 @@ describe('ValidatorHASigner', () => {
       expect(signFn).toHaveBeenCalledTimes(2);
     });
 
+    it('should allow only one signer to succeed when multiple signers for same validator try to sign the same duty', async () => {
+      const numSigners = 10;
+      const nodeIds = Array.from({ length: numSigners }, (_, i) => `node-${i + 1}`);
+
+      // Create separate signers with different node IDs for the same validator
+      const signers = nodeIds.map(nodeId => new ValidatorHASigner(db, { ...config, nodeId }));
+
+      // Start all signers
+      signers.forEach(signer => signer.start());
+
+      try {
+        // All signers try to sign the same duty for the same validator
+        const sameSlot = SlotNumber(200);
+        const sameBlockNumber = BlockNumber(100);
+        const sameDutyType = DutyType.BLOCK_PROPOSAL;
+        const sameBlockIndex = 0;
+
+        // Create signing functions for each signer
+        const signFns = nodeIds.map(() => {
+          const signFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
+          signFn.mockResolvedValue(mockSignature);
+          return signFn;
+        });
+
+        // All signers try to sign concurrently for the same validator
+        const results = await Promise.allSettled(
+          signers.map((signer, index) =>
+            signer.signWithProtection(
+              VALIDATOR_ADDRESS,
+              MESSAGE_HASH,
+              {
+                slot: sameSlot,
+                blockNumber: sameBlockNumber,
+                dutyType: sameDutyType,
+                blockIndexWithinCheckpoint: sameBlockIndex,
+              },
+              signFns[index],
+            ),
+          ),
+        );
+
+        // Exactly one should succeed
+        const successful = results.filter(r => r.status === 'fulfilled');
+        const failed = results.filter(r => r.status === 'rejected');
+
+        expect(successful.length).toBe(1);
+        expect(failed.length).toBe(9);
+
+        // All failures should be DutyAlreadySignedError
+        for (const failure of failed) {
+          if (failure.status === 'rejected') {
+            expect(failure.reason).toBeInstanceOf(DutyAlreadySignedError);
+          }
+        }
+
+        // Only one signing function should have been called
+        const totalCalls = signFns.reduce((sum, fn) => sum + fn.mock.calls.length, 0);
+        expect(totalCalls).toBe(1);
+
+        // Verify the duty is recorded in the database with the winning nodeId
+        const dutyResult = await db.tryInsertOrGetExisting({
+          validatorAddress: VALIDATOR_ADDRESS,
+          slot: sameSlot,
+          blockNumber: sameBlockNumber,
+          dutyType: sameDutyType,
+          blockIndexWithinCheckpoint: sameBlockIndex,
+          messageHash: MESSAGE_HASH.toString(),
+          nodeId: nodeIds[0], // Check with any nodeId, should return the same record
+        });
+        expect(dutyResult.isNew).toBe(false);
+        expect(dutyResult.record.status).toBe(DutyStatus.SIGNED);
+        // The winning nodeId should be one of the ten
+        expect(nodeIds).toContain(dutyResult.record.nodeId);
+      } finally {
+        // Stop all signers
+        await Promise.all(signers.map(signer => signer.stop()));
+      }
+    });
+
     it('should handle concurrent signing attempts - first succeeds', async () => {
       const localSignFn = jest.fn<(messageHash: Buffer32) => Promise<Signature>>();
 

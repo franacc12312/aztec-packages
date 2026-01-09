@@ -93,6 +93,10 @@ SELECT version FROM schema_version ORDER BY version DESC LIMIT 1;
  * returns the existing record instead.
  *
  * Returns the record with an `is_new` flag indicating whether we inserted or got existing.
+ *
+ * Note: In high concurrency scenarios, if the INSERT conflicts and another transaction
+ * just committed the row, there's a small window where the SELECT might not see it yet.
+ * The application layer should retry if no rows are returned.
  */
 export const INSERT_OR_GET_DUTY = `
 WITH inserted AS (

@@ -212,4 +212,26 @@ export class HAKeyStore implements ExtendedValidatorKeyStore {
     // Re-throw errors
     throw error;
   }
+
+  /**
+   * Is high-availability key store
+   * @returns true
+   */
+  isHAKeyStore(): this is HAKeyStore {
+    return true;
+  }
+
+  /**
+   * Start the high-availability key store
+   */
+  public start() {
+    this.haSigner.start();
+  }
+
+  /**
+   * Stop the high-availability key store
+   */
+  public async stop() {
+    await this.haSigner.stop();
+  }
 }

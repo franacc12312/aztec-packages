@@ -502,7 +502,7 @@ describe('PostgresSlashingProtectionDatabase', () => {
       const db = new PostgresSlashingProtectionDatabase(pool);
 
       await expect(db.initialize()).rejects.toThrow(
-        'Database schema not initialized. Please run migrations first: aztec migrate up --database-url <url>',
+        'Database schema not initialized. Please run migrations first: aztec migrate-ha-db up --database-url <url>',
       );
     });
 
@@ -518,7 +518,7 @@ describe('PostgresSlashingProtectionDatabase', () => {
       const db = new PostgresSlashingProtectionDatabase(pool);
 
       await expect(db.initialize()).rejects.toThrow(
-        'Database schema not initialized. Please run migrations first: aztec migrate up --database-url <url>',
+        'Database schema not initialized. Please run migrations first: aztec migrate-ha-db up --database-url <url>',
       );
     });
 
@@ -532,7 +532,7 @@ describe('PostgresSlashingProtectionDatabase', () => {
       const db = new PostgresSlashingProtectionDatabase(pool);
 
       await expect(db.initialize()).rejects.toThrow(
-        `Database schema version ${SCHEMA_VERSION - 1} is outdated (expected ${SCHEMA_VERSION}). Please run migrations: aztec migrate up --database-url <url>`,
+        `Database schema version ${SCHEMA_VERSION - 1} is outdated (expected ${SCHEMA_VERSION}). Please run migrations: aztec migrate-ha-db up --database-url <url>`,
       );
     });
 
@@ -556,6 +556,115 @@ describe('PostgresSlashingProtectionDatabase', () => {
       const endSpy = jest.spyOn(pool, 'end');
       await db.close();
       expect(endSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('tryInsertOrGetExisting retry logic', () => {
+    const VALIDATOR_ADDRESS = EthAddress.random();
+    const SLOT = SlotNumber(100);
+    const BLOCK_NUMBER = BlockNumber(50);
+    const MESSAGE_HASH = Buffer32.random().toString();
+    const NODE_ID = 'node-1';
+
+    beforeEach(async () => {
+      for (const statement of SCHEMA_SETUP) {
+        await pglite.query(statement);
+      }
+      await pglite.query(INSERT_SCHEMA_VERSION, [SCHEMA_VERSION]);
+    });
+
+    it('should retry when query returns no rows initially', async () => {
+      const db = new PostgresSlashingProtectionDatabase(pool);
+      let callCount = 0;
+
+      // Mock pool.query to return no rows on first call, then rows on second call
+      const originalQuery = pool.query.bind(pool);
+      jest.spyOn(pool, 'query').mockImplementation(async (...args: any[]) => {
+        callCount++;
+        if (callCount === 1) {
+          // First call: simulate race condition - no rows returned
+          return { rows: [] };
+        }
+        // Subsequent calls: return actual result
+        return await originalQuery(...args);
+      });
+
+      const result = await db.tryInsertOrGetExisting({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: SLOT,
+        blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: 0,
+        dutyType: DutyType.BLOCK_PROPOSAL,
+        messageHash: MESSAGE_HASH,
+        nodeId: NODE_ID,
+      });
+
+      // Should have retried (called at least twice)
+      expect(callCount).toBeGreaterThanOrEqual(2);
+      // Should eventually succeed
+      expect(result.isNew).toBe(true);
+      expect(result.record.validatorAddress).toEqual(VALIDATOR_ADDRESS);
+      expect(result.record.slot).toBe(SLOT);
+
+      // Restore original query
+      jest.restoreAllMocks();
+    });
+
+    it('should retry multiple times if needed', async () => {
+      const db = new PostgresSlashingProtectionDatabase(pool);
+      let callCount = 0;
+
+      // Mock pool.query to return no rows on first two calls, then rows on third call
+      const originalQuery = pool.query.bind(pool);
+      jest.spyOn(pool, 'query').mockImplementation(async (...args: any[]) => {
+        callCount++;
+        if (callCount <= 2) {
+          // First two calls: simulate race condition - no rows returned
+          return { rows: [] };
+        }
+        // Third call: return actual result
+        return await originalQuery(...args);
+      });
+
+      const result = await db.tryInsertOrGetExisting({
+        validatorAddress: VALIDATOR_ADDRESS,
+        slot: SLOT,
+        blockNumber: BLOCK_NUMBER,
+        blockIndexWithinCheckpoint: 0,
+        dutyType: DutyType.BLOCK_PROPOSAL,
+        messageHash: MESSAGE_HASH,
+        nodeId: NODE_ID,
+      });
+
+      // Should have retried multiple times
+      expect(callCount).toBeGreaterThanOrEqual(3);
+      // Should eventually succeed
+      expect(result.isNew).toBe(true);
+
+      // Restore original query
+      jest.restoreAllMocks();
+    });
+
+    it('should throw error after all retries are exhausted', async () => {
+      const db = new PostgresSlashingProtectionDatabase(pool);
+
+      // Mock pool.query to always return no rows
+      jest.spyOn(pool, 'query').mockResolvedValue({ rows: [] });
+
+      await expect(
+        db.tryInsertOrGetExisting({
+          validatorAddress: VALIDATOR_ADDRESS,
+          slot: SLOT,
+          blockNumber: BLOCK_NUMBER,
+          blockIndexWithinCheckpoint: 0,
+          dutyType: DutyType.BLOCK_PROPOSAL,
+          messageHash: MESSAGE_HASH,
+          nodeId: NODE_ID,
+        }),
+      ).rejects.toThrow('INSERT_OR_GET_DUTY returned no rows');
+
+      // Restore original query
+      jest.restoreAllMocks();
     });
   });
 

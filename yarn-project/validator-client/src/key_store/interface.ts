@@ -7,6 +7,8 @@ import type { SigningContext } from '@aztec/validator-ha-signer/types';
 
 import type { TypedDataDefinition } from 'viem';
 
+import type { HAKeyStore } from './ha_key_store.js';
+
 /** Key Store
  *
  * A keystore interface that can be replaced with a local keystore / remote signer service
@@ -108,4 +110,10 @@ export interface ExtendedValidatorKeyStore extends ValidatorKeyStore {
    * @returns the remote signer configuration or undefined
    */
   getRemoteSignerConfig(attesterAddress: EthAddress): EthRemoteSignerConfig | undefined;
+
+  /**
+   * Is high-availability key store
+   * @returns true if the key store is a high-availability key store
+   */
+  isHAKeyStore(): this is HAKeyStore;
 }
