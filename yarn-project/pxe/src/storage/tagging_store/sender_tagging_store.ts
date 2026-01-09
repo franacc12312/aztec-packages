@@ -110,14 +110,33 @@ export class SenderTaggingStore implements StagedStore {
     jobView.set(secret, lastFinalizedIndex);
   }
 
-  commit(_jobId: string): Promise<void> {
-    // set lastfinalizedindexes
-    //  if empty array => delete
-    // set pending indexes
-    throw new Error('Method not implemented.');
+  async commit(jobId: string): Promise<void> {
+    const stagedPendingIndexes = this.#stagedPendingIndexes.get(jobId);
+    if (stagedPendingIndexes) {
+      for (const [secret, pendingIndexes] of stagedPendingIndexes.entries()) {
+        if (pendingIndexes.length === 0) {
+          await this.#pendingIndexes.delete(secret);
+        } else {
+          await this.#pendingIndexes.set(secret, pendingIndexes);
+        }
+      }
+    }
+
+    const stagedLastFinalizedIndexes = this.#stagedLastFinalizedIndexes.get(jobId);
+    if (stagedLastFinalizedIndexes) {
+      for (const [secret, lastFinalizedIndex] of stagedLastFinalizedIndexes.entries()) {
+        await this.#lastFinalizedIndexes.set(secret, lastFinalizedIndex);
+      }
+    }
+
+    this.#stagedPendingIndexes.delete(jobId);
+    this.#stagedLastFinalizedIndexes.delete(jobId);
   }
-  discardStaged(_jobId: string): Promise<void> {
-    throw new Error('Method not implemented.');
+
+  discardStaged(jobId: string): Promise<void> {
+    this.#stagedPendingIndexes.delete(jobId);
+    this.#stagedLastFinalizedIndexes.delete(jobId);
+    return Promise.resolve();
   }
 
   /**
