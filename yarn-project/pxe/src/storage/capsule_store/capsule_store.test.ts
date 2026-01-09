@@ -447,4 +447,85 @@ describe('capsule data provider', () => {
       TEST_TIMEOUT_MS,
     );
   });
+
+  describe('staged writes', () => {
+    it('writes to job view are isolated from another job view', async () => {
+      const slot = Fr.random();
+      const committedValues = [Fr.random()];
+      const stagedValues = [Fr.random()];
+      const commitJobId: string = 'commit-job';
+      const stagedJob1: string = 'staged-job-1';
+      const stagedJob2: string = 'staged-job-2';
+
+      // First set a committed capsule (using a different job that we commit)
+      capsuleStore.storeCapsule(contract, slot, committedValues, commitJobId);
+      await capsuleStore.commit(commitJobId);
+
+      // Then set a staged capsule (not committed)
+      capsuleStore.storeCapsule(contract, slot, stagedValues, stagedJob1);
+
+      // With jobId=1, should get staged capsule
+      expect(await capsuleStore.loadCapsule(contract, slot, stagedJob1)).toEqual(stagedValues);
+
+      // With jobId=2, should get committed capsule
+      expect(await capsuleStore.loadCapsule(contract, slot, stagedJob2)).toEqual(committedValues);
+    });
+
+    it('staged deletions hide committed data', async () => {
+      const slot = Fr.random();
+      const committedValues = [Fr.random()];
+      const commitJobId: string = 'commit-job';
+      const stagedJob1: string = 'staged-job-1';
+      const stagedJob2: string = 'staged-job-2';
+
+      // First set a committed capsule
+      capsuleStore.storeCapsule(contract, slot, committedValues, commitJobId);
+      await capsuleStore.commit(commitJobId);
+
+      // Delete in staging (not committed)
+      capsuleStore.deleteCapsule(contract, slot, stagedJob1);
+
+      // Without jobId=2, should still see committed capsule
+      expect(await capsuleStore.loadCapsule(contract, slot, stagedJob2)).toEqual(committedValues);
+
+      // With jobId=1, should see null (deleted in staging)
+      expect(await capsuleStore.loadCapsule(contract, slot, stagedJob1)).toBeNull();
+    });
+
+    it('commit applies staged deletions', async () => {
+      const slot = Fr.random();
+      const committedValues = [Fr.random()];
+      const commitJobId: string = 'commit-job';
+      const deleteJobId: string = 'delete-job';
+
+      capsuleStore.storeCapsule(contract, slot, committedValues, commitJobId);
+      await capsuleStore.commit(commitJobId);
+      capsuleStore.deleteCapsule(contract, slot, deleteJobId);
+
+      await capsuleStore.commit(deleteJobId);
+
+      // Now any job should see this null (deleted)
+      expect(await capsuleStore.loadCapsule(contract, slot, 'any-job-sees-this')).toBeNull();
+    });
+
+    it('discardStaged removes staged data without affecting main', async () => {
+      const slot = Fr.random();
+      const committedValues = [Fr.random()];
+      const stagedValues = [Fr.random()];
+      const commitJobId: string = 'commit-job';
+      const stagingJobId: string = 'staging-job';
+
+      capsuleStore.storeCapsule(contract, slot, committedValues, commitJobId);
+      await capsuleStore.commit(commitJobId);
+      capsuleStore.storeCapsule(contract, slot, stagedValues, stagingJobId);
+
+      await capsuleStore.discardStaged(stagingJobId);
+
+      // Should still get committed capsule
+      expect(await capsuleStore.loadCapsule(contract, slot, 'any-job')).toEqual(committedValues);
+
+      // With stagingJobId should fall back to committed since staging was discarded
+      expect(await capsuleStore.loadCapsule(contract, slot, stagingJobId)).toEqual(committedValues);
+    });
+  });
 });
