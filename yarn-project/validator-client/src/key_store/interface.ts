@@ -42,7 +42,7 @@ export interface ValidatorKeyStore {
    * @param address - The address of the signer to use
    * @param typedData - The complete EIP-712 typed data structure
    * @param context - Optional signing context for HA slashing protection
-   * @returns signature, or null if duty was already signed (when context provided)
+   * @returns signature
    */
   signTypedDataWithAddress(
     address: EthAddress,
@@ -65,7 +65,7 @@ export interface ValidatorKeyStore {
    * @param address - The address of the signer to use
    * @param message - The message to sign
    * @param context - Optional signing context for HA slashing protection
-   * @returns signature, or null if duty was already signed (when context provided)
+   * @returns signature
    */
   signMessageWithAddress(address: EthAddress, message: Buffer32, context?: SigningContext): Promise<Signature>;
 }

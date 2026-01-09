@@ -69,10 +69,29 @@ export class HAKeyStore implements ExtendedValidatorKeyStore {
 
     // Sign each address with HA protection
     const addresses = this.getAddresses();
-    const results = await Promise.all(addresses.map(addr => this.signTypedDataWithAddress(addr, typedData, context)));
+    const results = await Promise.allSettled(
+      addresses.map(addr => this.signTypedDataWithAddress(addr, typedData, context)),
+    );
 
-    // Filter out nulls (already signed by other nodes)
-    return results.filter((sig): sig is Signature => sig !== null);
+    // Filter out failures (already signed by other nodes or other errors)
+    return results
+      .filter((result): result is PromiseFulfilledResult<Signature> => {
+        if (result.status === 'fulfilled') {
+          return true;
+        }
+        // Log expected HA errors (already signed) at debug level
+        if (result.reason instanceof DutyAlreadySignedError) {
+          this.log.debug(`Duty already signed by another node`, {
+            dutyType: context.dutyType,
+            slot: context.slot,
+            signedByNode: result.reason.signedByNode,
+          });
+          return false;
+        }
+        // Re-throw unexpected errors
+        throw result.reason;
+      })
+      .map(result => result.value);
   }
 
   /**
@@ -88,10 +107,29 @@ export class HAKeyStore implements ExtendedValidatorKeyStore {
 
     // Sign each address with HA protection
     const addresses = this.getAddresses();
-    const results = await Promise.all(addresses.map(addr => this.signMessageWithAddress(addr, message, context)));
+    const results = await Promise.allSettled(
+      addresses.map(addr => this.signMessageWithAddress(addr, message, context)),
+    );
 
-    // Filter out nulls (already signed by other nodes)
-    return results.filter((sig): sig is Signature => sig !== null);
+    // Filter out failures (already signed by other nodes or other errors)
+    return results
+      .filter((result): result is PromiseFulfilledResult<Signature> => {
+        if (result.status === 'fulfilled') {
+          return true;
+        }
+        // Log expected HA errors (already signed) at debug level
+        if (result.reason instanceof DutyAlreadySignedError) {
+          this.log.debug(`Duty already signed by another node`, {
+            dutyType: context.dutyType,
+            slot: context.slot,
+            signedByNode: result.reason.signedByNode,
+          });
+          return false;
+        }
+        // Re-throw unexpected errors
+        throw result.reason;
+      })
+      .map(result => result.value);
   }
 
   /**
