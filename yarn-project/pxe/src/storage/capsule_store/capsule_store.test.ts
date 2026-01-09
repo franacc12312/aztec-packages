@@ -449,6 +449,33 @@ describe('capsule data provider', () => {
   });
 
   describe('staged writes', () => {
+    it('commit does not hold zombie data', async () => {
+      // This test tries to reproduce a scenario where
+      // we fail to clear a job's data after commit.
+      // The effect of such an incorrect behavior would be perceived
+      // if we re-used a jobId we had previously committed,
+      // which should not happen given we generate random job id's,
+      // but it's good to keep things clean and consistent.
+      const slot = Fr.random();
+      const committedValues1 = [Fr.random()];
+      const committedValues2 = [Fr.random()];
+
+      capsuleStore.storeCapsule(contract, slot, committedValues1, 'job-1');
+
+      // After this commit, 'job-1' should logically be reset
+      // Any read of contract-slot after this should see committedValues1
+      await capsuleStore.commit('job-1');
+
+      // Any read of contract-slot should see job2committedValues
+      capsuleStore.storeCapsule(contract, slot, committedValues2, 'job-2');
+      await capsuleStore.commit('job-2');
+
+      // If we failed to properly dispose 'job-1's staged writes on commit,
+      // Instead of reading committedValues2 (as we should), we would end
+      // up reading committedValues1 (which would be wrong)
+      expect(await capsuleStore.loadCapsule(contract, slot, 'job-1')).toEqual(committedValues2);
+    });
+
     it('writes to job view are isolated from another job view', async () => {
       const slot = Fr.random();
       const committedValues = [Fr.random()];

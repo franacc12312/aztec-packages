@@ -13,7 +13,9 @@ export class CapsuleStore implements StagedStore {
   // Arbitrary data stored by contracts. Key is computed as `${contractAddress}:${key}`
   #capsules: AztecAsyncMap<string, Buffer>;
 
-  // jobId => `${contractAddress}:${key}` => memory
+  // jobId => `${contractAddress}:${key}` => capsule data
+  // when `#stagedCapsules.get('some-job-id').get('${some-contract-address:some-key') === null`,
+  // it signals that the capsule was deleted during the job, so it needs to be deleted on commit
   #stagedCapsules: Map<string, Map<string, Buffer | null>>;
 
   logger: Logger;
@@ -28,25 +30,56 @@ export class CapsuleStore implements StagedStore {
     this.logger = createLogger('pxe:capsule-data-provider');
   }
 
-  #getJobView(jobId: string): Map<string, Buffer | null> {
-    let jobView = this.#stagedCapsules.get(jobId);
-    if (!jobView) {
-      jobView = new Map();
-      this.#stagedCapsules.set(jobId, jobView);
+  /**
+   * Given a job denoted by `jobId`, it returns the
+   * capsules that said job has interacted with.
+   *
+   * Capsules that haven't been committed to persistence KV storage
+   * are kept in-memory in `#stagedCapsules`, this method provides a convenient
+   * way to access that in-memory collection of data.
+   *
+   * @param jobId
+   * @returns
+   */
+  #getJobStagedCapsules(jobId: string): Map<string, Buffer | null> {
+    let jobStagedCapsules = this.#stagedCapsules.get(jobId);
+    if (!jobStagedCapsules) {
+      jobStagedCapsules = new Map();
+      this.#stagedCapsules.set(jobId, jobStagedCapsules);
     }
-    return jobView;
+    return jobStagedCapsules;
   }
 
-  async #getFromStage(jobId: string, dbSlotKey: string): Promise<Buffer | null> {
-    const jobView = this.#getJobView(jobId);
-    let staged: Buffer | null | undefined = jobView.get(dbSlotKey);
+  /**
+   * Reads a capsule's slot from the staged version of the data associated to the given jobId.
+   *
+   * If it is not there, it reads it from the KV store.
+   */
+  async #getFromStage(jobId: string, dbSlotKey: string): Promise<Buffer | null | undefined> {
+    const jobStagedCapsules = this.#getJobStagedCapsules(jobId);
+    let staged: Buffer | null | undefined = jobStagedCapsules.get(dbSlotKey);
+    // Note that if staged === null, we marked it for deletion, so we don't want to
+    // re-read it from DB
     if (staged === undefined) {
       // If we don't have a staged version of this dbSlotKey, first we check if there's one in DB
-      // If it's not in DB, we'll get a null here, which is useful to signal "I checked, there was nothing"
       staged = await this.#loadCapsuleFromDb(dbSlotKey);
-      jobView.set(dbSlotKey, staged);
     }
     return staged;
+  }
+
+  /**
+   * Writes a capsule to the stage of a job.
+   */
+  #setOnStage(jobId: string, dbSlotKey: string, capsuleData: Buffer) {
+    this.#getJobStagedCapsules(jobId).set(dbSlotKey, capsuleData);
+  }
+
+  /**
+   * Deletes a capsule on the stage of a job. Note the capsule will still
+   * exist in storage until the job is committed.
+   */
+  #deleteOnStage(jobId: string, dbSlotKey: string) {
+    this.#getJobStagedCapsules(jobId).set(dbSlotKey, null);
   }
 
   async #loadCapsuleFromDb(dbSlotKey: string): Promise<Buffer | null> {
@@ -66,12 +99,12 @@ export class CapsuleStore implements StagedStore {
    * @param jobId - The jobId identifying which staged data to commit
    */
   async commit(jobId: string): Promise<void> {
-    const jobView = this.#getJobView(jobId);
-    if (!jobView) {
-      return;
-    }
+    const jobStagedCapsules = this.#getJobStagedCapsules(jobId);
 
-    for (const [key, value] of jobView) {
+    for (const [key, value] of jobStagedCapsules) {
+      // In the write stage, we represent deleted capsules with null
+      // (as opposed to undefined, which denotes there was never a capsule there to begin with).
+      // So we delete from actual KV store here.
       if (value === null) {
         await this.#capsules.delete(key);
       } else {
@@ -105,7 +138,7 @@ export class CapsuleStore implements StagedStore {
     const dbSlotKey = dbSlotToKey(contractAddress, slot);
 
     // A store overrides any pre-existing data on the slot
-    this.#getJobView(jobId).set(dbSlotKey, Buffer.concat(capsule.map(value => value.toBuffer())));
+    this.#setOnStage(jobId, dbSlotKey, Buffer.concat(capsule.map(value => value.toBuffer())));
   }
 
   /**
@@ -134,7 +167,7 @@ export class CapsuleStore implements StagedStore {
    */
   deleteCapsule(contractAddress: AztecAddress, slot: Fr, jobId: string) {
     // When we commit this, we will interpret null as a deletion, so we'll propagate the delete to the KV store
-    this.#getJobView(jobId).set(dbSlotToKey(contractAddress, slot), null);
+    this.#deleteOnStage(jobId, dbSlotToKey(contractAddress, slot));
   }
 
   /**
@@ -155,14 +188,10 @@ export class CapsuleStore implements StagedStore {
     numEntries: number,
     jobId: string,
   ): Promise<void> {
-    // This transactional context in theory isn't so critical now because we aren't
-    // writing to DB so if there's exceptions midway and it blows up, no visible impact
-    // to persistent storage will happen.
-    // I'm leaving this transactional context here though because I'm assuming this
-    // gives us "copy atomicity": there shouldn't be concurrent writes to what's being copied
-    // here.
-    // This is one point we should revisit in the future if we want to relax the concurrency
-    // of jobs: different calls running concurrently on the same contract may cause trouble.
+    // This transactional context gives us "copy atomicity":
+    // there shouldn't be concurrent writes to what's being copied here.
+    // Equally important: this in practice is expected to perform thousands of DB operations
+    // and not using a transaction here would heavily impact performance.
     return this.#store.transactionAsync(async () => {
       // In order to support overlapping source and destination regions, we need to check the relative positions of source
       // and destination. If destination is ahead of source, then by the time we overwrite source elements using forward
@@ -177,13 +206,12 @@ export class CapsuleStore implements StagedStore {
         const currentSrcSlot = dbSlotToKey(contractAddress, srcSlot.add(new Fr(i)));
         const currentDstSlot = dbSlotToKey(contractAddress, dstSlot.add(new Fr(i)));
 
-        // const toCopy = await this.#capsules.getAsync(currentSrcSlot);
         const toCopy = await this.#getFromStage(jobId, currentSrcSlot);
         if (!toCopy) {
           throw new Error(`Attempted to copy empty slot ${currentSrcSlot} for contract ${contractAddress.toString()}`);
         }
 
-        this.#getJobView(jobId).set(currentDstSlot, toCopy);
+        this.#setOnStage(jobId, currentDstSlot, toCopy);
       }
     });
   }
@@ -200,6 +228,8 @@ export class CapsuleStore implements StagedStore {
     // We wrap this in a transaction to serialize concurrent calls from Promise.all.
     // Without this, concurrent appends to the same array could race: both read length=0,
     // both write at the same slots, one overwrites the other.
+    // Equally important: this in practice is expected to perform thousands of DB operations
+    // and not using a transaction here would heavily impact performance.
     return this.#store.transactionAsync(async () => {
       // Load current length, defaulting to 0 if not found
       const lengthData = await this.loadCapsule(contractAddress, baseSlot, jobId);
