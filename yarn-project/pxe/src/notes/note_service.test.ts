@@ -342,7 +342,6 @@ describe('NoteService', () => {
       expect(allNotes).toHaveLength(1);
       expect(allNotes[0].noteHash.equals(noteHash)).toBe(true);
 
-      // Verify the note is nullified (not in active notes)
       const activeNotes = await noteStore.getNotes({
         contractAddress,
         scopes: [recipient.address],
