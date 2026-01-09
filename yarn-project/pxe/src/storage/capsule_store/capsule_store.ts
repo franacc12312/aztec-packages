@@ -196,27 +196,25 @@ export class CapsuleStore implements StagedStore {
    * @param baseSlot - The slot where the array length is stored
    * @param content - Array of capsule data to append
    */
-  async appendToCapsuleArray(
-    contractAddress: AztecAddress,
-    baseSlot: Fr,
-    content: Fr[][],
-    jobId: string,
-  ): Promise<void> {
-    // Load current length, defaulting to 0 if not found
-    const lengthData = await this.loadCapsule(contractAddress, baseSlot, jobId);
-    const currentLength = lengthData ? lengthData[0].toNumber() : 0;
+  appendToCapsuleArray(contractAddress: AztecAddress, baseSlot: Fr, content: Fr[][], jobId: string): Promise<void> {
+    // We wrap this in a transaction to serialize concurrent calls from Promise.all.
+    // Without this, concurrent appends to the same array could race: both read length=0,
+    // both write at the same slots, one overwrites the other.
+    return this.#store.transactionAsync(async () => {
+      // Load current length, defaulting to 0 if not found
+      const lengthData = await this.loadCapsule(contractAddress, baseSlot, jobId);
+      const currentLength = lengthData ? lengthData[0].toNumber() : 0;
 
-    // Store each capsule at consecutive slots after baseSlot + 1 + currentLength
-    for (let i = 0; i < content.length; i++) {
-      const nextSlot = arraySlot(baseSlot, currentLength + i);
-      this.storeCapsule(contractAddress, nextSlot, content[i], jobId);
-    }
+      // Store each capsule at consecutive slots after baseSlot + 1 + currentLength
+      for (let i = 0; i < content.length; i++) {
+        const nextSlot = arraySlot(baseSlot, currentLength + i);
+        this.storeCapsule(contractAddress, nextSlot, content[i], jobId);
+      }
 
-    // Update length to include all new capsules
-    const newLength = currentLength + content.length;
-    this.storeCapsule(contractAddress, baseSlot, [new Fr(newLength)], jobId);
-
-    return;
+      // Update length to include all new capsules
+      const newLength = currentLength + content.length;
+      this.storeCapsule(contractAddress, baseSlot, [new Fr(newLength)], jobId);
+    });
   }
 
   readCapsuleArray(contractAddress: AztecAddress, baseSlot: Fr, jobId: string): Promise<Fr[][]> {
