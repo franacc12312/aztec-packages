@@ -86,8 +86,8 @@ export class BlockProposal extends Gossipable {
    * @param payload - The consensus payload
    * @param txHashes - The transaction hashes
    * @param txs - Optional full transactions
-   * @param payloadSigner - Function to sign the payload (returns null if HA signer already signed this duty)
-   * @returns BlockProposal or null if the duty was already signed by another HA node
+   * @param payloadSigner - Function to sign the payload (throws if HA signer already signed this duty)
+   * @returns BlockProposal
    */
   static async createProposalFromSigner(
     payload: ConsensusPayload,
