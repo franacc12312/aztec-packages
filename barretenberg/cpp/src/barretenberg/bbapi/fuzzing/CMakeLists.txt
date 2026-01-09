@@ -1,0 +1,1 @@
+barretenberg_module(bbapi_fuzzing dsl)

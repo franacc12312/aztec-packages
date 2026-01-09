@@ -8,4 +8,5 @@ endif()
 # bbapi fuzzer needs vm2_stub for AVM recursion constraint references
 if(FUZZING)
     target_link_libraries(bbapi_bbapi_fuzzer PRIVATE vm2_stub)
+    add_subdirectory(fuzzing)
 endif()
