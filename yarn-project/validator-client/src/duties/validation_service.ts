@@ -155,10 +155,9 @@ export class ValidationService {
       keccak256(proposal.payload.getPayloadToSign(SignatureDomainSeparator.blockAttestation)),
     );
 
-    // Sign each attestor individually, catching HA errors per-attestor
-    const attestations: BlockAttestation[] = [];
-    for (const attestor of attestors) {
-      try {
+    // Sign each attestor in parallel, catching HA errors per-attestor
+    const results = await Promise.allSettled(
+      attestors.map(async attestor => {
         // Create signing context if blockNumber is available
         const context: SigningContext | undefined = blockNumber
           ? {
@@ -170,11 +169,20 @@ export class ValidationService {
           : undefined;
 
         const sig = await this.keyStore.signMessageWithAddress(attestor, buf, context);
-        attestations.push(new BlockAttestation(proposal.payload, sig, proposal.signature));
-      } catch (error) {
+        return new BlockAttestation(proposal.payload, sig, proposal.signature);
+      }),
+    );
+
+    const attestations: BlockAttestation[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === 'fulfilled') {
+        attestations.push(result.value);
+      } else {
+        const error = result.reason;
         if (error instanceof DutyAlreadySignedError || error instanceof SlashingProtectionError) {
           this.log.debug(
-            `Attestation for slot ${proposal.slotNumber} by ${attestor} already signed by another High-Availability node`,
+            `Attestation for slot ${proposal.slotNumber} by ${attestors[i]} already signed by another High-Availability node`,
           );
           // Continue with remaining attestors
         } else {
