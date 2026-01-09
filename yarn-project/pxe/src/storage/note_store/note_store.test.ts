@@ -23,15 +23,6 @@ const DUMMY_SILOED_NULLIFIER_2 = new Fr(2n);
 const DUMMY_SILOED_NULLIFIER_3 = new Fr(3n);
 // -----------------------------------------------------------------------------
 
-// ─── Test Fixtures Overview ────────────────────────────────────────────────
-//
-// Notes created by `setupProviderWithNotes`:
-//   note1 → CONTRACT_A, SLOT_X, SCOPE_1, siloedNullifier: DUMMY_SILOED_NULLIFIER_1
-//   note2 → CONTRACT_A, SLOT_Y, SCOPE_1, siloedNullifier: DUMMY_SILOED_NULLIFIER_2
-//   note3 → CONTRACT_B, SLOT_X, SCOPE_2, siloedNullifier: DUMMY_SILOED_NULLIFIER_3
-//
-// ───────────────────────────────────────────────────────────────────────────
-
 describe('NoteStore', () => {
   // Helper to create a deterministic note with sensible defaults, override any field as needed.
   function mkNote(overrides: Partial<NoteDao> = {}) {
