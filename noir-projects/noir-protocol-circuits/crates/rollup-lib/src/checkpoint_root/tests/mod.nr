@@ -347,7 +347,7 @@ impl TestBuilder {
             [expected_checkpoint_header.hash()],
         );
 
-        assert_eq(pi.new_out_hash.root, expected_checkpoint_header.out_hash);
+        assert_eq(pi.new_out_hash.root, expected_checkpoint_header.epoch_out_hash);
         assert_eq(
             pi.new_out_hash.next_available_leaf_index,
             self.hints.previous_out_hash.next_available_leaf_index + 1,
@@ -411,14 +411,14 @@ impl TestBuilder {
             }
         }
         out_hashes[checkpoint_index] = out_hash;
-        let out_hash = compute_sha_tree_root(out_hashes);
+        let epoch_out_hash = compute_sha_tree_root(out_hashes);
 
         CheckpointHeader {
             last_archive_root: left.previous_archive.root,
             block_headers_hash,
             blobs_hash: self.hints.blobs_hash,
             in_hash: left.in_hash,
-            out_hash,
+            epoch_out_hash,
             slot_number: left.constants.slot_number,
             timestamp: right.timestamp,
             coinbase: left.constants.coinbase,

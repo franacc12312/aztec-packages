@@ -121,9 +121,8 @@ describe('CheckpointBuilder', () => {
       expect(checkpoint.blocks.length).toBe(1);
       expect(checkpoint.blocks[0].number).toEqual(blockNumber);
 
-      // There is no previous checkpoints (previousCheckpointOutHashes == []), so the accumulated out hash in the header
-      // equals the empty root.
-      expect(checkpoint.header.outHash).toEqual(new Fr(EMPTY_EPOCH_OUT_HASH));
+      // There is no previous checkpoints (previousCheckpointOutHashes == []), so the epoch out hash is empty.
+      expect(checkpoint.header.epochOutHash).toEqual(new Fr(EMPTY_EPOCH_OUT_HASH));
       // The checkpoint's out hash is zero, since there are no txs/msgs.
       expect(checkpoint.getCheckpointOutHash()).toEqual(Fr.ZERO);
 
@@ -171,12 +170,12 @@ describe('CheckpointBuilder', () => {
       expect(checkpoint.blocks.length).toBe(1);
       expect(checkpoint.blocks[0].number).toEqual(blockNumber);
 
-      // The accumulated out hash in the header is computed from the previous checkpoint out hashes and the current
+      // The epoch out hash in the header is computed from the previous checkpoint out hashes and the current
       // checkpoint's out hash.
       const checkpointOutHash = checkpoint.getCheckpointOutHash();
       expect(checkpointOutHash).not.toEqual(Fr.ZERO);
-      const accumulatedOutHash = accumulateCheckpointOutHashes([...previousCheckpointOutHashes, checkpointOutHash]);
-      expect(checkpoint.header.outHash).toEqual(accumulatedOutHash);
+      const epochOutHash = accumulateCheckpointOutHashes([...previousCheckpointOutHashes, checkpointOutHash]);
+      expect(checkpoint.header.epochOutHash).toEqual(epochOutHash);
 
       await fork.close();
     });

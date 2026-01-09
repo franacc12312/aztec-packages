@@ -15,7 +15,12 @@ pub struct CheckpointHeader {
     pub block_headers_hash: Field,
     pub blobs_hash: Field,
     pub in_hash: Field,
-    pub out_hash: Field,
+    // The root of the epoch out hash balanced tree. The out hash of the first checkpoint in the epoch is inserted at
+    // index 0, the second at index 1, and so on.
+    // Note: This is not necessarily the final epoch out hash. It includes only the out hashes of checkpoints up to and
+    // including the current checkpoint. Any subsequent checkpoints added to the same epoch are not reflected in this
+    // value.
+    pub epoch_out_hash: Field,
     pub slot_number: Field,
     // The timestamp of the slot. All blocks in the checkpoint share the same timestamp, which must equal to this value.
     pub timestamp: u64,
@@ -34,7 +39,7 @@ impl Empty for CheckpointHeader {
             block_headers_hash: 0,
             blobs_hash: 0,
             in_hash: 0,
-            out_hash: 0,
+            epoch_out_hash: 0,
             slot_number: 0,
             timestamp: 0,
             coinbase: EthAddress::zero(),
@@ -53,7 +58,7 @@ impl CheckpointHeader {
         let block_headers_hash_bytes: [u8; 32] = self.block_headers_hash.to_be_bytes();
         let blobs_hash_bytes: [u8; 32] = self.blobs_hash.to_be_bytes();
         let in_hash_bytes: [u8; 32] = self.in_hash.to_be_bytes();
-        let out_hash_bytes: [u8; 32] = self.out_hash.to_be_bytes();
+        let epoch_out_hash_bytes: [u8; 32] = self.epoch_out_hash.to_be_bytes();
         let slot_number_bytes: [u8; 32] = self.slot_number.to_be_bytes();
         let coinbase_bytes: [u8; 20] = self.coinbase.to_be_bytes();
         let fee_recipient_bytes: [u8; 32] = self.fee_recipient.to_field().to_be_bytes();
@@ -74,8 +79,8 @@ impl CheckpointHeader {
             offset += blobs_hash_bytes.len();
             bytes[i + offset] = in_hash_bytes[i];
             offset += in_hash_bytes.len();
-            bytes[i + offset] = out_hash_bytes[i];
-            offset += out_hash_bytes.len();
+            bytes[i + offset] = epoch_out_hash_bytes[i];
+            offset += epoch_out_hash_bytes.len();
             bytes[i + offset] = slot_number_bytes[i];
             offset += slot_number_bytes.len();
         }
@@ -135,7 +140,7 @@ fn checkpoint_header_hash_matches_ts() {
         block_headers_hash: 456,
         blobs_hash: 77,
         in_hash: 88,
-        out_hash: 99,
+        epoch_out_hash: 99,
         slot_number: 1234,
         timestamp: 5678,
         coinbase: EthAddress::from_field(9090),
@@ -165,7 +170,7 @@ fn checkpoint_header_hash_large_values_matches_ts() {
         block_headers_hash: MAX_FIELD_VALUE - 456,
         blobs_hash: MAX_FIELD_VALUE - 77,
         in_hash: MAX_FIELD_VALUE - 88,
-        out_hash: MAX_FIELD_VALUE - 99,
+        epoch_out_hash: MAX_FIELD_VALUE - 99,
         slot_number: MAX_FIELD_VALUE - 1234,
         timestamp: MAX_U64_VALUE - 5678,
         coinbase: EthAddress::from_field(max_bytes_20 - 9090),

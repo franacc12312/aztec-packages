@@ -14,8 +14,8 @@ pub struct RootRollupPublicInputs {
     pub previous_archive_root: Field,
     // Root of archive tree after this rollup has been processed.
     pub new_archive_root: Field,
-    // Root of the epoch out hash **balanced** tree.
-    // The `out_hash` of the first checkpoint in the epoch is inserted at index 0, the second at index 1, and so on.
+    // Root of the epoch out hash *balanced* tree.
+    // The out hash of the first checkpoint in the epoch is inserted at index 0, the second at index 1, and so on.
     pub out_hash: Field,
     // Checkpoint header hashes for each checkpoint in this epoch.
     // The header hash of the first checkpoint in the epoch is at index 0, the second at index 1, and so on.

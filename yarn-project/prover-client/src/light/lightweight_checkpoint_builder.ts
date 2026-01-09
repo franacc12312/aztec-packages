@@ -172,7 +172,7 @@ export class LightweightCheckpointBuilder {
     const checkpointOutHash = computeCheckpointOutHash(
       blocks.map(block => block.body.txEffects.map(tx => tx.l2ToL1Msgs)),
     );
-    const accumulatedOutHash = accumulateCheckpointOutHashes([...this.previousCheckpointOutHashes, checkpointOutHash]);
+    const epochOutHash = accumulateCheckpointOutHashes([...this.previousCheckpointOutHashes, checkpointOutHash]);
 
     // TODO(palla/mbps): Should we source this from the constants instead?
     // timestamp of a checkpoint is the timestamp of the last block in the checkpoint.
@@ -184,7 +184,7 @@ export class LightweightCheckpointBuilder {
       lastArchiveRoot: this.lastArchives[0].root,
       blobsHash,
       inHash,
-      outHash: accumulatedOutHash,
+      epochOutHash,
       blockHeadersHash,
       slotNumber,
       timestamp,

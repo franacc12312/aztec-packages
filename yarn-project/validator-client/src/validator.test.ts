@@ -252,8 +252,8 @@ describe('ValidatorClient', () => {
 
     beforeEach(() => {
       const emptyInHash = computeInHashFromL1ToL2Messages([]);
-      const outHash = accumulateCheckpointOutHashes([]);
-      const blockHeader = makeL2BlockHeader(1, 100, 100, { inHash: emptyInHash, outHash });
+      const epochOutHash = accumulateCheckpointOutHashes([]);
+      const blockHeader = makeL2BlockHeader(1, 100, 100, { inHash: emptyInHash, epochOutHash });
       blockNumber = BlockNumber(blockHeader.getBlockNumber());
       proposal = makeBlockProposal({ header: blockHeader });
       // Set the current time to the start of the slot of the proposal

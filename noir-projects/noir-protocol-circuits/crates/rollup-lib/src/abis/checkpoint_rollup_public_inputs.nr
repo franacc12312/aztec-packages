@@ -20,13 +20,13 @@ pub struct CheckpointRollupPublicInputs {
     // Archive tree root after applying this checkpoint range.
     pub new_archive: AppendOnlyTreeSnapshot,
 
-    // Out hash tree snapshot immediately before this checkpoint range.
+    // Snapshot of the epoch out hash tree immediately before this checkpoint range.
     // The `previous_out_hash` of the first checkpoint in an epoch must be empty. The out hash of the first checkpoint
-    // will be inserted into the **balanced** tree at index 0, the second at index 1, and so on.
+    // will be inserted into the tree at index 0, the second at index 1, and so on.
     pub previous_out_hash: AppendOnlyTreeSnapshot,
-    // Out hash tree snapshot after applying this checkpoint range.
+    // Snapshot of the epoch out hash tree after applying this checkpoint range.
     // The `new_out_hash` of the last checkpoint in an epoch contains all checkpoint out hashes. The root becomes the
-    // final epoch `out_hash` inserted into the Outbox on L1.
+    // final epoch out hash inserted into the Outbox on L1.
     pub new_out_hash: AppendOnlyTreeSnapshot,
 
     // Hashes of checkpoint headers for this checkpoint range.

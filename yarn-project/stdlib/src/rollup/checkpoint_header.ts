@@ -31,10 +31,13 @@ export class CheckpointHeader {
     /** Root of the l1 to l2 messages subtree. */
     public inHash: Fr,
     /**
-     * The accumulated checkpoint out hash (the root of the epoch out hash balanced tree): The out hash of the first
-     * checkpoint in the epoch is inserted at index 0, the second at index 1, and so on.
+     * The root of the epoch out hash balanced tree. The out hash of the first checkpoint in the epoch is inserted at
+     * index 0, the second at index 1, and so on.
+     * Note: This is not necessarily the final epoch out hash. It includes only the out hashes of checkpoints up to and
+     * including the current checkpoint. Any subsequent checkpoints added to the same epoch are not reflected in this
+     * value.
      */
-    public outHash: Fr,
+    public epochOutHash: Fr,
     /** Slot number of the L2 block */
     public slotNumber: SlotNumber,
     /** Timestamp of the L2 block. */
@@ -56,7 +59,7 @@ export class CheckpointHeader {
         blockHeadersHash: schemas.Fr,
         blobsHash: schemas.Fr,
         inHash: schemas.Fr,
-        outHash: schemas.Fr,
+        epochOutHash: schemas.Fr,
         slotNumber: schemas.SlotNumber,
         timestamp: schemas.BigInt,
         coinbase: schemas.EthAddress,
@@ -73,7 +76,7 @@ export class CheckpointHeader {
       fields.blockHeadersHash,
       fields.blobsHash,
       fields.inHash,
-      fields.outHash,
+      fields.epochOutHash,
       fields.slotNumber,
       fields.timestamp,
       fields.coinbase,
@@ -111,7 +114,7 @@ export class CheckpointHeader {
       this.blockHeadersHash.equals(other.blockHeadersHash) &&
       this.blobsHash.equals(other.blobsHash) &&
       this.inHash.equals(other.inHash) &&
-      this.outHash.equals(other.outHash) &&
+      this.epochOutHash.equals(other.epochOutHash) &&
       this.slotNumber === other.slotNumber &&
       this.timestamp === other.timestamp &&
       this.coinbase.equals(other.coinbase) &&
@@ -128,7 +131,7 @@ export class CheckpointHeader {
       this.blockHeadersHash,
       this.blobsHash,
       this.inHash,
-      this.outHash,
+      this.epochOutHash,
       new Fr(this.slotNumber),
       bigintToUInt64BE(this.timestamp),
       this.coinbase,
@@ -148,7 +151,7 @@ export class CheckpointHeader {
       blockHeadersHash: Fr.ZERO,
       blobsHash: Fr.ZERO,
       inHash: Fr.ZERO,
-      outHash: Fr.ZERO,
+      epochOutHash: Fr.ZERO,
       slotNumber: SlotNumber.ZERO,
       timestamp: 0n,
       coinbase: EthAddress.ZERO,
@@ -165,7 +168,7 @@ export class CheckpointHeader {
       blockHeadersHash: Fr.random(),
       blobsHash: Fr.random(),
       inHash: Fr.random(),
-      outHash: Fr.random(),
+      epochOutHash: Fr.random(),
       slotNumber: SlotNumber(Math.floor(Math.random() * 1000) + 1),
       timestamp: BigInt(Math.floor(Date.now() / 1000)),
       coinbase: EthAddress.random(),
@@ -182,7 +185,7 @@ export class CheckpointHeader {
       this.blockHeadersHash.isZero() &&
       this.blobsHash.isZero() &&
       this.inHash.isZero() &&
-      this.outHash.isZero() &&
+      this.epochOutHash.isZero() &&
       this.slotNumber === 0 &&
       this.timestamp === 0n &&
       this.coinbase.isZero() &&
@@ -234,7 +237,7 @@ export class CheckpointHeader {
       blockHeadersHash: this.blockHeadersHash.toString(),
       blobsHash: this.blobsHash.toString(),
       inHash: this.inHash.toString(),
-      outHash: this.outHash.toString(),
+      outHash: this.epochOutHash.toString(),
       slotNumber: BigInt(this.slotNumber),
       timestamp: this.timestamp,
       coinbase: this.coinbase.toString(),
@@ -253,7 +256,7 @@ export class CheckpointHeader {
       blockHeadersHash: this.blockHeadersHash.toString(),
       blobsHash: this.blobsHash.toString(),
       inHash: this.inHash.toString(),
-      outHash: this.outHash.toString(),
+      epochOutHash: this.epochOutHash.toString(),
       slotNumber: this.slotNumber,
       timestamp: this.timestamp,
       coinbase: this.coinbase.toString(),
@@ -269,7 +272,7 @@ export class CheckpointHeader {
   blockHeadersHash: ${this.blockHeadersHash.toString()},
   blobsHash: ${inspect(this.blobsHash)},
   inHash: ${inspect(this.inHash)},
-  outHash: ${inspect(this.outHash)},
+  epochOutHash: ${inspect(this.epochOutHash)},
   slotNumber: ${this.slotNumber},
   timestamp: ${this.timestamp},
   coinbase: ${this.coinbase.toString()},

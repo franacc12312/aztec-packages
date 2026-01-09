@@ -205,6 +205,9 @@ export class BlockProposalHandler {
     let reexecutionResult;
     if (shouldReexecute) {
       // Compute the previous checkpoint out hashes for the epoch.
+      // TODO(mbps): This assumes one block per checkpoint, which is only true for now.
+      // TODO: There can be a more efficient way to get the previous checkpoint out hashes without having to fetch all
+      // the blocks.
       const epoch = getEpochAtSlot(slotNumber, this.epochCache.getL1Constants());
       const previousBlocks = (await this.blockSource.getBlocksForEpoch(epoch))
         .filter(b => b.number < blockNumber)
@@ -232,12 +235,12 @@ export class BlockProposalHandler {
       const checkpointOutHash = computeCheckpointOutHash([
         reexecutionResult.block.body.txEffects.map(tx => tx.l2ToL1Msgs),
       ]);
-      const accumulatedOutHash = accumulateCheckpointOutHashes([...previousCheckpointOutHashes, checkpointOutHash]);
-      const proposalOutHash = proposal.payload.header.outHash;
-      if (!accumulatedOutHash.equals(proposalOutHash)) {
-        this.log.warn(`Accumulated out hash mismatch`, {
+      const computedOutHash = accumulateCheckpointOutHashes([...previousCheckpointOutHashes, checkpointOutHash]);
+      const proposalOutHash = proposal.payload.header.epochOutHash;
+      if (!computedOutHash.equals(proposalOutHash)) {
+        this.log.warn(`Epoch out hash mismatch`, {
           proposalOutHash: proposalOutHash.toString(),
-          accumulatedOutHash: accumulatedOutHash.toString(),
+          computedOutHash: computedOutHash.toString(),
           ...proposalInfo,
         });
         return { isValid: false, blockNumber, reason: 'out_hash_mismatch' };

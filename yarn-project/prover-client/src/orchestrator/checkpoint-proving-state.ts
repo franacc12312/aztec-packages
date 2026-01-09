@@ -40,7 +40,7 @@ import { accumulateBlobs, buildBlobHints, toProofData } from './block-building-h
 import { BlockProvingState, type ProofState } from './block-proving-state.js';
 import type { EpochProvingState } from './epoch-proving-state.js';
 
-type OutHashHints = {
+type OutHashHint = {
   treeSnapshot: AppendOnlyTreeSnapshot;
   siblingPath: Tuple<Fr, typeof OUT_HASH_TREE_HEIGHT>;
 };
@@ -53,11 +53,11 @@ export class CheckpointProvingState {
     | ProofState<CheckpointRollupPublicInputs, typeof NESTED_RECURSIVE_ROLLUP_HONK_PROOF_LENGTH>
     | undefined;
   private blocks: (BlockProvingState | undefined)[] = [];
-  private previousOutHashHints: OutHashHints | undefined;
+  private previousOutHashHint: OutHashHint | undefined;
   private outHash: Fr | undefined;
   // The snapshot and sibling path after the checkpoint's out hash is inserted.
   // Stored here to be retrieved for the next checkpoint when it's added.
-  private newOutHashHints: OutHashHints | undefined;
+  private newOutHashHint: OutHashHint | undefined;
   private startBlobAccumulator: BatchedBlobAccumulator | undefined;
   private endBlobAccumulator: BatchedBlobAccumulator | undefined;
   private blobFields: Fr[] | undefined;
@@ -207,12 +207,12 @@ export class CheckpointProvingState {
     return new ParityBasePrivateInputs(messages, this.constants.vkTreeRoot);
   }
 
-  public setOutHashHints(hints: OutHashHints) {
-    this.previousOutHashHints = hints;
+  public setOutHashHint(hint: OutHashHint) {
+    this.previousOutHashHint = hint;
   }
 
-  public getOutHashHints() {
-    return this.previousOutHashHints;
+  public getOutHashHint() {
+    return this.previousOutHashHint;
   }
 
   public accumulateBlockOutHashes() {
@@ -228,12 +228,12 @@ export class CheckpointProvingState {
     return this.outHash;
   }
 
-  public setOutHashHintsForNextCheckpoint(hints: OutHashHints) {
-    this.newOutHashHints = hints;
+  public setOutHashHintForNextCheckpoint(hint: OutHashHint) {
+    this.newOutHashHint = hint;
   }
 
-  public getOutHashHintsForNextCheckpoint() {
-    return this.newOutHashHints;
+  public getOutHashHintForNextCheckpoint() {
+    return this.newOutHashHint;
   }
 
   public async accumulateBlobs(startBlobAccumulator: BatchedBlobAccumulator) {
@@ -277,8 +277,8 @@ export class CheckpointProvingState {
     if (proofs.length !== nonEmptyProofs.length) {
       throw new Error('At least one child is not ready for the checkpoint root rollup.');
     }
-    if (!this.previousOutHashHints) {
-      throw new Error('Out hash hints are not set.');
+    if (!this.previousOutHashHint) {
+      throw new Error('Out hash hint is not set.');
     }
     if (!this.startBlobAccumulator) {
       throw new Error('Start blob accumulator is not set.');
@@ -292,8 +292,8 @@ export class CheckpointProvingState {
     const hints = CheckpointRootRollupHints.from({
       previousBlockHeader: this.headerOfLastBlockInPreviousCheckpoint,
       previousArchiveSiblingPath: this.lastArchiveSiblingPath,
-      previousOutHash: this.previousOutHashHints.treeSnapshot,
-      newOutHashSiblingPath: this.previousOutHashHints.siblingPath,
+      previousOutHash: this.previousOutHashHint.treeSnapshot,
+      newOutHashSiblingPath: this.previousOutHashHint.siblingPath,
       startBlobAccumulator: this.startBlobAccumulator.toBlobAccumulator(),
       finalBlobChallenges: this.finalBlobBatchingChallenges,
       blobFields: padArrayEnd(blobFields, Fr.ZERO, FIELDS_PER_BLOB * BLOBS_PER_CHECKPOINT),
@@ -319,7 +319,7 @@ export class CheckpointProvingState {
 
   public isReadyForCheckpointRoot() {
     const allChildProofsReady = this.#getChildProofsForRoot().every(p => !!p);
-    return allChildProofsReady && !!this.previousOutHashHints && !!this.startBlobAccumulator;
+    return allChildProofsReady && !!this.previousOutHashHint && !!this.startBlobAccumulator;
   }
 
   public verifyState() {

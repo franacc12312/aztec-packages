@@ -105,7 +105,7 @@ impl<let NumBlobs: u32> CheckpointRollupPublicInputsComposer<NumBlobs> {
         )
     }
 
-    fn create_checkpoint_header(self, accumulated_out_hash: Field) -> CheckpointHeader {
+    fn create_checkpoint_header(self, epoch_out_hash: Field) -> CheckpointHeader {
         let merged_rollup = self.merged_rollup;
         let constants = merged_rollup.constants;
 
@@ -114,7 +114,7 @@ impl<let NumBlobs: u32> CheckpointRollupPublicInputsComposer<NumBlobs> {
             block_headers_hash: merged_rollup.block_headers_hash,
             blobs_hash: self.blobs_hash,
             in_hash: merged_rollup.in_hash,
-            out_hash: accumulated_out_hash,
+            epoch_out_hash,
             slot_number: constants.slot_number,
             timestamp: merged_rollup.timestamp,
             coinbase: constants.coinbase,

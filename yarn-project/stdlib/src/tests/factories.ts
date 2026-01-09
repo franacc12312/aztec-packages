@@ -920,7 +920,7 @@ export function makeL2BlockHeader(
     makeAppendOnlyTreeSnapshot(seed + 0x100),
     overrides?.blobsHash ?? fr(seed + 0x200),
     overrides?.inHash ?? fr(seed + 0x300),
-    overrides?.outHash ?? fr(seed + 0x400),
+    overrides?.epochOutHash ?? fr(seed + 0x400),
     overrides?.state ?? makeStateReference(seed + 0x600),
     makeGlobalVariables((seed += 0x700), {
       ...(blockNumber !== undefined ? { blockNumber: BlockNumber(blockNumber) } : {}),
@@ -939,7 +939,7 @@ export function makeCheckpointHeader(seed = 0) {
     blockHeadersHash: fr(seed + 0x150),
     blobsHash: fr(seed + 0x200),
     inHash: fr(seed + 0x210),
-    outHash: fr(seed + 0x220),
+    epochOutHash: fr(seed + 0x220),
     slotNumber: SlotNumber(seed + 0x300),
     timestamp: BigInt(seed + 0x400),
     coinbase: makeEthAddress(seed + 0x500),

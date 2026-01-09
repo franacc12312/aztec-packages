@@ -130,10 +130,10 @@ export class EpochPruneWatcher extends (EventEmitter as new () => WatcherEmitter
     try {
       for (const block of blocks) {
         await this.validateBlock(block, previousCheckpointOutHashes, fork);
-        previousCheckpointOutHashes = [
-          ...previousCheckpointOutHashes,
-          computeCheckpointOutHash([block.body.txEffects.map(tx => tx.l2ToL1Msgs)]),
-        ];
+
+        // TODO(mbps): This assumes one block per checkpoint, which is only true for now.
+        const checkpointOutHash = computeCheckpointOutHash([block.body.txEffects.map(tx => tx.l2ToL1Msgs)]);
+        previousCheckpointOutHashes = [...previousCheckpointOutHashes, checkpointOutHash];
       }
     } finally {
       await fork.close();

@@ -95,7 +95,7 @@ export class LightweightBlockFactory implements IBlockFactory {
     const blockOutHash = computeBlockOutHash(txs.map(tx => tx.txEffect.l2ToL1Msgs));
     // There's only one block per checkpoint, so the checkpoint out hash equals the block out hash.
     const checkpointOutHash = blockOutHash;
-    const outHash = accumulateCheckpointOutHashes([...this.previousCheckpointOutHashes, checkpointOutHash]);
+    const epochOutHash = accumulateCheckpointOutHashes([...this.previousCheckpointOutHashes, checkpointOutHash]);
     const inHash = computeInHashFromL1ToL2Messages(this.l1ToL2Messages!);
     const numBlobFields = blockBlobFields.length + 1;
     const blobFields = blockBlobFields.concat([encodeCheckpointEndMarker({ numBlobFields })]);
@@ -106,7 +106,7 @@ export class LightweightBlockFactory implements IBlockFactory {
       blockHeadersHash: blockHeaderHash,
       blobsHash,
       inHash,
-      outHash,
+      epochOutHash,
     });
 
     const block = new L2Block(newArchive, l2BlockHeader, body);

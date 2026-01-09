@@ -223,7 +223,7 @@ export class EpochProvingState {
       Promise.resolve(shaMerkleHash(left, right)),
     );
 
-    const computeHints = async (leaves: Fr[]) => {
+    const computeOutHashHint = async (leaves: Fr[]) => {
       const tree = await treeCalculator.computeTree(leaves.map(l => l.toBuffer()));
       const nextAvailableLeafIndex = leaves.length;
       return {
@@ -235,7 +235,7 @@ export class EpochProvingState {
       };
     };
 
-    let hints = this.checkpoints[0]?.getOutHashHints();
+    let hint = this.checkpoints[0]?.getOutHashHint();
     const outHashes = [];
     for (let i = 0; i < this.totalNumCheckpoints; i++) {
       const checkpoint = this.checkpoints[i];
@@ -244,8 +244,8 @@ export class EpochProvingState {
       }
 
       // If hints are not set yet, it must be the first checkpoint. Compute the hints with an empty tree.
-      hints ??= await computeHints([]);
-      checkpoint.setOutHashHints(hints);
+      hint ??= await computeOutHashHint([]);
+      checkpoint.setOutHashHint(hint);
 
       // Get the out hash for this checkpoint.
       const outHash = checkpoint.accumulateBlockOutHashes();
@@ -255,8 +255,8 @@ export class EpochProvingState {
       outHashes.push(outHash);
 
       // Get or create hints for the next checkpoint.
-      hints = checkpoint.getOutHashHintsForNextCheckpoint() ?? (await computeHints(outHashes));
-      checkpoint.setOutHashHintsForNextCheckpoint(hints);
+      hint = checkpoint.getOutHashHintForNextCheckpoint() ?? (await computeOutHashHint(outHashes));
+      checkpoint.setOutHashHintForNextCheckpoint(hint);
     }
   }
 
