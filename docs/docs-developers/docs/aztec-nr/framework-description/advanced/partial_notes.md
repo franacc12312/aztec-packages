@@ -3,6 +3,7 @@ title: Partial Notes
 sidebar_position: 1
 tags: [Developers, Contracts, Notes]
 description: "Learn how partial notes enable private-to-public value transfers when data depends on onchain state."
+references: ["noir-projects/aztec-nr/uint-note/src/uint_note.nr", "noir-projects/noir-contracts/contracts/app/token_contract/src/main.nr"]
 ---
 
 import Image from "@theme/IdealImage";
