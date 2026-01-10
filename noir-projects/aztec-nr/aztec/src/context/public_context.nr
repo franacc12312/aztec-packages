@@ -178,8 +178,8 @@ impl PublicContext {
     ///
     /// ## Safety
     ///
-    /// While it is safe to rely on this function's return value to determine if a nullifier exists or not, it is
-    /// **not** safe to infer any additional information from that. In particular, it is **unsafe** to infer that the
+    /// While it is safe to rely on this function's return value to determine if a nullifier exists or not, it is often
+    /// **not** safe to infer additional information from that. In particular, it is **unsafe** to infer that the
     /// existence of a nullifier emitted from a private function implies that all other side-effects of said private
     /// execution have been completed, more concretely that any enqueued public calls have been executed.
     ///
