@@ -56,7 +56,7 @@ export function createValidatorForAcceptingTxs(
 ): TxValidator<Tx> {
   const validators: TxValidator<Tx>[] = [
     new TxPermittedValidator(txsPermitted),
-    new SizeTxValidator(256 * 1024),
+    new SizeTxValidator(),
     new DataTxValidator(),
     new MetadataTxValidator({
       l1ChainId: new Fr(l1ChainId),
