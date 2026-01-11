@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1768011274455,
+  "lastUpdate": 1768112055884,
   "repoUrl": "https://github.com/AztecProtocol/aztec-packages",
   "entries": {
     "Aztec Benchmarks": [
@@ -467984,6 +467984,71 @@ window.BENCHMARK_DATA = {
           {
             "name": "yarn-project/end-to-end/unproven_2tps/p99_inclusion",
             "value": 937,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "AztecBot",
+            "email": "tech@aztecprotocol.com"
+          },
+          "committer": {
+            "name": "AztecBot",
+            "email": "tech@aztecprotocol.com"
+          },
+          "id": "a895f37193b92e3d20c5ca78bb36300f1d875d4f",
+          "message": "chore(docs): cut new aztec and bb docs version for tag v4.0.0-nightly.20260110",
+          "timestamp": "2026-01-10T04:44:25Z",
+          "url": "https://github.com/AztecProtocol/aztec-packages/commit/a895f37193b92e3d20c5ca78bb36300f1d875d4f"
+        },
+        "date": 1768111977861,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "yarn-project/end-to-end/unproven_0.1tps/avg_inclusion",
+            "value": 48.2,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_0.1tps/median_inclusion",
+            "value": 48,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_0.1tps/p99_inclusion",
+            "value": 82,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_0.2tps/avg_inclusion",
+            "value": 47.5,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_0.2tps/median_inclusion",
+            "value": 47,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_0.2tps/p99_inclusion",
+            "value": 83,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_0.5tps/avg_inclusion",
+            "value": 436,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_0.5tps/median_inclusion",
+            "value": 303,
+            "unit": "s"
+          },
+          {
+            "name": "yarn-project/end-to-end/unproven_0.5tps/p99_inclusion",
+            "value": 1309,
             "unit": "s"
           }
         ]
