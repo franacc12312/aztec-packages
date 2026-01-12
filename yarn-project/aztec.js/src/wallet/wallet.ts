@@ -178,6 +178,8 @@ export type ContractMetadata = {
  * Contract class metadata.
  */
 export type ContractClassMetadata = {
+  /** Whether the artifact is registered in the wallet */
+  isArtifactRegistered: boolean;
   /** Whether the contract class is publicly registered on-chain */
   isContractClassPubliclyRegistered: boolean;
 };
@@ -324,12 +326,12 @@ export const ContractMetadataSchema = z.object({
   instance: optional(ContractInstanceWithAddressSchema),
   isContractInitialized: z.boolean(),
   isContractPublished: z.boolean(),
-  isContractClassPubliclyRegistered: z.boolean(),
   isContractUpdated: z.boolean(),
   updatedContractClassId: optional(schemas.Fr),
 });
 
 export const ContractClassMetadataSchema = z.object({
+  isArtifactRegistered: z.boolean(),
   isContractClassPubliclyRegistered: z.boolean(),
 });
 

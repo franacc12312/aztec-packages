@@ -305,7 +305,6 @@ class MockWallet implements Wallet {
       instance: undefined,
       isContractInitialized: false,
       isContractPublished: false,
-      isContractClassPubliclyRegistered: false,
       isContractUpdated: false,
       updatedContractClassId: undefined,
     });
@@ -313,6 +312,7 @@ class MockWallet implements Wallet {
 
   getContractClassMetadata(_id: Fr): Promise<ContractClassMetadata> {
     return Promise.resolve({
+      isArtifactRegistered: false,
       isContractClassPubliclyRegistered: false,
     });
   }
