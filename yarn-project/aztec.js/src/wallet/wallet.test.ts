@@ -101,6 +101,25 @@ describe('WalletSchema', () => {
     expect(result).toEqual([{ alias: 'account1', item: expect.any(AztecAddress) }]);
   });
 
+  it('getContractMetadata', async () => {
+    const result = await context.client.getContractMetadata(await AztecAddress.random());
+    expect(result).toEqual({
+      instance: undefined,
+      isContractInitialized: expect.any(Boolean),
+      isContractPublished: expect.any(Boolean),
+      isContractUpdated: expect.any(Boolean),
+      updatedContractClassId: undefined,
+    });
+  });
+
+  it('getContractClassMetadata', async () => {
+    const result = await context.client.getContractClassMetadata(Fr.random());
+    expect(result).toEqual({
+      isArtifactRegistered: expect.any(Boolean),
+      isContractClassPubliclyRegistered: expect.any(Boolean),
+    });
+  });
+
   it('registerContract', async () => {
     const mockArtifact: ContractArtifact = {
       name: 'TestContract',
