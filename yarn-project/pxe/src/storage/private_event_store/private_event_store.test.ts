@@ -553,4 +553,169 @@ describe('PrivateEventStore', () => {
       expect(events[0].packedEvent).toEqual(msgContent1);
     });
   });
+
+  describe('staging', () => {
+    it('stages events without affecting committed storage', async () => {
+      const commitJobId: string = 'commit-job';
+      const stagingJobId: string = 'staging-job';
+
+      const committedEventRandomness = Fr.random();
+      const stagedEventRandomness = Fr.random();
+
+      // Store committed event
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        committedEventRandomness,
+        msgContent,
+        eventCommitmentIndex,
+        { contractAddress, scope, txHash, l2BlockNumber, l2BlockHash },
+        commitJobId,
+      );
+      await privateEventStore.commit(commitJobId);
+
+      // Store staged event (not committed)
+      const stagedMsgContent = getRandomMsgContent();
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        stagedEventRandomness,
+        stagedMsgContent,
+        eventCommitmentIndex + 1,
+        { contractAddress, scope, txHash: TxHash.random(), l2BlockNumber, l2BlockHash },
+        stagingJobId,
+      );
+
+      // With a fresh jobId, should only see committed event
+      const events = await privateEventStore.getPrivateEvents(
+        eventSelector,
+        {
+          contractAddress,
+          fromBlock: l2BlockNumber,
+          toBlock: l2BlockNumber + 1,
+          scopes: [scope],
+        },
+        'some-job-id',
+      );
+      expect(events).toHaveLength(1);
+      expect(events[0].packedEvent).toEqual(msgContent);
+    });
+
+    it('staged events are visible when reading with jobId', async () => {
+      const stagingJobId: string = 'staging-job';
+      const stagedEventRandomness = Fr.random();
+
+      const stagedMsgContent = getRandomMsgContent();
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        stagedEventRandomness,
+        stagedMsgContent,
+        eventCommitmentIndex,
+        { contractAddress, scope, txHash, l2BlockNumber, l2BlockHash },
+        stagingJobId,
+      );
+
+      // With fresh jobId, should not see the staged event
+      const eventsWithoutJobId = await privateEventStore.getPrivateEvents(
+        eventSelector,
+        {
+          contractAddress,
+          fromBlock: l2BlockNumber,
+          toBlock: l2BlockNumber + 1,
+          scopes: [scope],
+        },
+        'some-job-id',
+      );
+      expect(eventsWithoutJobId).toHaveLength(0);
+
+      // With jobId, should see the staged event
+      const eventsWithJobId = await privateEventStore.getPrivateEvents(
+        eventSelector,
+        {
+          contractAddress,
+          fromBlock: l2BlockNumber,
+          toBlock: l2BlockNumber + 1,
+          scopes: [scope],
+        },
+        stagingJobId,
+      );
+      expect(eventsWithJobId).toHaveLength(1);
+      expect(eventsWithJobId[0].packedEvent).toEqual(stagedMsgContent);
+    });
+
+    it('commit promotes staged events to main storage', async () => {
+      const stagingJobId: string = 'staging-job';
+      const stagedEventRandomness = Fr.random();
+      const stagedMsgContent = getRandomMsgContent();
+
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        stagedEventRandomness,
+        stagedMsgContent,
+        eventCommitmentIndex,
+        { contractAddress, scope, txHash, l2BlockNumber, l2BlockHash },
+        stagingJobId,
+      );
+
+      await privateEventStore.commit(stagingJobId);
+
+      // Now should see the event with a fresh jobId
+      const events = await privateEventStore.getPrivateEvents(
+        eventSelector,
+        {
+          contractAddress,
+          fromBlock: l2BlockNumber,
+          toBlock: l2BlockNumber + 1,
+          scopes: [scope],
+        },
+        'some-job-id',
+      );
+      expect(events).toHaveLength(1);
+      expect(events[0].packedEvent).toEqual(stagedMsgContent);
+    });
+
+    it('discardStaged removes staged events without affecting main', async () => {
+      const commitJobId: string = 'commit-job';
+      const stagingJobId: string = 'staging-job';
+      const committedEventRandomness = Fr.random();
+      const stagedEventRandomness = Fr.random();
+
+      // Store committed event
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        committedEventRandomness,
+        msgContent,
+        eventCommitmentIndex,
+        { contractAddress, scope, txHash, l2BlockNumber, l2BlockHash },
+        commitJobId,
+      );
+      await privateEventStore.commit(commitJobId);
+
+      // Store staged event (not committed)
+      const stagedMsgContent = getRandomMsgContent();
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        stagedEventRandomness,
+        stagedMsgContent,
+        eventCommitmentIndex + 1,
+        { contractAddress, scope, txHash: TxHash.random(), l2BlockNumber, l2BlockHash },
+        stagingJobId,
+      );
+
+      // Discard staging
+      await privateEventStore.discardStaged(stagingJobId);
+
+      // Should only see committed event
+      const events = await privateEventStore.getPrivateEvents(
+        eventSelector,
+        {
+          contractAddress,
+          fromBlock: l2BlockNumber,
+          toBlock: l2BlockNumber + 1,
+          scopes: [scope],
+        },
+        'some-job-id',
+      );
+      expect(events).toHaveLength(1);
+      expect(events[0].packedEvent).toEqual(msgContent);
+    });
+  });
 });
