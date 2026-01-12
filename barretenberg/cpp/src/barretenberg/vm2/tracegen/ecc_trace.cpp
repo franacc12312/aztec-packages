@@ -62,7 +62,7 @@ void EccTraceBuilder::process_add(const simulation::EventEmitterInterface<simula
         bool y_match = p.y() == q.y();
 
         bool double_predicate = (x_match && y_match);
-        bool add_predicate = (!x_match && !y_match);
+        bool add_predicate = !x_match;
         // If x match but the y's don't, the result is the infinity point when adding;
         bool infinity_predicate = (x_match && !y_match);
         // The result is also the infinity point if
