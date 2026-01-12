@@ -481,6 +481,7 @@ export function getDeployRollupForUpgradeEnvVars(
     AZTEC_PROOF_SUBMISSION_EPOCHS: args.aztecProofSubmissionEpochs.toString(),
     AZTEC_LOCAL_EJECTION_THRESHOLD: args.localEjectionThreshold.toString(),
     AZTEC_SLASHING_LIFETIME_IN_ROUNDS: args.slashingLifetimeInRounds.toString(),
+    AZTEC_SLASHING_EXECUTION_DELAY_IN_ROUNDS: args.slashingExecutionDelayInRounds.toString(),
     AZTEC_SLASHING_VETOER: args.slashingVetoer.toString(),
     AZTEC_SLASHING_DISABLE_DURATION: args.slashingDisableDuration.toString(),
     AZTEC_MANA_TARGET: args.manaTarget.toString(),

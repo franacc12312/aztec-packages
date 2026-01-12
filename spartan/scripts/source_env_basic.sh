@@ -11,12 +11,43 @@ function resolve_env_file_path {
   fi
 }
 
+# Source default.json and export all values as environment variables
+# default.json is the canonical source of truth for network defaults
+function source_default_json {
+  local default_json_file="$spartan/environments/default.json"
+
+  if [[ ! -f "$default_json_file" ]]; then
+    echo "Warning: default.json not found at $default_json_file" >&2
+    return
+  fi
+
+  echo "Loading default environment variables from $default_json_file"
+
+  # Parse JSON with Node.js and source the output
+  # Structure: {"timing": {"AZTEC_SLOT_DURATION": 36}, ...} -> export AZTEC_SLOT_DURATION="36"
+  # shellcheck disable=SC1090
+  source <(node -e "
+    const j = require('$default_json_file');
+    for (const section of Object.values(j)) {
+      if (typeof section === 'object' && section) {
+        for (const [k, v] of Object.entries(section)) {
+          console.log('export ' + k + '=' + JSON.stringify(String(v)));
+        }
+      }
+    }
+  ")
+}
+
 function source_env_basic {
   local env_file="$1"
   local actual_env_file=$(resolve_env_file_path "$env_file")
 
+  # Source default.json first (provides sensible defaults for all L2ChainConfig values)
+  source_default_json
+
+  # Then source the network-specific env file (overrides defaults)
   if [[ -f "$actual_env_file" ]]; then
-    echo "Loading basic environment variables from $actual_env_file"
+    echo "Loading network environment variables from $actual_env_file"
     set -a
     # shellcheck disable=SC1090
     source "$actual_env_file"

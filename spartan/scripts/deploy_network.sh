@@ -4,6 +4,7 @@ set -euo pipefail
 # Resolve repo root and script directory for reliable relative paths
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENVIRONMENTS_DIR="${REPO_ROOT}/spartan/environments"
 
 source "${REPO_ROOT}/ci3/source"
 
@@ -11,6 +12,37 @@ source "${REPO_ROOT}/ci3/source"
 log() { echo "[INFO]  $(date -Is) - $*"; }
 err() { echo "[ERROR] $(date -Is) - $*" >&2; }
 die() { err "$*"; exit 1; }
+
+########################
+# SOURCE NETWORK CONFIG
+########################
+# NETWORK must be set (either via env or first positional arg)
+NETWORK="${NETWORK:-${1:-}}"
+if [[ -z "${NETWORK}" ]]; then
+  die "NETWORK is required. Set NETWORK env var or pass as first argument."
+fi
+
+# Source the network YAML config
+# YAML values override existing env vars EXCEPT for NAMESPACE and AZTEC_DOCKER_IMAGE
+YAML_FILE="${ENVIRONMENTS_DIR}/${NETWORK}.env.yml"
+if [[ -f "$YAML_FILE" ]]; then
+  log "Loading network config from ${YAML_FILE}"
+  # Save caller's overrides
+  _SAVED_NAMESPACE="${NAMESPACE:-}"
+  _SAVED_AZTEC_DOCKER_IMAGE="${AZTEC_DOCKER_IMAGE:-}"
+
+  # Source YAML (overrides everything)
+  while IFS='=' read -r key value; do
+    [[ -z "$key" || "$key" =~ ^# ]] && continue
+    export "$key=$value"
+  done < <(yq -o shell "$YAML_FILE" | sed "s/^export //" | sed "s/'//g")
+
+  # Restore caller's overrides for NAMESPACE and AZTEC_DOCKER_IMAGE
+  [[ -n "$_SAVED_NAMESPACE" ]] && export NAMESPACE="$_SAVED_NAMESPACE"
+  [[ -n "$_SAVED_AZTEC_DOCKER_IMAGE" ]] && export AZTEC_DOCKER_IMAGE="$_SAVED_AZTEC_DOCKER_IMAGE"
+else
+  log "Warning: Network config not found: ${YAML_FILE}"
+fi
 
 # Cleanup function for traps
 cleanup() {
@@ -33,7 +65,10 @@ declare -A STAGE_TIMINGS
 ########################
 # GLOBAL VARIABLES
 ########################
-NAMESPACE=${NAMESPACE} # required
+# NAMESPACE comes from YAML config or must be pre-set
+if [[ -z "${NAMESPACE:-}" ]]; then
+  die "NAMESPACE is required. Set in YAML config or as env var."
+fi
 CLUSTER=${CLUSTER:-kind}
 RESOURCE_PROFILE=$([[ "${CLUSTER}" == "kind" ]] && echo "dev" || echo "prod")
 BASE_STATE_PATH="${CLUSTER}/${NAMESPACE}"
