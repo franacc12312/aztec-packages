@@ -50,37 +50,59 @@ describe('PrivateEventStore', () => {
   });
 
   it('stores and retrieves private events', async () => {
-    await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent, eventCommitmentIndex, {
-      contractAddress,
-      scope,
-      txHash,
-      l2BlockNumber,
-      l2BlockHash,
-    });
-    const events = await privateEventStore.getPrivateEvents(eventSelector, {
-      contractAddress,
-      fromBlock: l2BlockNumber,
-      toBlock: l2BlockNumber + 1,
-      scopes: [scope],
-    });
+    await privateEventStore.storePrivateEventLog(
+      eventSelector,
+      randomness,
+      msgContent,
+      eventCommitmentIndex,
+      {
+        contractAddress,
+        scope,
+        txHash,
+        l2BlockNumber,
+        l2BlockHash,
+      },
+      'test',
+    );
+    const events = await privateEventStore.getPrivateEvents(
+      eventSelector,
+      {
+        contractAddress,
+        fromBlock: l2BlockNumber,
+        toBlock: l2BlockNumber + 1,
+        scopes: [scope],
+      },
+      'test',
+    );
     expect(events).toEqual([expectedEvent]);
   });
 
   it('ignores duplicate events with same eventCommitmentIndex', async () => {
-    await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent, eventCommitmentIndex, {
-      contractAddress,
-      scope,
-      txHash,
-      l2BlockNumber,
-      l2BlockHash,
-    });
+    await privateEventStore.storePrivateEventLog(
+      eventSelector,
+      randomness,
+      msgContent,
+      eventCommitmentIndex,
+      {
+        contractAddress,
+        scope,
+        txHash,
+        l2BlockNumber,
+        l2BlockHash,
+      },
+      'test',
+    );
 
-    const events = await privateEventStore.getPrivateEvents(eventSelector, {
-      contractAddress,
-      fromBlock: l2BlockNumber,
-      toBlock: l2BlockNumber + 1,
-      scopes: [scope],
-    });
+    const events = await privateEventStore.getPrivateEvents(
+      eventSelector,
+      {
+        contractAddress,
+        fromBlock: l2BlockNumber,
+        toBlock: l2BlockNumber + 1,
+        scopes: [scope],
+      },
+      'test',
+    );
 
     expect(events).toEqual([expectedEvent]);
   });
@@ -88,27 +110,45 @@ describe('PrivateEventStore', () => {
   it('allows multiple events with same content but different eventCommitmentIndex', async () => {
     const otherEventCommitmentIndex = eventCommitmentIndex + 1;
 
-    await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent, eventCommitmentIndex, {
-      contractAddress,
-      scope,
-      txHash,
-      l2BlockNumber,
-      l2BlockHash,
-    });
-    await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent, otherEventCommitmentIndex, {
-      contractAddress,
-      scope,
-      txHash,
-      l2BlockNumber,
-      l2BlockHash,
-    });
+    await privateEventStore.storePrivateEventLog(
+      eventSelector,
+      randomness,
+      msgContent,
+      eventCommitmentIndex,
+      {
+        contractAddress,
+        scope,
+        txHash,
+        l2BlockNumber,
+        l2BlockHash,
+      },
+      'test',
+    );
+    await privateEventStore.storePrivateEventLog(
+      eventSelector,
+      randomness,
+      msgContent,
+      otherEventCommitmentIndex,
+      {
+        contractAddress,
+        scope,
+        txHash,
+        l2BlockNumber,
+        l2BlockHash,
+      },
+      'test',
+    );
 
-    const events = await privateEventStore.getPrivateEvents(eventSelector, {
-      contractAddress,
-      fromBlock: l2BlockNumber,
-      toBlock: l2BlockNumber + 1,
-      scopes: [scope],
-    });
+    const events = await privateEventStore.getPrivateEvents(
+      eventSelector,
+      {
+        contractAddress,
+        fromBlock: l2BlockNumber,
+        toBlock: l2BlockNumber + 1,
+        scopes: [scope],
+      },
+      'test',
+    );
 
     expect(events).toEqual([expectedEvent, expectedEvent]);
   });
@@ -120,34 +160,59 @@ describe('PrivateEventStore', () => {
       l2BlockNumber: BlockNumber(200),
     };
 
-    await privateEventStore.storePrivateEventLog(eventSelector, randomness, getRandomMsgContent(), 0, {
-      contractAddress,
-      scope,
-      txHash: TxHash.random(),
-      l2BlockNumber: BlockNumber(100),
-      l2BlockHash,
-    });
-    await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent, 1, {
-      contractAddress,
-      scope,
-      txHash: expectedEvent.txHash,
-      l2BlockNumber: expectedEvent.l2BlockNumber,
-      l2BlockHash: expectedEvent.l2BlockHash,
-    });
-    await privateEventStore.storePrivateEventLog(eventSelector, randomness, getRandomMsgContent(), 2, {
-      contractAddress,
-      scope,
-      txHash: TxHash.random(),
-      l2BlockNumber: BlockNumber(300),
-      l2BlockHash,
-    });
+    await privateEventStore.storePrivateEventLog(
+      eventSelector,
+      randomness,
+      getRandomMsgContent(),
+      0,
+      {
+        contractAddress,
+        scope,
+        txHash: TxHash.random(),
+        l2BlockNumber: BlockNumber(100),
+        l2BlockHash,
+      },
+      'test',
+    );
+    await privateEventStore.storePrivateEventLog(
+      eventSelector,
+      randomness,
+      msgContent,
+      1,
+      {
+        contractAddress,
+        scope,
+        txHash: expectedEvent.txHash,
+        l2BlockNumber: expectedEvent.l2BlockNumber,
+        l2BlockHash: expectedEvent.l2BlockHash,
+      },
+      'test',
+    );
+    await privateEventStore.storePrivateEventLog(
+      eventSelector,
+      randomness,
+      getRandomMsgContent(),
+      2,
+      {
+        contractAddress,
+        scope,
+        txHash: TxHash.random(),
+        l2BlockNumber: BlockNumber(300),
+        l2BlockHash,
+      },
+      'test',
+    );
 
-    const events = await privateEventStore.getPrivateEvents(eventSelector, {
-      contractAddress,
-      fromBlock: 150,
-      toBlock: 150 + 100,
-      scopes: [scope],
-    });
+    const events = await privateEventStore.getPrivateEvents(
+      eventSelector,
+      {
+        contractAddress,
+        fromBlock: 150,
+        toBlock: 150 + 100,
+        scopes: [scope],
+      },
+      'test',
+    );
 
     expect(events).toEqual([expectedEvent]); // Only includes event from block 200
   });
@@ -155,38 +220,60 @@ describe('PrivateEventStore', () => {
   it('filters events by recipient', async () => {
     const otherScope = await AztecAddress.random();
 
-    await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent, eventCommitmentIndex, {
-      contractAddress,
-      scope,
-      txHash,
-      l2BlockNumber,
-      l2BlockHash,
-    });
-    await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent, eventCommitmentIndex + 1, {
-      contractAddress,
-      scope: otherScope,
-      txHash: TxHash.random(),
-      l2BlockNumber,
-      l2BlockHash,
-    });
+    await privateEventStore.storePrivateEventLog(
+      eventSelector,
+      randomness,
+      msgContent,
+      eventCommitmentIndex,
+      {
+        contractAddress,
+        scope,
+        txHash,
+        l2BlockNumber,
+        l2BlockHash,
+      },
+      'test',
+    );
+    await privateEventStore.storePrivateEventLog(
+      eventSelector,
+      randomness,
+      msgContent,
+      eventCommitmentIndex + 1,
+      {
+        contractAddress,
+        scope: otherScope,
+        txHash: TxHash.random(),
+        l2BlockNumber,
+        l2BlockHash,
+      },
+      'test',
+    );
 
-    const events = await privateEventStore.getPrivateEvents(eventSelector, {
-      contractAddress,
-      fromBlock: l2BlockNumber,
-      toBlock: l2BlockNumber + 1,
-      scopes: [scope],
-    });
+    const events = await privateEventStore.getPrivateEvents(
+      eventSelector,
+      {
+        contractAddress,
+        fromBlock: l2BlockNumber,
+        toBlock: l2BlockNumber + 1,
+        scopes: [scope],
+      },
+      'test',
+    );
 
     expect(events).toEqual([expectedEvent]);
   });
 
   it('returns empty array when no events match criteria', async () => {
-    const events = await privateEventStore.getPrivateEvents(eventSelector, {
-      contractAddress,
-      fromBlock: l2BlockNumber,
-      toBlock: l2BlockNumber + 1,
-      scopes: [scope],
-    });
+    const events = await privateEventStore.getPrivateEvents(
+      eventSelector,
+      {
+        contractAddress,
+        fromBlock: l2BlockNumber,
+        toBlock: l2BlockNumber + 1,
+        scopes: [scope],
+      },
+      'test',
+    );
 
     expect(events).toEqual([]);
   });
@@ -203,36 +290,61 @@ describe('PrivateEventStore', () => {
     });
 
     it('returns events in order by eventCommitmentIndex', async () => {
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent2, 1, {
-        contractAddress,
-        scope,
-        txHash: TxHash.random(),
-        l2BlockNumber: BlockNumber(200),
-        l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        msgContent2,
+        1,
+        {
+          contractAddress,
+          scope,
+          txHash: TxHash.random(),
+          l2BlockNumber: BlockNumber(200),
+          l2BlockHash,
+        },
+        'test',
+      );
 
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent1, 0, {
-        contractAddress,
-        scope,
-        txHash: TxHash.random(),
-        l2BlockNumber: BlockNumber(100),
-        l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        msgContent1,
+        0,
+        {
+          contractAddress,
+          scope,
+          txHash: TxHash.random(),
+          l2BlockNumber: BlockNumber(100),
+          l2BlockHash,
+        },
+        'test',
+      );
 
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent3, 2, {
-        contractAddress,
-        scope,
-        txHash: TxHash.random(),
-        l2BlockNumber: BlockNumber(300),
-        l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        msgContent3,
+        2,
+        {
+          contractAddress,
+          scope,
+          txHash: TxHash.random(),
+          l2BlockNumber: BlockNumber(300),
+          l2BlockHash,
+        },
+        'test',
+      );
 
-      const events = await privateEventStore.getPrivateEvents(eventSelector, {
-        contractAddress,
-        fromBlock: 0,
-        toBlock: 0 + 1000,
-        scopes: [scope],
-      });
+      const events = await privateEventStore.getPrivateEvents(
+        eventSelector,
+        {
+          contractAddress,
+          fromBlock: 0,
+          toBlock: 0 + 1000,
+          scopes: [scope],
+        },
+        'test',
+      );
 
       expect(events.map(e => e.packedEvent)).toEqual([msgContent1, msgContent2, msgContent3]);
     });
@@ -253,47 +365,81 @@ describe('PrivateEventStore', () => {
 
     it('removes events after rollback block', async () => {
       // Store events in blocks 100, 200, 300
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent1, 0, {
-        contractAddress,
-        scope,
-        txHash: TxHash.random(),
-        l2BlockNumber: BlockNumber(100),
-        l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        msgContent1,
+        0,
+        {
+          contractAddress,
+          scope,
+          txHash: TxHash.random(),
+          l2BlockNumber: BlockNumber(100),
+          l2BlockHash,
+        },
+        'before-rollback',
+      );
       // We add another event in the same block to verify that more events per block work.
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent2, 1, {
-        contractAddress,
-        scope,
-        txHash: TxHash.random(),
-        l2BlockNumber: BlockNumber(100),
-        l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        msgContent2,
+        1,
+        {
+          contractAddress,
+          scope,
+          txHash: TxHash.random(),
+          l2BlockNumber: BlockNumber(100),
+          l2BlockHash,
+        },
+        'before-rollback',
+      );
 
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent3, 2, {
-        contractAddress,
-        scope,
-        txHash: TxHash.random(),
-        l2BlockNumber: BlockNumber(200),
-        l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        msgContent3,
+        2,
+        {
+          contractAddress,
+          scope,
+          txHash: TxHash.random(),
+          l2BlockNumber: BlockNumber(200),
+          l2BlockHash,
+        },
+        'before-rollback',
+      );
 
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent4, 3, {
-        contractAddress,
-        scope,
-        txHash: TxHash.random(),
-        l2BlockNumber: BlockNumber(300),
-        l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        msgContent4,
+        3,
+        {
+          contractAddress,
+          scope,
+          txHash: TxHash.random(),
+          l2BlockNumber: BlockNumber(300),
+          l2BlockHash,
+        },
+        'before-rollback',
+      );
+
+      await privateEventStore.commit('before-rollback');
 
       // Rollback to block 150 (should remove events from blocks 200 and 300)
       await privateEventStore.rollbackEventsAfterBlock(150, 300);
 
-      const events = await privateEventStore.getPrivateEvents(eventSelector, {
-        contractAddress,
-        fromBlock: 0,
-        toBlock: 1000,
-        scopes: [scope],
-      });
+      const events = await privateEventStore.getPrivateEvents(
+        eventSelector,
+        {
+          contractAddress,
+          fromBlock: 0,
+          toBlock: 1000,
+          scopes: [scope],
+        },
+        'after-rollback',
+      );
 
       expect(events.length).toBe(2);
       expect(events[0].packedEvent).toEqual(msgContent1);
@@ -306,63 +452,102 @@ describe('PrivateEventStore', () => {
       const reorgTxHash = TxHash.random();
 
       // Store event at block 200
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent1, 0, {
-        contractAddress,
-        scope,
-        txHash: reorgTxHash,
-        l2BlockNumber: BlockNumber(200),
-        l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        msgContent1,
+        0,
+        {
+          contractAddress,
+          scope,
+          txHash: reorgTxHash,
+          l2BlockNumber: BlockNumber(200),
+          l2BlockHash,
+        },
+        'before-rollback',
+      );
+
+      await privateEventStore.commit('before-rollback');
 
       // Rollback to block 100
       await privateEventStore.rollbackEventsAfterBlock(100, 200);
 
       // Verify event was removed
-      let events = await privateEventStore.getPrivateEvents(eventSelector, {
-        contractAddress,
-        fromBlock: 0,
-        toBlock: 1000,
-        scopes: [scope],
-      });
+      let events = await privateEventStore.getPrivateEvents(
+        eventSelector,
+        {
+          contractAddress,
+          fromBlock: 0,
+          toBlock: 1000,
+          scopes: [scope],
+        },
+        'after-rollback',
+      );
       expect(events.length).toBe(0);
 
       // Re-add the same event (same eventCommitmentIndex and txHash, as happens after a reorg)
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent1, 0, {
-        contractAddress,
-        scope,
-        txHash: reorgTxHash,
-        l2BlockNumber: BlockNumber(200),
-        l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        msgContent1,
+        0,
+        {
+          contractAddress,
+          scope,
+          txHash: reorgTxHash,
+          l2BlockNumber: BlockNumber(200),
+          l2BlockHash,
+        },
+        're-add',
+      );
+
+      await privateEventStore.commit('re-add');
 
       // Verify event can be retrieved again
-      events = await privateEventStore.getPrivateEvents(eventSelector, {
-        contractAddress,
-        fromBlock: 0,
-        toBlock: 1000,
-        scopes: [scope],
-      });
+      events = await privateEventStore.getPrivateEvents(
+        eventSelector,
+        {
+          contractAddress,
+          fromBlock: 0,
+          toBlock: 1000,
+          scopes: [scope],
+        },
+        'after-re-add',
+      );
       expect(events.length).toBe(1);
     });
 
     it('handles rollback with no events to remove', async () => {
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, msgContent1, 0, {
-        contractAddress,
-        scope,
-        txHash: TxHash.random(),
-        l2BlockNumber: BlockNumber(100),
-        l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        msgContent1,
+        0,
+        {
+          contractAddress,
+          scope,
+          txHash: TxHash.random(),
+          l2BlockNumber: BlockNumber(100),
+          l2BlockHash,
+        },
+        'before-rollback',
+      );
+
+      await privateEventStore.commit('before-rollback');
 
       // Rollback after all existing events
       await privateEventStore.rollbackEventsAfterBlock(200, 300);
 
-      const events = await privateEventStore.getPrivateEvents(eventSelector, {
-        contractAddress,
-        fromBlock: 0,
-        toBlock: 1000,
-        scopes: [scope],
-      });
+      const events = await privateEventStore.getPrivateEvents(
+        eventSelector,
+        {
+          contractAddress,
+          fromBlock: 0,
+          toBlock: 1000,
+          scopes: [scope],
+        },
+        'after-rollback',
+      );
 
       expect(events.length).toBe(1);
       expect(events[0].packedEvent).toEqual(msgContent1);

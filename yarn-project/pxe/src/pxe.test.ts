@@ -220,13 +220,20 @@ describe('PXE', () => {
 
       const randomness = Fr.random();
 
-      await privateEventStore.storePrivateEventLog(eventSelector, randomness, event.packedEvent, eventIndex++, {
-        contractAddress,
-        scope,
-        txHash: event.txHash,
-        l2BlockNumber: event.l2BlockNumber,
-        l2BlockHash: event.l2BlockHash,
-      });
+      await privateEventStore.storePrivateEventLog(
+        eventSelector,
+        randomness,
+        event.packedEvent,
+        eventIndex++,
+        {
+          contractAddress,
+          scope,
+          txHash: event.txHash,
+          l2BlockNumber: event.l2BlockNumber,
+          l2BlockHash: event.l2BlockHash,
+        },
+        'test',
+      );
 
       return event;
     }
@@ -235,6 +242,7 @@ describe('PXE', () => {
       // Store a couple of events to exercise `getPrivateEvents`
       const event1 = await storeEvent();
       const event2 = await storeEvent();
+      await privateEventStore.commit('test');
 
       const events = await pxe.getPrivateEvents(eventSelector, {
         contractAddress,
@@ -275,6 +283,8 @@ describe('PXE', () => {
           storeEvent(lastKnownBlockNumber + 1),
           storeEvent(lastKnownBlockNumber + 1),
         ]);
+
+        await privateEventStore.commit('test');
       });
 
       it('filters by txHash', async () => {

@@ -1099,7 +1099,7 @@ export class PXE {
         `Getting private events for ${sanitizedFilter.contractAddress.toString()} from ${sanitizedFilter.fromBlock} to ${sanitizedFilter.toBlock}`,
       );
 
-      return this.privateEventStore.getPrivateEvents(eventSelector, sanitizedFilter);
+      return this.privateEventStore.getPrivateEvents(eventSelector, sanitizedFilter, jobId);
     });
   }
 

@@ -91,7 +91,7 @@ describe('deliverEvent', () => {
       ]),
     );
 
-    eventService = new EventService(anchorBlockStore, aztecNode, privateEventStore);
+    eventService = new EventService(anchorBlockStore, aztecNode, privateEventStore, 'test');
   });
 
   function runDeliverEvent(
@@ -141,12 +141,16 @@ describe('deliverEvent', () => {
     await runDeliverEvent();
 
     // I should be able to retrieve the private event I just saved using getPrivateEvents
-    const result = await privateEventStore.getPrivateEvents(eventSelector, {
-      contractAddress,
-      fromBlock: blockNumber,
-      toBlock: blockNumber + 1,
-      scopes: [recipient],
-    });
+    const result = await privateEventStore.getPrivateEvents(
+      eventSelector,
+      {
+        contractAddress,
+        fromBlock: blockNumber,
+        toBlock: blockNumber + 1,
+        scopes: [recipient],
+      },
+      'test',
+    );
 
     expect(result.length).toEqual(1);
     expect(result[0].packedEvent).toEqual(eventContent);

@@ -170,12 +170,16 @@ export class TXEOracleTopLevelContext implements IMiscOracle, ITxeExecutionOracl
 
   async txeGetPrivateEvents(selector: EventSelector, contractAddress: AztecAddress, scope: AztecAddress) {
     return (
-      await this.privateEventStore.getPrivateEvents(selector, {
-        contractAddress,
-        scopes: [scope],
-        fromBlock: 0,
-        toBlock: (await this.getLastBlockNumber()) + 1,
-      })
+      await this.privateEventStore.getPrivateEvents(
+        selector,
+        {
+          contractAddress,
+          scopes: [scope],
+          fromBlock: 0,
+          toBlock: (await this.getLastBlockNumber()) + 1,
+        },
+        TXE_JOB_ID,
+      )
     ).map(e => e.packedEvent);
   }
 
