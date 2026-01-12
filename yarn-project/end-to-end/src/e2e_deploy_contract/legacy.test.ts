@@ -3,7 +3,7 @@ import { type DeployOptions, getContractInstanceFromInstantiationParams } from '
 import { ContractDeployer } from '@aztec/aztec.js/deployment';
 import { Fr } from '@aztec/aztec.js/fields';
 import type { Logger } from '@aztec/aztec.js/log';
-import { type AztecNode } from '@aztec/aztec.js/node';
+import type { AztecNode } from '@aztec/aztec.js/node';
 import { TxStatus } from '@aztec/aztec.js/tx';
 import { TokenContractArtifact } from '@aztec/noir-contracts.js/Token';
 import { StatefulTestContract } from '@aztec/noir-test-contracts.js/StatefulTest';

@@ -676,26 +676,26 @@ export async function setup(
  * @param accountsToDeploy - Which accounts to publicly deploy.
  */
 
-export async function ensureAccountContractsPublished(
-  wallet: TestWallet,
-  accountsToDeploy: AztecAddress[],
-  aztecNode: AztecNode,
-) {
+export async function ensureAccountContractsPublished(wallet: Wallet, accountsToDeploy: AztecAddress[]) {
   // We have to check whether the accounts are already deployed. This can happen if the test runs against
   // the local network and the test accounts exist
-  const accountsMetadata = await Promise.all(
-    accountsToDeploy.map(async address => ({
-      address,
-      metadata: await wallet.getContractMetadata(address),
-    })),
+  const accountsAndAddresses = await Promise.all(
+    accountsToDeploy.map(async address => {
+      return {
+        address,
+        deployed: (await wallet.getContractMetadata(address)).isContractPublished,
+      };
+    }),
   );
-  const instances = accountsMetadata
-    .filter(({ metadata }) => !metadata.instance)
-    .map(({ metadata }) => metadata.instance);
+  const instances = (
+    await Promise.all(
+      accountsAndAddresses
+        .filter(({ deployed }) => !deployed)
+        .map(({ address }) => wallet.getContractMetadata(address)),
+    )
+  ).map(contractMetadata => contractMetadata.instance);
   const contractClass = await getContractClassFromArtifact(SchnorrAccountContractArtifact);
-  // Check if the class is already published using the first account's metadata
-  const firstAccountMetadata = accountsMetadata[0]?.metadata;
-  if (firstAccountMetadata && !firstAccountMetadata.isContractClassPubliclyRegistered) {
+  if (!(await wallet.getContractClassMetadata(contractClass.id)).isContractClassPubliclyRegistered) {
     await (await publishContractClass(wallet, SchnorrAccountContractArtifact))
       .send({ from: accountsToDeploy[0] })
       .wait();

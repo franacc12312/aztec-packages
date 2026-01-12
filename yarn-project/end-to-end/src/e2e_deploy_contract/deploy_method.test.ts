@@ -3,6 +3,7 @@ import { BatchCall } from '@aztec/aztec.js/contracts';
 import { Fr } from '@aztec/aztec.js/fields';
 import type { Logger } from '@aztec/aztec.js/log';
 import { type AztecNode, createAztecNodeClient } from '@aztec/aztec.js/node';
+import type { Wallet } from '@aztec/aztec.js/wallet';
 import { TokenContract } from '@aztec/noir-contracts.js/Token';
 import { CounterContract } from '@aztec/noir-test-contracts.js/Counter';
 import { NoConstructorContract } from '@aztec/noir-test-contracts.js/NoConstructor';
@@ -16,7 +17,7 @@ describe('e2e_deploy_contract deploy method', () => {
   const t = new DeployTest('deploy method');
 
   let logger: Logger;
-  let wallet: TestWallet;
+  let wallet: Wallet;
   let aztecNode: AztecNode;
   let defaultAccountAddress: AztecAddress;
 

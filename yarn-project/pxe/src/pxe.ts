@@ -25,7 +25,7 @@ import {
   getContractClassFromArtifact,
 } from '@aztec/stdlib/contract';
 import { SimulationError } from '@aztec/stdlib/errors';
-import { computeProtocolNullifier, siloNullifier } from '@aztec/stdlib/hash';
+import { computeProtocolNullifier } from '@aztec/stdlib/hash';
 import type { AztecNode, PrivateKernelProver } from '@aztec/stdlib/interfaces/client';
 import type {
   PrivateExecutionStep,

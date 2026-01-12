@@ -199,8 +199,10 @@ export function ContractComponent() {
       });
       // Temporarily filter out not-yet-published contracts
       if (currentContractAddress) {
-        const contractInstance = await node.getContract(currentContractAddress);
-        if (contractInstance) {
+        const { isContractPublished } = await wallet.getContractMetadata(currentContractAddress);
+        if (isContractPublished) {
+          const contractInstance = await node.getContract(currentContractAddress);
+
           await wallet.registerContract(contractInstance, currentContractArtifact);
           const contract = Contract.at(currentContractAddress, currentContractArtifact, wallet);
           setCurrentContractClassId(contractInstance.currentContractClassId);

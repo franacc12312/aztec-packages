@@ -51,7 +51,7 @@ export function ContractSelector() {
       const aliasedContracts = await playgroundDB.listAliases('contracts');
       const contracts = parseAliasedBuffersAsString(aliasedContracts);
       // Temporarily filter out undeployed contracts
-      const deployedContracts = await filterDeployedAliasedContracts(contracts, node);
+      const deployedContracts = await filterDeployedAliasedContracts(contracts, wallet);
       setContracts(deployedContracts);
       setIsContractsLoading(false);
     };

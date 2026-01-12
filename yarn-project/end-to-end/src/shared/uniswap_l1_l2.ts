@@ -97,7 +97,7 @@ export const uniswapL1L2TestSuite = (
       version = Number(await rollup.getVersion());
       ownerEthAddress = EthAddress.fromString((await l1Client.getAddresses())[0]);
 
-      await ensureAccountContractsPublished(wallet, [ownerAddress, sponsorAddress], aztecNode);
+      await ensureAccountContractsPublished(wallet, [ownerAddress, sponsorAddress]);
 
       logger.info('Deploying DAI Portal, initializing and deploying l2 contract...');
       daiCrossChainHarness = await CrossChainTestHarness.new(

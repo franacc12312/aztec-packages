@@ -1,11 +1,10 @@
 import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { BatchCall, type ContractInstanceWithAddress } from '@aztec/aztec.js/contracts';
 import { Fr } from '@aztec/aztec.js/fields';
-import type { AztecNode } from '@aztec/aztec.js/node';
 import { TxStatus } from '@aztec/aztec.js/tx';
+import type { Wallet } from '@aztec/aztec.js/wallet';
 import { AvmInitializerTestContract } from '@aztec/noir-test-contracts.js/AvmInitializerTest';
 import { AvmTestContract } from '@aztec/noir-test-contracts.js/AvmTest';
-import type { TestWallet } from '@aztec/test-wallet/server';
 
 import { jest } from '@jest/globals';
 
@@ -16,8 +15,7 @@ const TIMEOUT = 100_000;
 describe('e2e_avm_simulator', () => {
   jest.setTimeout(TIMEOUT);
 
-  let wallet: TestWallet;
-  let aztecNode: AztecNode;
+  let wallet: Wallet;
   let defaultAccountAddress: AztecAddress;
   let teardown: () => Promise<void>;
 
@@ -25,10 +23,9 @@ describe('e2e_avm_simulator', () => {
     ({
       teardown,
       wallet,
-      aztecNode,
       accounts: [defaultAccountAddress],
     } = await setup(1));
-    await ensureAccountContractsPublished(wallet, [defaultAccountAddress], aztecNode);
+    await ensureAccountContractsPublished(wallet, [defaultAccountAddress]);
   });
 
   afterAll(() => teardown());

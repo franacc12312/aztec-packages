@@ -1,6 +1,6 @@
 import type { AztecAddress } from '@aztec/aztec.js/addresses';
 import { type Logger, createLogger } from '@aztec/aztec.js/log';
-import { type AztecNode } from '@aztec/aztec.js/node';
+import type { AztecNode } from '@aztec/aztec.js/node';
 import { CheatCodes } from '@aztec/aztec/testing';
 import { createExtendedL1Client } from '@aztec/ethereum/client';
 import { RollupContract } from '@aztec/ethereum/contracts';
@@ -208,7 +208,7 @@ export class FeesTest {
 
   async applyPublicDeployAccountsSnapshot() {
     await this.snapshotManager.snapshot('public_deploy_accounts', () =>
-      ensureAccountContractsPublished(this.wallet, this.accounts, this.aztecNode),
+      ensureAccountContractsPublished(this.wallet, this.accounts),
     );
   }
 

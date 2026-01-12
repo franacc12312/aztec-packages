@@ -2,11 +2,11 @@ import { SchnorrAccountContractArtifact } from '@aztec/accounts/schnorr';
 import { type InitialAccountData, generateSchnorrAccounts } from '@aztec/accounts/testing';
 import { type AztecNodeConfig, AztecNodeService, getConfigEnvVars } from '@aztec/aztec-node';
 import { AztecAddress, EthAddress } from '@aztec/aztec.js/addresses';
-import { getContractClassFromArtifact } from '@aztec/aztec.js/contracts';
 import { BatchCall, type ContractFunctionInteraction, waitForProven } from '@aztec/aztec.js/contracts';
 import { publishContractClass, publishInstance } from '@aztec/aztec.js/deployment';
 import type { Logger } from '@aztec/aztec.js/log';
-import { type AztecNode } from '@aztec/aztec.js/node';
+import type { AztecNode } from '@aztec/aztec.js/node';
+import type { Wallet } from '@aztec/aztec.js/wallet';
 import { AnvilTestWatcher, CheatCodes } from '@aztec/aztec/testing';
 import { createExtendedL1Client } from '@aztec/ethereum/client';
 import { getL1ContractsConfigEnvVars } from '@aztec/ethereum/config';
@@ -615,7 +615,7 @@ export const deployAccounts =
  * @param node - AztecNode used to wait for proven tx.
  */
 export async function publicDeployAccounts(
-  wallet: TestWallet,
+  wallet: Wallet,
   accountsToDeploy: AztecAddress[],
   waitUntilProven = false,
   node?: AztecNode,
@@ -624,7 +624,6 @@ export async function publicDeployAccounts(
     metadata => metadata.instance,
   );
 
-  const contractClass = await getContractClassFromArtifact(SchnorrAccountContractArtifact);
   const firstMetadata = await wallet.getContractMetadata(accountsToDeploy[0]);
   const alreadyRegistered = firstMetadata.isContractClassPubliclyRegistered;
 

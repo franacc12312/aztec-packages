@@ -33,7 +33,7 @@ describe('e2e_authwit_tests', () => {
       accounts: [account1Address, account2Address],
       aztecNode,
     } = await setup(2));
-    await ensureAccountContractsPublished(wallet, [account1Address, account2Address], aztecNode);
+    await ensureAccountContractsPublished(wallet, [account1Address, account2Address]);
 
     const nodeInfo = await aztecNode.getNodeInfo();
     chainId = new Fr(nodeInfo.l1ChainId);

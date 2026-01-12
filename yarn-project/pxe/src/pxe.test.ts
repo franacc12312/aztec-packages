@@ -2,7 +2,6 @@ import { BBBundlePrivateKernelProver } from '@aztec/bb-prover/client/bundle';
 import { GENESIS_BLOCK_HEADER_HASH } from '@aztec/constants';
 import type { L1ContractAddresses } from '@aztec/ethereum/l1-contract-addresses';
 import { BlockNumber } from '@aztec/foundation/branded-types';
-import { omit } from '@aztec/foundation/collection';
 import { Fr } from '@aztec/foundation/curves/bn254';
 import { EthAddress } from '@aztec/foundation/eth-address';
 import { AztecLMDBStoreV2, openTmpStore } from '@aztec/kv-store/lmdb-v2';

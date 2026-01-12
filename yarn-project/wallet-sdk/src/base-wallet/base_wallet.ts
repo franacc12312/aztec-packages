@@ -365,6 +365,7 @@ export abstract class BaseWallet implements Wallet {
   async getContractClassMetadata(id: Fr) {
     const publiclyRegisteredContractClass = await this.aztecNode.getContractClass(id);
     return {
+      isArtifactRegistered: !!(await this.pxe.getContractArtifact(id)),
       isContractClassPubliclyRegistered: !!publiclyRegisteredContractClass,
     };
   }
