@@ -5,6 +5,7 @@ import { BufferReader, serializeToBuffer } from '@aztec/foundation/serialize';
 
 import { z } from 'zod';
 
+import { MAX_COMMITTEE_SIZE } from '../deserialization/index.js';
 import { BlockInfoSchema, type L2BlockInfo, deserializeBlockInfo, serializeBlockInfo } from './l2_block_info.js';
 import { CommitteeAttestation } from './proposal/committee_attestation.js';
 
@@ -105,13 +106,13 @@ export function deserializeValidateBlockResult(bufferOrReader: Buffer | BufferRe
   if (valid) {
     return { valid };
   }
-  const reason = reader.readString() as 'insufficient-attestations' | 'invalid-attestation';
+  const reason = reader.readString(64) as 'insufficient-attestations' | 'invalid-attestation';
   const block = deserializeBlockInfo(reader.readBuffer());
-  const committee = reader.readVector(EthAddress);
+  const committee = reader.readVector(EthAddress, MAX_COMMITTEE_SIZE);
   const epoch = EpochNumber(reader.readNumber());
   const seed = reader.readBigInt();
-  const attestors = reader.readVector(EthAddress);
-  const attestations = reader.readVector(CommitteeAttestation);
+  const attestors = reader.readVector(EthAddress, MAX_COMMITTEE_SIZE);
+  const attestations = reader.readVector(CommitteeAttestation, MAX_COMMITTEE_SIZE);
   const invalidIndex = reader.readNumber();
   if (reason === 'insufficient-attestations') {
     return { valid, reason, block, committee, epoch, seed, attestors, attestations: attestations };
