@@ -119,7 +119,7 @@ describe('spartan_upgrade_rollup_version', () => {
         slashingVetoer: l1Config.slashingVetoer,
         slashingDisableDuration: l1Config.slashingDisableDuration,
         localEjectionThreshold: l1Config.localEjectionThreshold,
-        manaTarget: l1Config.manaTarget,
+        manaTarget: l1Config.manaTarget + 1n, // +1 to force different version hash for upgrade
         provingCostPerMana: l1Config.provingCostPerMana,
         feeJuicePortalInitialBalance: 0n,
         realVerifier: false,
@@ -513,7 +513,7 @@ describe('spartan_upgrade_rollup_version', () => {
     try {
       await updateSequencersConfig(config, { governanceProposerPayload: payloadAddress });
       const configs = await getSequencersConfig(config);
-      debugLogger.info(`Sequencer configs re-applied: ${JSON.stringify(configs)}`);
+      debugLogger.info(`Sequencer configs re-applied; count=${configs.length}`);
     } catch (err) {
       debugLogger.warn(`Failed to reapply proposer payload (continuing): ${String(err)}`);
     }

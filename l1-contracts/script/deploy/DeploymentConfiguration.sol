@@ -105,7 +105,7 @@ contract DeploymentConfiguration is IDeploymentConfiguration, Test {
           lockDelay: Timestamp.wrap(60 * 60 * 24 * 30), lockAmount: 100e18 * 100
         }),
         votingDelay: Timestamp.wrap(60),
-        votingDuration: Timestamp.wrap(60 * 60),
+        votingDuration: Timestamp.wrap(2 * 60),
         executionDelay: Timestamp.wrap(60),
         gracePeriod: Timestamp.wrap(60 * 60 * 24 * 7),
         quorum: 0.3e18,
