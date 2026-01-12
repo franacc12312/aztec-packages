@@ -3,6 +3,7 @@
 # This script is called by aztec-up to install a specific version of the Aztec toolchain.
 # It expects VERSION and INSTALL_URI to be set.
 set -euo pipefail
+shopt -s inherit_errexit
 
 # Colors
 g="\033[32m" # Green
@@ -68,7 +69,6 @@ function install_versions_file {
 }
 
 function install_noir {
-  set -euo pipefail
   local noir_version=$(cat "$version_path/versions" | grep noir | cut -d' ' -f2)
 
   # Create a temp directory for noirup to install to
@@ -91,7 +91,6 @@ function install_noir {
 }
 
 function install_foundry {
-  set -euo pipefail
   local foundry_version=$(cat "$version_path/versions" | grep foundry | cut -d' ' -f2)
 
   # Create a temp directory for foundryup to install to
@@ -118,12 +117,8 @@ function install_foundry {
 }
 
 function install_aztec_packages {
-  set -euo pipefail
-  local aztec_version=$(cat "$version_path/versions" | grep aztec | cut -d' ' -f2)
-
   # Install npm packages to the version directory using --prefix
-  npm install @aztec/aztec@"$aztec_version" @aztec/cli-wallet@"$aztec_version" @aztec/bb.js@"$aztec_version" \
-    --prefix "$version_path"
+  npm install @aztec/aztec@$VERSION @aztec/cli-wallet@$VERSION @aztec/bb.js@$VERSION --prefix "$version_path"
 }
 
 function main {

@@ -13,7 +13,10 @@ cmd=${1:-}
 export AZTEC_SHELL_WRAPPER=1
 
 if [ -f .aztecrc ] && command -v aztec-up &>/dev/null; then
-  aztec-up use
+  if env_setup=$(aztec-up env); then
+    eval "$env_setup"
+    exec aztec "$cmd" "$@"
+  fi
 fi
 
 case $cmd in

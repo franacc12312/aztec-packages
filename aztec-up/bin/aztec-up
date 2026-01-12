@@ -38,6 +38,7 @@ function help {
   echo "  list                      List installed versions"
   echo "  uninstall <version>       Remove an installed version"
   echo "  self-update               Update aztec-up itself to the latest version"
+  echo "  env                       Output PATH for .aztecrc version (for eval)"
   echo
   echo "Options:"
   echo "  -h, --help                Show this help message"
@@ -269,6 +270,37 @@ function cmd_self-update {
   echo "Run 'aztec-up --help' to see available commands."
 }
 
+# Output PATH for .aztecrc version (for eval in shell scripts)
+function cmd_env {
+  # Find and read .aztecrc
+  local aztecrc_file
+  if ! aztecrc_file=$(find_aztecrc); then
+    echo "Error: No .aztecrc file found." >&2
+    return 1
+  fi
+
+  local version
+  version=$(read_aztecrc "$aztecrc_file")
+
+  # Resolve alias to actual version
+  local resolved_version
+  if ! resolved_version=$(resolve_version "$version"); then
+    return 1
+  fi
+
+  # Check if version is installed
+  if ! is_version_installed "$resolved_version"; then
+    echo "Error: Version $resolved_version is not installed." >&2
+    echo "Run 'aztec-up install $version' to install it first." >&2
+    return 1
+  fi
+
+  local version_dir="$AZTEC_HOME/versions/$resolved_version"
+
+  # Output PATH export with relevant bin directories
+  echo "export PATH=\"$version_dir/bin:$version_dir/node_modules/.bin:\$PATH\""
+}
+
 # Main entry point
 function main {
   local cmd="${1:-}"
@@ -278,7 +310,7 @@ function main {
     ""|-h|--help)
       help
       ;;
-    install|use|list|uninstall|self-update)
+    install|use|list|uninstall|self-update|env)
       cmd_$cmd "$@"
       ;;
     *)
