@@ -117,12 +117,10 @@ describe('PXE', () => {
     const instance = await randomContractInstanceWithAddress({ contractClassId });
 
     await pxe.registerContractClass(artifact);
-    expect((await pxe.getContractClassMetadata(contractClassId)).contractClass).toMatchObject(
-      omit(contractClass, 'privateFunctionsRoot', 'publicBytecodeCommitment'),
-    );
+    expect(await pxe.getContractArtifact(contractClassId)).toEqual(artifact);
 
     await pxe.registerContract({ instance });
-    expect((await pxe.getContractMetadata(instance.address)).contractInstance).toEqual(instance);
+    expect(await pxe.getContractInstance(instance.address)).toEqual(instance);
   });
 
   it('refuses to register a class with a mismatched address', async () => {

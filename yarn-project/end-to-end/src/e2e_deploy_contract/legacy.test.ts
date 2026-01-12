@@ -3,7 +3,7 @@ import { type DeployOptions, getContractInstanceFromInstantiationParams } from '
 import { ContractDeployer } from '@aztec/aztec.js/deployment';
 import { Fr } from '@aztec/aztec.js/fields';
 import type { Logger } from '@aztec/aztec.js/log';
-import { type AztecNode, isContractClassPubliclyRegistered, isContractPublished } from '@aztec/aztec.js/node';
+import { type AztecNode } from '@aztec/aztec.js/node';
 import { TxStatus } from '@aztec/aztec.js/tx';
 import { TokenContractArtifact } from '@aztec/noir-contracts.js/Token';
 import { StatefulTestContract } from '@aztec/noir-test-contracts.js/StatefulTest';
@@ -44,7 +44,8 @@ describe('e2e_deploy_contract legacy', () => {
       .wait({ wallet });
     expect(receipt.contract.address).toEqual(deploymentData.address);
     expect(await aztecNode.getContract(deploymentData.address)).toBeDefined();
-    expect(await isContractPublished(aztecNode, deploymentData.address)).toBeTrue();
+    const metadata = await wallet.getContractMetadata(deploymentData.address);
+    expect(metadata.isContractPublished).toBe(true);
   });
 
   /**
@@ -126,8 +127,9 @@ describe('e2e_deploy_contract legacy', () => {
 
     expect(badTxReceipt.status).toEqual(TxStatus.APP_LOGIC_REVERTED);
 
-    const classId = (await badDeploy.getInstance()).currentContractClassId;
-    // But the bad tx did not deploy
-    expect(await isContractClassPubliclyRegistered(aztecNode, classId)).toBeFalse();
+    const badInstance = await badDeploy.getInstance();
+    // But the bad tx did not deploy the class
+    const badMetadata = await wallet.getContractMetadata(badInstance.address);
+    expect(badMetadata.isContractClassPubliclyRegistered).toBeFalse();
   });
 });

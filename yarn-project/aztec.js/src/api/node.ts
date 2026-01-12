@@ -16,12 +16,5 @@
  *
  * @packageDocumentation
  */
-export {
-  createAztecNodeClient,
-  isContractClassPubliclyRegistered,
-  isContractInitialized,
-  isContractPublished,
-  waitForNode,
-  type AztecNode,
-} from '../utils/node.js';
+export { createAztecNodeClient, waitForNode, type AztecNode } from '../utils/node.js';
 export { type NodeInfo } from '@aztec/stdlib/contract';

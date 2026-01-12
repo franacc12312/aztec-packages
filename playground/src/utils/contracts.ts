@@ -1,5 +1,5 @@
 import { AztecAddress } from '@aztec/aztec.js/addresses';
-import { type AztecNode, isContractPublished } from '@aztec/aztec.js/node';
+import type { AztecNode } from '@aztec/aztec.js/node';
 
 export async function filterDeployedAliasedContracts(
   aliasedContracts: { alias: string; item: string }[],
@@ -8,7 +8,8 @@ export async function filterDeployedAliasedContracts(
   const deployed = (
     await Promise.all(
       aliasedContracts.map(async contract => {
-        return { ...contract, deployed: await isContractPublished(node, AztecAddress.fromString(contract.item)) };
+        const contractInstance = await node.getContract(AztecAddress.fromString(contract.item));
+        return { ...contract, deployed: !!contractInstance };
       }),
     )
   ).filter(contract => contract.deployed);

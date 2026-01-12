@@ -184,11 +184,19 @@ export class DeployMethod<TContract extends ContractBase = ContractBase> extends
 
     // Publish the contract class if it hasn't been published already.
     if (!options?.skipClassPublication) {
-      this.log.info(
-        `Creating request for publishing contract class ${contractClass.id.toString()} as part of deployment for ${instance.address.toString()}`,
-      );
-      const registerContractClassInteraction = await publishContractClass(this.wallet, this.artifact);
-      calls.push(await registerContractClassInteraction.request());
+      // Check if the class is already publicly registered
+      const classMetadata = await this.wallet.getContractClassMetadata(contractClass.id);
+      if (!classMetadata.isContractClassPubliclyRegistered) {
+        this.log.info(
+          `Creating request for publishing contract class ${contractClass.id.toString()} as part of deployment for ${instance.address.toString()}`,
+        );
+        const registerContractClassInteraction = await publishContractClass(this.wallet, this.artifact);
+        calls.push(await registerContractClassInteraction.request());
+      } else {
+        this.log.debug(
+          `Skipping contract class publication for ${contractClass.id.toString()} as it is already registered`,
+        );
+      }
     }
 
     // Publish the contract instance:

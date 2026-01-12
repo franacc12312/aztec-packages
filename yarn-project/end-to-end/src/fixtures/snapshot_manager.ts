@@ -6,7 +6,7 @@ import { getContractClassFromArtifact } from '@aztec/aztec.js/contracts';
 import { BatchCall, type ContractFunctionInteraction, waitForProven } from '@aztec/aztec.js/contracts';
 import { publishContractClass, publishInstance } from '@aztec/aztec.js/deployment';
 import type { Logger } from '@aztec/aztec.js/log';
-import { type AztecNode, isContractClassPubliclyRegistered } from '@aztec/aztec.js/node';
+import { type AztecNode } from '@aztec/aztec.js/node';
 import { AnvilTestWatcher, CheatCodes } from '@aztec/aztec/testing';
 import { createExtendedL1Client } from '@aztec/ethereum/client';
 import { getL1ContractsConfigEnvVars } from '@aztec/ethereum/config';
@@ -621,13 +621,12 @@ export async function publicDeployAccounts(
   node?: AztecNode,
 ) {
   const instances = (await Promise.all(accountsToDeploy.map(account => wallet.getContractMetadata(account)))).map(
-    metadata => metadata.contractInstance,
+    metadata => metadata.instance,
   );
 
   const contractClass = await getContractClassFromArtifact(SchnorrAccountContractArtifact);
-  const alreadyRegistered = node
-    ? await isContractClassPubliclyRegistered(node, contractClass.id)
-    : (await wallet.getContractClassMetadata(contractClass.id)).isContractClassPubliclyRegistered;
+  const firstMetadata = await wallet.getContractMetadata(accountsToDeploy[0]);
+  const alreadyRegistered = firstMetadata.isContractClassPubliclyRegistered;
 
   const calls: ContractFunctionInteraction[] = await Promise.all([
     ...(!alreadyRegistered ? [publishContractClass(wallet, SchnorrAccountContractArtifact)] : []),

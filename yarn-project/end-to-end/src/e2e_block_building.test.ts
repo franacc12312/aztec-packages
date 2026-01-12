@@ -2,7 +2,7 @@ import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { BatchCall, ContractFunctionInteraction, type DeployOptions } from '@aztec/aztec.js/contracts';
 import { Fr } from '@aztec/aztec.js/fields';
 import type { Logger } from '@aztec/aztec.js/log';
-import { type AztecNode, isContractPublished } from '@aztec/aztec.js/node';
+import { type AztecNode } from '@aztec/aztec.js/node';
 import { TxStatus } from '@aztec/aztec.js/tx';
 import { AnvilTestWatcher, CheatCodes } from '@aztec/aztec/testing';
 import { asyncMap } from '@aztec/foundation/async-map';
@@ -159,7 +159,9 @@ describe('e2e_block_building', () => {
       expect(receipts.map(r => r.blockNumber)).toEqual(times(TX_COUNT, () => receipts[0].blockNumber));
 
       // Assert all contracts got deployed
-      const areDeployed = await Promise.all(addresses.map(a => isContractPublished(aztecNode, a)));
+      const areDeployed = await Promise.all(
+        addresses.map(async a => (await wallet.getContractMetadata(a)).isContractPublished),
+      );
       expect(areDeployed).toEqual(times(TX_COUNT, () => true));
     });
 

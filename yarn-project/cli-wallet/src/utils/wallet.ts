@@ -17,7 +17,6 @@ import type { PXEConfig } from '@aztec/pxe/config';
 import type { PXE } from '@aztec/pxe/server';
 import { createPXE, getPXEConfig } from '@aztec/pxe/server';
 import { AztecAddress } from '@aztec/stdlib/aztec-address';
-import type { ContractClassMetadata, ContractMetadata } from '@aztec/stdlib/contract';
 import { deriveSigningKey } from '@aztec/stdlib/keys';
 import { NoteDao } from '@aztec/stdlib/note';
 import type { NotesFilter } from '@aztec/stdlib/note';
@@ -181,7 +180,7 @@ export class CLIWallet extends BaseWallet {
     const chainInfo = await this.getChainInfo();
     const originalAccount = await this.getAccountFromAddress(address);
     const originalAddress = originalAccount.getCompleteAddress();
-    const { contractInstance } = await this.pxe.getContractMetadata(originalAddress.address);
+    const contractInstance = await this.pxe.getContractInstance(originalAddress.address);
     if (!contractInstance) {
       throw new Error(`No contract instance found for address: ${originalAddress.address}`);
     }
@@ -261,13 +260,9 @@ export class CLIWallet extends BaseWallet {
     return this.pxe.debug.getNotes(filter);
   }
 
-  // Exposed for CLI commands that need local contract metadata for display purposes.
-  getContractMetadata(address: AztecAddress): Promise<ContractMetadata> {
-    return this.pxe.getContractMetadata(address);
-  }
-
-  // Exposed for CLI commands that need local contract class metadata for display purposes.
-  getContractClassMetadata(id: Fr, includeArtifact: boolean = false): Promise<ContractClassMetadata> {
-    return this.pxe.getContractClassMetadata(id, includeArtifact);
+  // Exposed because of the `aztec-wallet get-tx` command. It has been decided that it's fine to keep around because
+  // this is just a CLI wallet.
+  getContractArtifact(id: Fr) {
+    return this.pxe.getContractArtifact(id);
   }
 }

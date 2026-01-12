@@ -14,7 +14,6 @@ import { FeeJuicePaymentMethodWithClaim } from '@aztec/aztec.js/fee';
 import { deriveKeys } from '@aztec/aztec.js/keys';
 import { createLogger } from '@aztec/aztec.js/log';
 import { waitForL1ToL2MessageReady } from '@aztec/aztec.js/messaging';
-import { isContractInitialized, isContractPublished } from '@aztec/aztec.js/node';
 import { createEthereumChain } from '@aztec/ethereum/chain';
 import { createExtendedL1Client } from '@aztec/ethereum/client';
 import { Fr } from '@aztec/foundation/curves/bn254';
@@ -119,8 +118,8 @@ export class BotFactory {
       contract: new SchnorrAccountContract(signingKey!),
     };
     const accountManager = await this.wallet.createAccount(accountData);
-    const isInit = await isContractInitialized(this.aztecNode, accountManager.address);
-    if (isInit) {
+    const metadata = await this.wallet.getContractMetadata(accountManager.address);
+    if (metadata.isContractInitialized) {
       this.log.info(`Account at ${accountManager.address.toString()} already initialized`);
       const timer = new Timer();
       const address = accountManager.address;
@@ -193,7 +192,8 @@ export class BotFactory {
     }
 
     const address = tokenInstance?.address ?? (await deploy.getInstance(deployOpts)).address;
-    if (await isContractPublished(this.aztecNode, address)) {
+    const metadata = await this.wallet.getContractMetadata(address);
+    if (metadata.instance) {
       this.log.info(`Token at ${address.toString()} already deployed`);
       return deploy.register();
     } else {
@@ -326,7 +326,8 @@ export class BotFactory {
     deployOpts: DeployOptions,
   ): Promise<T> {
     const address = (await deploy.getInstance(deployOpts)).address;
-    if (await isContractPublished(this.aztecNode, address)) {
+    const metadata = await this.wallet.getContractMetadata(address);
+    if (metadata.instance) {
       this.log.info(`Contract ${name} at ${address.toString()} already deployed`);
       return deploy.register();
     } else {

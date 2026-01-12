@@ -159,6 +159,32 @@ export type PrivateEvent<T> = {
 };
 
 /**
+ * Contract metadata including deployment and registration status.
+ */
+export type ContractMetadata = {
+  /** The contract instance */
+  instance?: ContractInstanceWithAddress;
+  /** Whether the contract has been initialized (init nullifier exists) */
+  isContractInitialized: boolean;
+  /** Whether the contract instance is publicly deployed on-chain */
+  isContractPublished: boolean;
+  /** Whether the contract class is publicly registered on-chain */
+  isContractClassPubliclyRegistered: boolean;
+  /** Whether the contract has been updated to a different class */
+  isContractUpdated: boolean;
+  /** The updated contract class ID if the contract has been updated */
+  updatedContractClassId?: Fr | undefined;
+};
+
+/**
+ * Contract class metadata.
+ */
+export type ContractClassMetadata = {
+  /** Whether the contract class is publicly registered on-chain */
+  isContractClassPubliclyRegistered: boolean;
+};
+
+/**
  * The wallet interface.
  */
 export type Wallet = {
@@ -168,6 +194,8 @@ export type Wallet = {
   ): Promise<PrivateEvent<T>[]>;
   getChainInfo(): Promise<ChainInfo>;
   getTxReceipt(txHash: TxHash): Promise<TxReceipt>;
+  getContractMetadata(address: AztecAddress): Promise<ContractMetadata>;
+  getContractClassMetadata(id: Fr): Promise<ContractClassMetadata>;
   registerSender(address: AztecAddress, alias?: string): Promise<AztecAddress>;
   getAddressBook(): Promise<Aliased<AztecAddress>[]>;
   getAccounts(): Promise<Aliased<AztecAddress>[]>;
@@ -294,12 +322,27 @@ export const PrivateEventFilterSchema = z.object({
   toBlock: optional(BlockNumberPositiveSchema),
 });
 
+export const ContractMetadataSchema = z.object({
+  instance: optional(ContractInstanceWithAddressSchema),
+  isContractInitialized: z.boolean(),
+  isContractPublished: z.boolean(),
+  isContractClassPubliclyRegistered: z.boolean(),
+  isContractUpdated: z.boolean(),
+  updatedContractClassId: optional(schemas.Fr),
+});
+
+export const ContractClassMetadataSchema = z.object({
+  isContractClassPubliclyRegistered: z.boolean(),
+});
+
 export const WalletSchema: ApiSchemaFor<Wallet> = {
   getChainInfo: z
     .function()
     .args()
     .returns(z.object({ chainId: schemas.Fr, version: schemas.Fr })),
   getTxReceipt: z.function().args(TxHash.schema).returns(TxReceipt.schema),
+  getContractMetadata: z.function().args(schemas.AztecAddress).returns(ContractMetadataSchema),
+  getContractClassMetadata: z.function().args(schemas.Fr).returns(ContractClassMetadataSchema),
   getPrivateEvents: z
     .function()
     .args(EventMetadataDefinitionSchema, PrivateEventFilterSchema)

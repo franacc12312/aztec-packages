@@ -27,7 +27,6 @@ import { ContractDescriptions, ContractDocumentationLinks, ContractMethodOrder }
 import Box from '@mui/material/Box';
 import { trackButtonClick } from '../../utils/matomo';
 import { colors, commonStyles } from '../../global.styles';
-import { isContractPublished } from '@aztec/aztec.js/node';
 
 const container = css({
   display: 'flex',
@@ -199,12 +198,14 @@ export function ContractComponent() {
         utility: true,
       });
       // Temporarily filter out not-yet-published contracts
-      if (currentContractAddress && (await isContractPublished(node, currentContractAddress))) {
+      if (currentContractAddress) {
         const contractInstance = await node.getContract(currentContractAddress);
-        await wallet.registerContract(contractInstance, currentContractArtifact);
-        const contract = Contract.at(currentContractAddress, currentContractArtifact, wallet);
-        setCurrentContractClassId(contractInstance.currentContractClassId);
-        setCurrentContract(contract);
+        if (contractInstance) {
+          await wallet.registerContract(contractInstance, currentContractArtifact);
+          const contract = Contract.at(currentContractAddress, currentContractArtifact, wallet);
+          setCurrentContractClassId(contractInstance.currentContractClassId);
+          setCurrentContract(contract);
+        }
       }
       setIsLoadingArtifact(false);
     };

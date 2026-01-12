@@ -23,6 +23,8 @@ import type {
   BatchResults,
   BatchableMethods,
   BatchedMethod,
+  ContractClassMetadata,
+  ContractMetadata,
   PrivateEvent,
   PrivateEventFilter,
   ProfileOptions,
@@ -296,6 +298,23 @@ class MockWallet implements Wallet {
 
   getTxReceipt(_txHash: TxHash): Promise<TxReceipt> {
     return Promise.resolve(TxReceipt.empty());
+  }
+
+  getContractMetadata(_address: AztecAddress): Promise<ContractMetadata> {
+    return Promise.resolve({
+      instance: undefined,
+      isContractInitialized: false,
+      isContractPublished: false,
+      isContractClassPubliclyRegistered: false,
+      isContractUpdated: false,
+      updatedContractClassId: undefined,
+    });
+  }
+
+  getContractClassMetadata(_id: Fr): Promise<ContractClassMetadata> {
+    return Promise.resolve({
+      isContractClassPubliclyRegistered: false,
+    });
   }
 
   registerSender(address: AztecAddress, _alias?: string): Promise<AztecAddress> {

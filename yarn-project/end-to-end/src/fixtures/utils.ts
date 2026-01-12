@@ -7,13 +7,7 @@ import { BatchCall, type ContractMethod } from '@aztec/aztec.js/contracts';
 import { publishContractClass, publishInstance } from '@aztec/aztec.js/deployment';
 import { Fr } from '@aztec/aztec.js/fields';
 import { type Logger, createLogger } from '@aztec/aztec.js/log';
-import {
-  type AztecNode,
-  createAztecNodeClient,
-  isContractClassPubliclyRegistered,
-  isContractPublished,
-  waitForNode,
-} from '@aztec/aztec.js/node';
+import { type AztecNode, createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
 import type { Wallet } from '@aztec/aztec.js/wallet';
 import { AnvilTestWatcher, CheatCodes } from '@aztec/aztec/testing';
 import { createBlobClientWithFileStores } from '@aztec/blob-client/client';
@@ -689,23 +683,19 @@ export async function ensureAccountContractsPublished(
 ) {
   // We have to check whether the accounts are already deployed. This can happen if the test runs against
   // the local network and the test accounts exist
-  const accountsAndAddresses = await Promise.all(
-    accountsToDeploy.map(async address => {
-      return {
-        address,
-        deployed: await isContractPublished(aztecNode, address),
-      };
-    }),
+  const accountsMetadata = await Promise.all(
+    accountsToDeploy.map(async address => ({
+      address,
+      metadata: await wallet.getContractMetadata(address),
+    })),
   );
-  const instances = (
-    await Promise.all(
-      accountsAndAddresses
-        .filter(({ deployed }) => !deployed)
-        .map(({ address }) => wallet.getContractMetadata(address)),
-    )
-  ).map(contractMetadata => contractMetadata.contractInstance);
+  const instances = accountsMetadata
+    .filter(({ metadata }) => !metadata.instance)
+    .map(({ metadata }) => metadata.instance);
   const contractClass = await getContractClassFromArtifact(SchnorrAccountContractArtifact);
-  if (!(await isContractClassPubliclyRegistered(aztecNode, contractClass.id))) {
+  // Check if the class is already published using the first account's metadata
+  const firstAccountMetadata = accountsMetadata[0]?.metadata;
+  if (firstAccountMetadata && !firstAccountMetadata.isContractClassPubliclyRegistered) {
     await (await publishContractClass(wallet, SchnorrAccountContractArtifact))
       .send({ from: accountsToDeploy[0] })
       .wait();
