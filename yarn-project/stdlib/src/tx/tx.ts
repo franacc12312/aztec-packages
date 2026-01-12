@@ -123,18 +123,23 @@ export class Tx extends Gossipable {
     );
   }
 
+  private bufferCache: undefined | Buffer<ArrayBufferLike>;
+
   /**
    * Serializes the Tx object into a Buffer.
    * @returns Buffer representation of the Tx object.
    */
   toBuffer() {
-    return serializeToBuffer([
-      this.txHash,
-      this.data,
-      this.chonkProof,
-      serializeArrayOfBufferableToVector(this.contractClassLogFields, 1),
-      serializeArrayOfBufferableToVector(this.publicFunctionCalldata, 1),
-    ]);
+    if (this.bufferCache === undefined) {
+      this.bufferCache = serializeToBuffer([
+        this.txHash,
+        this.data,
+        this.chonkProof,
+        serializeArrayOfBufferableToVector(this.contractClassLogFields, 1),
+        serializeArrayOfBufferableToVector(this.publicFunctionCalldata, 1),
+      ]);
+    }
+    return this.bufferCache;
   }
 
   static get schema(): ZodFor<Tx> {
@@ -247,7 +252,7 @@ export class Tx extends Gossipable {
       contractClassLogSize: this.data.getEmittedContractClassLogsLength(),
 
       proofSize: this.chonkProof.fields.length,
-      size: this.toBuffer().length,
+      size: this.getSize(),
 
       feePaymentMethod:
         // needsSetup? then we pay through a fee payment contract
@@ -256,12 +261,7 @@ export class Tx extends Gossipable {
   }
 
   getSize() {
-    return (
-      this.data.getSize() +
-      this.chonkProof.fields.length * Fr.SIZE_IN_BYTES +
-      arraySerializedSizeOfNonEmpty(this.contractClassLogFields) +
-      this.publicFunctionCalldata.reduce((accum, cd) => accum + cd.getSize(), 0)
-    );
+    return this.toBuffer().length;
   }
 
   /**
