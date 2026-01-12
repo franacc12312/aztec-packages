@@ -164,11 +164,8 @@ export class EmbeddedWallet extends BaseWallet {
     let i = 0;
     // Assume we're in a network with test accounts (local network) if the first of them
     // is initialized
-    const sampleInstance = await this.pxe.getContractInstance(sampleAccount.address);
-    if (
-      !aliasedAccounts.find(aliased => aliased.item.equals(sampleAccount.address)) &&
-      sampleInstance
-    ) {
+    const { isContractInitialized } = await this.getContractMetadata(sampleAccount.address);
+    if (!aliasedAccounts.find(aliased => aliased.item.equals(sampleAccount.address)) && isContractInitialized) {
       for (const accountData of testAccountData) {
         const accountManager = await this.createAccountInternal(
           'schnorr',

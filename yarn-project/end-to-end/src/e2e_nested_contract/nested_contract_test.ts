@@ -1,9 +1,9 @@
 import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { type Logger, createLogger } from '@aztec/aztec.js/log';
 import type { AztecNode } from '@aztec/aztec.js/node';
+import type { Wallet } from '@aztec/aztec.js/wallet';
 import { ChildContract } from '@aztec/noir-test-contracts.js/Child';
 import { ParentContract } from '@aztec/noir-test-contracts.js/Parent';
-import type { TestWallet } from '@aztec/test-wallet/server';
 
 import {
   type ISnapshotManager,
@@ -18,7 +18,7 @@ const { E2E_DATA_PATH: dataPath } = process.env;
 export class NestedContractTest {
   private snapshotManager: ISnapshotManager;
   logger: Logger;
-  wallet!: TestWallet;
+  wallet!: Wallet;
   defaultAccountAddress!: AztecAddress;
   aztecNode!: AztecNode;
 

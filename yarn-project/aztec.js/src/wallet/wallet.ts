@@ -168,8 +168,6 @@ export type ContractMetadata = {
   isContractInitialized: boolean;
   /** Whether the contract instance is publicly deployed on-chain */
   isContractPublished: boolean;
-  /** Whether the contract class is publicly registered on-chain */
-  isContractClassPubliclyRegistered: boolean;
   /** Whether the contract has been updated to a different class */
   isContractUpdated: boolean;
   /** The updated contract class ID if the contract has been updated */

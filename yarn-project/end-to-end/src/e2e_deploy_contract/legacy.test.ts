@@ -3,7 +3,6 @@ import { type DeployOptions, getContractInstanceFromInstantiationParams } from '
 import { ContractDeployer } from '@aztec/aztec.js/deployment';
 import { Fr } from '@aztec/aztec.js/fields';
 import type { Logger } from '@aztec/aztec.js/log';
-import type { AztecNode } from '@aztec/aztec.js/node';
 import { TxStatus } from '@aztec/aztec.js/tx';
 import { TokenContractArtifact } from '@aztec/noir-contracts.js/Token';
 import { StatefulTestContract } from '@aztec/noir-test-contracts.js/StatefulTest';
@@ -18,11 +17,10 @@ describe('e2e_deploy_contract legacy', () => {
 
   let logger: Logger;
   let wallet: TestWallet;
-  let aztecNode: AztecNode;
   let defaultAccountAddress: AztecAddress;
 
   beforeAll(async () => {
-    ({ logger, wallet, defaultAccountAddress, aztecNode } = await t.setup());
+    ({ logger, wallet, defaultAccountAddress } = await t.setup());
   });
 
   afterAll(() => t.teardown());
@@ -43,9 +41,9 @@ describe('e2e_deploy_contract legacy', () => {
       .send({ from: defaultAccountAddress, contractAddressSalt: salt })
       .wait({ wallet });
     expect(receipt.contract.address).toEqual(deploymentData.address);
-    expect(await aztecNode.getContract(deploymentData.address)).toBeDefined();
-    const metadata = await wallet.getContractMetadata(deploymentData.address);
-    expect(metadata.isContractPublished).toBe(true);
+    const { instance, isContractPublished } = await wallet.getContractMetadata(deploymentData.address);
+    expect(instance).toBeDefined();
+    expect(isContractPublished).toBe(true);
   });
 
   /**
@@ -129,7 +127,7 @@ describe('e2e_deploy_contract legacy', () => {
 
     const badInstance = await badDeploy.getInstance();
     // But the bad tx did not deploy the class
-    const badMetadata = await wallet.getContractMetadata(badInstance.address);
+    const badMetadata = await wallet.getContractClassMetadata(badInstance.currentContractClassId);
     expect(badMetadata.isContractClassPubliclyRegistered).toBeFalse();
   });
 });

@@ -184,7 +184,6 @@ export class DeployMethod<TContract extends ContractBase = ContractBase> extends
 
     // Publish the contract class if it hasn't been published already.
     if (!options?.skipClassPublication) {
-      // Check if the class is already publicly registered
       const classMetadata = await this.wallet.getContractClassMetadata(contractClass.id);
       if (!classMetadata.isContractClassPubliclyRegistered) {
         this.log.info(

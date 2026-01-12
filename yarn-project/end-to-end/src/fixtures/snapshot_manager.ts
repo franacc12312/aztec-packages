@@ -624,11 +624,11 @@ export async function publicDeployAccounts(
     metadata => metadata.instance,
   );
 
-  const firstMetadata = await wallet.getContractMetadata(accountsToDeploy[0]);
-  const alreadyRegistered = firstMetadata.isContractClassPubliclyRegistered;
+  const { instance } = await wallet.getContractMetadata(accountsToDeploy[0]);
+  const { isContractClassPubliclyRegistered } = await wallet.getContractClassMetadata(instance!.currentContractClassId);
 
   const calls: ContractFunctionInteraction[] = await Promise.all([
-    ...(!alreadyRegistered ? [publishContractClass(wallet, SchnorrAccountContractArtifact)] : []),
+    ...(!isContractClassPubliclyRegistered ? [publishContractClass(wallet, SchnorrAccountContractArtifact)] : []),
     ...instances.map(instance => publishInstance(wallet, instance!)),
   ]);
 
