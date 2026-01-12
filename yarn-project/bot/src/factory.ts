@@ -193,7 +193,7 @@ export class BotFactory {
 
     const address = tokenInstance?.address ?? (await deploy.getInstance(deployOpts)).address;
     const metadata = await this.wallet.getContractMetadata(address);
-    if (metadata.instance) {
+    if (metadata.isContractPublished) {
       this.log.info(`Token at ${address.toString()} already deployed`);
       return deploy.register();
     } else {
@@ -327,7 +327,7 @@ export class BotFactory {
   ): Promise<T> {
     const address = (await deploy.getInstance(deployOpts)).address;
     const metadata = await this.wallet.getContractMetadata(address);
-    if (metadata.instance) {
+    if (metadata.isContractPublished) {
       this.log.info(`Contract ${name} at ${address.toString()} already deployed`);
       return deploy.register();
     } else {
